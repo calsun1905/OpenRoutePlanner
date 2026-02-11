@@ -159,8 +159,6 @@ async function calculateRoute() {
         return;
     }
 
-    const place = elPlaceSelect.value;
-
     showLoading("Rota hesaplanıyor...\nHarita verisi ilk kez indiriliyorsa biraz zaman alabilir.");
 
     try {
@@ -169,7 +167,6 @@ async function calculateRoute() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 points: selectedPoints,
-                place: place,
             }),
         });
 
@@ -216,15 +213,6 @@ function drawRoute(data) {
 
     // Haritayı rotaya sığdır
     map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
-
-    // Marker sırasını güncelle (optimize edilmiş sıraya göre)
-    if (data.optimized_order) {
-        data.optimized_order.forEach((origIndex, newIndex) => {
-            if (markers[origIndex]) {
-                markers[origIndex].setIcon(createNumberedIcon(newIndex + 1));
-            }
-        });
-    }
 }
 
 function clearRoute() {

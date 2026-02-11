@@ -25,12 +25,6 @@ def get_graph(place_name: str = "Kadikoy, Istanbul, Turkey"):
     Belirtilen bölgenin yürüyüş grafiğini döner.
     İlk çağrıda internetten indirir ve .graphml olarak cache'ler.
     Sonraki çağrılarda dosyadan okur (çok daha hızlı).
-    
-    Args:
-        place_name: OSM yer adı (ör: "Kadikoy, Istanbul, Turkey")
-    
-    Returns:
-        networkx.MultiDiGraph: Yürüyüş grafiği
     """
     cache_file = _cache_path(place_name)
 
@@ -46,9 +40,64 @@ def get_graph(place_name: str = "Kadikoy, Istanbul, Turkey"):
     return G
 
 
+def get_graph_for_points(points: list):
+    """
+    Seçilen noktaların merkezinden, tüm noktaları kapsayacak
+    yarıçapla graf indirir. graph_from_point kullanır (bbox'tan çok daha hızlı).
+    
+    Args:
+        points: [(lat, lon), ...] koordinat listesi
+    
+    Returns:
+        networkx.MultiDiGraph: Yürüyüş grafiği
+    """
+    import math
+    
+    lats = [p[0] for p in points]
+    lons = [p[1] for p in points]
+    
+    # Merkez noktayı hesapla
+    center_lat = sum(lats) / len(lats)
+    center_lon = sum(lons) / len(lons)
+    
+    # En uzak noktaya olan mesafeyi hesapla (metre cinsinden)
+    max_dist = 0
+    for lat, lon in points:
+        # Haversine yaklaşımı (basit)
+        dlat = math.radians(lat - center_lat)
+        dlon = math.radians(lon - center_lon)
+        a = math.sin(dlat/2)**2 + math.cos(math.radians(center_lat)) * math.cos(math.radians(lat)) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        dist = 6371000 * c  # metre
+        if dist > max_dist:
+            max_dist = dist
+    
+    # Minimum 500m, padding olarak +300m ekle
+    radius = max(500, max_dist + 300)
+    
+    # Cache key: merkez + yarıçap
+    cache_key = f"point_{center_lat:.4f}_{center_lon:.4f}_{int(radius)}"
+    cache_file = os.path.join(DATA_DIR, f"{cache_key}.graphml")
+    
+    if os.path.exists(cache_file):
+        print(f"[GraphManager] Cache'den okunuyor: {cache_file}")
+        G = ox.load_graphml(cache_file)
+    else:
+        print(f"[GraphManager] Graf indiriliyor: merkez=({center_lat:.4f}, {center_lon:.4f}), yarıçap={int(radius)}m")
+        G = ox.graph_from_point((center_lat, center_lon), dist=radius, network_type="walk")
+        ox.save_graphml(G, cache_file)
+        print(f"[GraphManager] Cache'e kaydedildi: {cache_file}")
+    
+    return G
+
+
 def find_nearest_node(G, lat: float, lon: float) -> int:
     """
     Verilen koordinata (lat, lon) en yakın graf düğümünü bulur.
+    
+    nearest_edges kullanarak en yakın yol kenarını bulur, sonra
+    o kenarın uç noktalarından kullanıcıya en yakın olanı seçer.
+    Bu sayede ana caddeye değil, gerçekten en yakın sokağa snap edilir.
     
     Args:
         G: NetworkX grafiği
@@ -58,8 +107,21 @@ def find_nearest_node(G, lat: float, lon: float) -> int:
     Returns:
         int: En yakın düğüm ID'si
     """
-    nearest = ox.nearest_nodes(G, X=lon, Y=lat)
-    return nearest
+    try:
+        # En yakın yol kenarını bul (u, v, key)
+        u, v, _ = ox.nearest_edges(G, X=lon, Y=lat)
+        
+        # Kenarın iki uç noktasından kullanıcıya en yakın olanı seç
+        u_data = G.nodes[u]
+        v_data = G.nodes[v]
+        
+        dist_u = ((u_data["y"] - lat) ** 2 + (u_data["x"] - lon) ** 2)
+        dist_v = ((v_data["y"] - lat) ** 2 + (v_data["x"] - lon) ** 2)
+        
+        return u if dist_u <= dist_v else v
+    except Exception:
+        # Fallback: nearest_nodes kullan
+        return ox.nearest_nodes(G, X=lon, Y=lat)
 
 
 def search_pois(place_name: str, category: str) -> list:

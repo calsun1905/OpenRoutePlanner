@@ -8,7 +8,7 @@ import os
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from graph_manager import get_graph, search_pois
+from graph_manager import get_graph, get_graph_for_points, search_pois
 from route_engine import (
     solve_tsp,
     build_full_route,
@@ -61,7 +61,6 @@ def api_get_route():
             return jsonify({"error": "Geçersiz istek: 'points' alanı gerekli."}), 400
 
         points = data["points"]
-        place = data.get("place", "Kadikoy, Istanbul, Turkey")
 
         # Validasyon
         if not isinstance(points, list) or len(points) < 2:
@@ -76,13 +75,13 @@ def api_get_route():
             except (ValueError, TypeError):
                 return jsonify({"error": f"Nokta {i} geçersiz koordinat."}), 400
 
-        # 1) Graf'ı al
-        print(f"[API] Graf alınıyor: {place}")
-        G = _get_cached_graph(place)
+        # 1) Seçilen noktaları kapsayan grafı al (otomatik bölge algılama)
+        point_tuples = [(p[0], p[1]) for p in points]
+        print(f"[API] Noktalar için graf alınıyor: {len(points)} nokta")
+        G = get_graph_for_points(point_tuples)
 
         # 2) TSP ile optimal sıralamayı bul
         print(f"[API] TSP çözülüyor: {len(points)} nokta")
-        point_tuples = [(p[0], p[1]) for p in points]
         optimized_order = solve_tsp(G, point_tuples)
 
         # 3) Sıralanmış noktalar
