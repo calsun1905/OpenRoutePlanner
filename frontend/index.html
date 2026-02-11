@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenTrip — Akıllı Rota Optimizasyonu</title>
+    <meta name="description" content="Harita üzerinde seçtiğiniz noktaları TSP algoritması ile optimize ederek en kısa rotayı oluşturun.">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Sidebar Panel -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                    <circle cx="12" cy="9" r="2.5"/>
+                </svg>
+                <h1>OpenTrip</h1>
+            </div>
+            <p class="tagline">Akıllı Rota Optimizasyonu</p>
+        </div>
+
+        <!-- Points List -->
+        <div class="section">
+            <div class="section-header">
+                <h2>📍 Seçilen Noktalar</h2>
+                <span class="badge" id="pointCount">0</span>
+            </div>
+            <div id="pointsList" class="points-list">
+                <div class="empty-state">
+                    <p>Haritaya tıklayarak nokta ekleyin</p>
+                </div>
+            </div>
+            <div class="point-actions">
+                <button class="btn btn-danger" id="btnClearAll" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
+                    Tümünü Sil
+                </button>
+            </div>
+        </div>
+
+        <!-- Place Selector -->
+        <div class="section">
+            <h2>🗺️ Bölge</h2>
+            <select id="placeSelect" class="select-input">
+                <option value="Kadikoy, Istanbul, Turkey">Kadıköy, İstanbul</option>
+                <option value="Besiktas, Istanbul, Turkey">Beşiktaş, İstanbul</option>
+                <option value="Fatih, Istanbul, Turkey">Fatih, İstanbul</option>
+                <option value="Uskudar, Istanbul, Turkey">Üsküdar, İstanbul</option>
+                <option value="Beyoglu, Istanbul, Turkey">Beyoğlu, İstanbul</option>
+                <option value="Sisli, Istanbul, Turkey">Şişli, İstanbul</option>
+            </select>
+        </div>
+
+        <!-- Route Action -->
+        <div class="section">
+            <button class="btn btn-primary btn-lg" id="btnCalculateRoute" disabled>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                Rotayı Hesapla
+            </button>
+        </div>
+
+        <!-- Route Info (hidden initially) -->
+        <div class="section route-info" id="routeInfo" style="display: none;">
+            <h2>📊 Rota Detayları</h2>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Mesafe</span>
+                    <span class="stat-value" id="statDistance">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Yürüme Süresi</span>
+                    <span class="stat-value" id="statDuration">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Durak Sayısı</span>
+                    <span class="stat-value" id="statStops">—</span>
+                </div>
+            </div>
+            <a href="#" target="_blank" class="btn btn-secondary" id="btnGoogleMaps" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+                Google Maps'te Aç
+            </a>
+        </div>
+
+        <!-- POI Search -->
+        <div class="section">
+            <h2>🔍 Mekan Ara (POI)</h2>
+            <div class="poi-grid">
+                <button class="btn btn-poi" data-category="museum">🏛️ Müze</button>
+                <button class="btn btn-poi" data-category="cafe">☕ Kafe</button>
+                <button class="btn btn-poi" data-category="park">🌳 Park</button>
+                <button class="btn btn-poi" data-category="restaurant">🍽️ Restoran</button>
+                <button class="btn btn-poi" data-category="mosque">🕌 Cami</button>
+                <button class="btn btn-poi" data-category="library">📚 Kütüphane</button>
+            </div>
+            <button class="btn btn-ghost" id="btnClearPois" style="display: none;">POI'leri Temizle</button>
+        </div>
+
+        <!-- Footer -->
+        <div class="sidebar-footer">
+            <p>Graph Theory • TSP • Dijkstra</p>
+            <p class="version">v1.0 — Bitirme Projesi</p>
+        </div>
+    </div>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p id="loadingText">Rota hesaplanıyor...</p>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- App JS -->
+    <script src="js/app.js"></script>
+</body>
+</html>
