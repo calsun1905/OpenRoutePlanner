@@ -161,12 +161,15 @@ async function calculateRoute() {
 
     showLoading("Rota hesaplanıyor...\nHarita verisi ilk kez indiriliyorsa biraz zaman alabilir.");
 
+    const optimize = document.getElementById("chkOptimize").checked;
+
     try {
         const response = await fetch(`${API_BASE}/get-route`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 points: selectedPoints,
+                optimize: optimize,
             }),
         });
 

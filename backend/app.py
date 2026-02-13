@@ -23,8 +23,9 @@ FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 CORS(app)  # Frontend'den gelen isteklere izin ver
 
-# Global değişkenler: graf cache'i
+# Global değişkenler: cache
 _graph_cache = {}
+_poi_cache = {}
 
 
 def _get_cached_graph(place_name: str):
@@ -61,6 +62,7 @@ def api_get_route():
             return jsonify({"error": "Geçersiz istek: 'points' alanı gerekli."}), 400
 
         points = data["points"]
+        optimize = data.get("optimize", False)  # Varsayılan: sıralı bağla
 
         # Validasyon
         if not isinstance(points, list) or len(points) < 2:
@@ -80,9 +82,13 @@ def api_get_route():
         print(f"[API] Noktalar için graf alınıyor: {len(points)} nokta")
         G = get_graph_for_points(point_tuples)
 
-        # 2) TSP ile optimal sıralamayı bul
-        print(f"[API] TSP çözülüyor: {len(points)} nokta")
-        optimized_order = solve_tsp(G, point_tuples)
+        # 2) Sıralama: TSP optimizasyonu veya kullanıcı sırası
+        if optimize and len(point_tuples) > 2:
+            print(f"[API] TSP çözülüyor: {len(points)} nokta")
+            optimized_order = solve_tsp(G, point_tuples)
+        else:
+            print(f"[API] Sıralı rota: {len(points)} nokta")
+            optimized_order = list(range(len(point_tuples)))
 
         # 3) Sıralanmış noktalar
         ordered_points = [point_tuples[i] for i in optimized_order]
@@ -154,7 +160,13 @@ def api_search_pois():
                 "error": f"Geçersiz kategori. Geçerli: {', '.join(valid_categories)}"
             }), 400
 
-        pois = search_pois(place, category)
+        cache_key = f"{place}::{category}"
+        if cache_key in _poi_cache:
+            print(f"[API] POI cache'den döndürülüyor: {cache_key}")
+            pois = _poi_cache[cache_key]
+        else:
+            pois = search_pois(place, category)
+            _poi_cache[cache_key] = pois
         return jsonify({"pois": pois})
 
     except Exception as e:

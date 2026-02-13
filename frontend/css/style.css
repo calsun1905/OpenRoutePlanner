@@ -336,6 +336,26 @@ body {
     background: var(--bg-card);
 }
 
+/* --- Toggle Label --- */
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    margin-bottom: 10px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    user-select: none;
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+}
+
 /* --- Select Input --- */
 .select-input {
     width: 100%;
