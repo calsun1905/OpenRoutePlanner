@@ -4,7 +4,26 @@
 
 ---
 
-## 🎓 Öğrenme Önerileri
+## 📋 ONAYLANAN ÖZELLİKLER ÖZETİ (28.02.2026)
+
+**Toplam 21 özellik onaylandı** - Sırayla geliştirilecek:
+
+| Sıra | Kategori | Özellik | Puan |
+|------|----------|---------|------|
+| 1 | 🤖 AI | Doğal Dil Sorgu | 10/10 |
+| 2 | 📍 POI | Derecelendirme (Maps tarzı) | 10/10 |
+| 3 | 📍 POI | Filtreleme + Fiyata göre seçme | 10/10 |
+| 4 | 📱 UX | Sesli Rehber | 10/10 |
+| 5 | 🤖 AI | Yerel Zeka | 9/10 |
+| 6 | 🤖 AI | Akıllı POI | 9/10 |
+| 7 | 📍 POI | Fiyat Aralığı (€-€€-€€€) | 9/10 |
+| 8 | 📍 POI | Çalışma Saatleri | 9/10 |
+| 9 | 📱 UX | Kaydedilen Rotalar | 9/10 |
+| 10 | 📱 UX | Harita Modları | 9/10 |
+| 11 | 🗺️ Rota | Rota Notları (Souls-style) | - |
+| 12-21 | ... | (Detaylar aşağıda) | 7-8/10 |
+
+---
 
 ### Şu Anda Odaklanılması Gerekenler:
 1. **Cache mekanizması** - `_graph_cache` ve `_poi_cache` nasıl çalışıyor?
@@ -43,35 +62,35 @@
 
 ### 2. 🤖 AI Özellikleri
 
-| Fikir | Açıklama | Öncelik |
-|-------|----------|---------|
-| 💬 **Doğal Dil Sorgu** | "Boğaz turu yapacak rota ayarla" gibi | Çok Yüksek |
-| 🎯 **Kişiselleştirilmiş Öneri** | Kullanıcının geçmişine göre rota | Orta |
-| 📊 **Yerel Zeka** | "Bu bölgede neler yapabilirim?" | Yüksek |
-| 🏆 **Akıllı POI** | İlgi alanına göre mekan önerisi | Yüksek |
-| 🌤️ **Hava Durumu** | Rota planlarken hava durumu | Düşük |
+| Fikir | Açıklama | Öncelik | Puan | Durum | Sıra |
+|-------|----------|---------|------|-------|------|
+| 💬 **Doğal Dil Sorgu** | "Boğaz turu yapacak rota ayarla" gibi | Çok Yüksek | 10/10 | ✅ ONAYLI | 1 |
+| 🎯 **Kişiselleştirilmiş Öneri** | Kullanıcının geçmişine göre rota | Orta | 8/10 | ✅ ONAYLI | 4 |
+| 📊 **Yerel Zeka** | "Bu bölgede neler yapabilirim?" | Yüksek | 9/10 | ✅ ONAYLI | 2 |
+| 🏆 **Akıllı POI** | İlgi alanına göre mekan önerisi | Yüksek | 9/10 | ✅ ONAYLI | 3 |
+| 🌤️ **Hava Durumu** | Rota planlarken hava durumu | Düşük | 6/10 | ✅ ONAYLI | 5 |
 
 ### 3. 📍 POI & Keşif
 
-| Fikr | Açıklama | Öncelik |
-|-------|----------|---------|
-| ⭐ **Derecelendirme** | Kullanıcı puanlaması | Orta |
-| 📸 **Fotoğraf Galeri** | POI fotoğrafları | Düşük |
-| 🔍 **Filtreleme** | Kafe, müze, park vb. filtrele | Yüksek |
-| 💰 **Fiyat Aralığı** | Ücretsiz/ücretli yerler | Orta |
-| ⏰ **Çalışma Saatleri** | Açık/kapalı bilgisi | Orta |
-| 📱 **İletişim** | Telefon, web sitesi | Düşük |
+| Fikir | Açıklama | Öncelik | Puan | Durum | Sıra |
+|-------|----------|---------|------|-------|------|
+| ⭐ **Derecelendirme** | Google Maps gibi kullanıcı puanlaması (yıldız, yorum) | Çok Yüksek | 10/10 | ✅ ONAYLI | 1 |
+| 📸 **Fotoğraf Galeri** | POI fotoğrafları | Orta | 7/10 | ✅ ONAYLI | 6 |
+| 🔍 **Filtreleme** | Kafe, müze, park vb. + fiyat aralığına göre kafe/yemek seçme | Çok Yüksek | 10/10 | ✅ ONAYLI | 2 |
+| 💰 **Fiyat Aralığı** | Ücretsiz/ücretli, €-€€-€€€ sınıflandırma | Yüksek | 9/10 | ✅ ONAYLI | 3 |
+| ⏰ **Çalışma Saatleri** | Açık/kapalı bilgisi | Yüksek | 9/10 | ✅ ONAYLI | 4 |
+| 📱 **İletişim** | Telefon, web sitesi, directions | Yüksek | 8/10 | ✅ ONAYLI | 5 |
 
 ### 4. 📱 Kullanıcı Deneyimi
 
-| Fikir | Açıklama | Öncelik |
-|-------|----------|---------|
-| 💾 **Kaydedilen Rotalar** | Favori rotalar | Yüksek |
-| 📊 **Geçmiş** | Daha önce nereye gitmiş | Orta |
-| 🔔 **Bildirimler** | Yakındaki ilginç yerler | Düşük |
-| 🌙 **Dark Mode** | Gece modu | Orta |
-| 🗣️ **Sesli Rehber** | Rota sırasında sesli yönlendirme | Orta |
-| 📐 **Harita Modları** | Uydu, cadde, arazi | Orta |
+| Fikir | Açıklama | Öncelik | Puan | Durum | Sıra |
+|-------|----------|---------|------|-------|------|
+| 💾 **Kaydedilen Rotalar** | Favori rotaları kaydetme | Yüksek | 9/10 | ✅ ONAYLI | 2 |
+| 📊 **Geçmiş** | Daha önce nereye gitmiş | Yüksek | 8/10 | ✅ ONAYLI | 3 |
+| 🔔 **Bildirimler** | Yakındaki ilginç yerler | Düşük | 5/10 | ⏸️ BEKLEMEDE | - |
+| 🌙 **Dark Mode** | Gece modu | Orta | 7/10 | ⏸️ BEKLEMEDE | - |
+| 🗣️ **Sesli Rehber** | Rota sırasında sesli yönlendirme | ÇOK YÜKSEK | 10/10 | ✅ ONAYLI | 1 |
+| 📐 **Harita Modları** | Uydu, cadde, arazi | Yüksek | 9/10 | ✅ ONAYLI | 4 |
 
 ### 5. 🚀 Teknik Özellikler
 

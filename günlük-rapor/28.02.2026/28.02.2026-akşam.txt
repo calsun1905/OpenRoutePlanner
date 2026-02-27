@@ -1,0 +1,230 @@
+╔═══════════════════════════════════════════════════════╗
+║          🌙 AKŞAM OTURUM RAPORU                      ║
+║          Tarih: 28.02.2026 - Bitiş: ~22:00         ║
+╚═══════════════════════════════════════════════════════╝
+
+## OTURUM BİLGİLERİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Başlangıç: ~20:00 (tahmin)
+Bitiş: ~22:00
+Toplam Süre: ~2 saat
+Branch: batu.feature
+Değişen Dosya: 4 dosya
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## ✅ TAMAMLANAN GÖREVLER
+
+### 1. OpenStreetMap Ekosistemi Eğitimi
+   - OSM, OSMnx, Nominatim, Leaflet.js kavramları açıklandı
+   - Kavramlar arası ilişkiler görselleştirildi
+   - Kullanıcı sorularına detaylı cevaplar verildi
+   Etkilenen dosyalar: [osm-kavramlari.md, nominatim-osm-basit.md]
+   Süre: ~60 dakika
+   Zorluk: Orta
+   Notlar: Kullanıcı Nominatim'in "OSM'nin arama motoru" olduğunu kavradı
+
+### 2. Doğal Dil Sorgu Özelliği Tasarımı
+   - Hibrit yaklaşım planlandı (Regex + Geocoding)
+   - 5 fazlı implementasyon stratejisi belirlendi:
+     * Faz 1: geocoder.py (Nominatim API wrapper)
+     * Faz 2: nlp_engine.py (Türkçe regex parser)
+     * Faz 3: API endpoint (/api/natural-query)
+     * Faz 4: Frontend chat input
+     * Faz 5: Preset routes (hazır turlar)
+   Etkilenen dosyalar: [progress/2026-02.md, öneriler.md]
+   Süre: ~45 dakika
+   Zorluk: Orta-Zor
+   Notlar: Kullanıcı regex yaklaşımını onayladı
+
+### 3. Dokümantasyon Oluşturulması
+   - osm-kavramlari.md: 343 satır (detaylı açıklama)
+   - nominatim-osm-basit.md: 179 satır (basitleştirilmiş versiyon)
+   - Kod örnekleri, diyagramlar, karşılaştırma tabloları eklendi
+   Etkilenen dosyalar: [2 yeni dosya]
+   Süre: ~30 dakika
+   Zorluk: Kolay
+   Notlar: İki aşamalı açıklama stratejisi işe yaradı
+
+## 🔄 DEVAM EDEN GÖREVLER
+
+### 1. Doğal Dil Sorgu - Implementasyon
+   Durum: %0 tamamlandı (planlama bitti, kod başlamadı)
+   Yapılan: 
+   - Mimari tasarım tamamlandı
+   - Teknoloji seçimi yapıldı (Nominatim, Regex, Flask)
+   - Fazlar belirlendi
+   Kalan: 
+   - Faz 1: geocoder.py dosyası oluşturulacak
+   - Nominatim API integration
+   - Error handling ve rate limiting
+   - Cache mekanizması
+   Sonraki adım: geocoder.py oluştur ve Nominatim API entegrasyonu başlat
+   Tahmini süre: 120 dakika (tüm fazlar için ~6-8 saat)
+   Notlar: 
+   - Nominatim ücretsiz (limit: 1 req/sec)
+   - Türkiye şehir/ilçe/mahalle verileri zaten OSM'de mevcut
+   - Google Maps benzeri kullanıcı deneyimi hedefleniyor
+
+## ❌ TAMAMLANAMAYAN GÖREVLER
+
+*(Bu oturumda başlanması planlanmamış işler)*
+
+## 🐛 KARŞILAŞILAN SORUNLAR
+
+### 1. Kavram Kargaşası - OSM vs Nominatim
+   Bulunan yer: Eğitim aşaması
+   Hata mesajı: "Nominatim ve OSM arasındaki olayı anlayamadım hiç"
+   Sebep: OSM = Veri, Nominatim = Arama motoru ayrımı net değildi
+   Çözüm: ✅ Basit benzetme kullanıldı (Google benzetmesi)
+   Durum: ✅ Çözüldü
+   Öncelik: Orta
+   Detay: "Web siteleri = OSM, Google = Nominatim" benzetmesi işe yaradı
+
+### 2. Koordinat Kaynağı Kafa Karışıklığı
+   Bulunan yer: Kullanıcı sorgusu
+   Hata mesajı: "Kadıköy, Maltepe koordinatlarını nasıl öğrendik?"
+   Sebep: Mevcut sistemde harita tıklaması kullanılıyor, ama kullanıcı manuel ekleme sanıyordu
+   Çözüm: ✅ Açıklama yapıldı: "Şu an tıklıyorsun → Nominatim ekleyince yazacaksın"
+   Durum: ✅ Çözüldü
+   Öncelik: Düşük
+
+## 💡 YENİ FİKİRLER VE ÖĞRENİLENLER
+
+### Yeni Fikirler:
+
+1. **Hybrid NLP Yaklaşımı**
+   Açıklama: Önce regex ile basit sorguları çöz, karmaşık sorgular için LLM kullan
+   Fayda: Hız + Doğruluk dengesi
+   Zorluk: Orta
+   Öncelik: Yüksek
+   Tahmini süre: 8 saat (tüm fazlar)
+   İlgili dosyalar: backend/nlp_engine.py, backend/geocoder.py
+   Ön gereksinimler: Nominatim API çalışmalı
+
+2. **İki Seviyeli Dokümantasyon**
+   Açıklama: Hem detaylı hem basit versiyon oluştur
+   Fayda: Farklı öğrenme stillerine hitap eder
+   Zorluk: Kolay
+   Öncelik: Orta (şu an uygulandı)
+   Notlar: osm-kavramlari.md + nominatim-osm-basit.md çok işlevli oldu
+
+### Öğrenilenler:
+
+1. **OpenStreetMap Ekosistemi**
+   - OSM: Dünya çapında açık kaynak harita verisi
+   - OSMnx: Python kütüphanesi, yol ağı + rota hesaplama
+   - Nominatim: Geocoding servisi (yer ismi → koordinat)
+   - Leaflet.js: Frontend harita görüntüleme
+   - Hepsi birlikte çalışıyor, uyumlu ekosistem
+
+2. **Nominatim API Limitleri**
+   - Ücretsiz servis: 1 request/saniye
+   - Rate limiting gerekli
+   - Cache önemli (aynı yer tekrar sorulmamalı)
+   - User-Agent header zorunlu
+
+3. **Geocoding Stratejisi**
+   - Manuel koordinat ekleme YANLIŞ yaklaşım
+   - Kullanıcı sadece yer ismi yazmalı
+   - Backend otomatik koordinat bulmalı
+   - Fuzzy matching için Nominatim API'sine ek string matching eklenebilir
+
+### İyileştirme Önerileri:
+
+1. **Cache Mekanizması**
+   - Nominatim sonuçlarını SQLite'a kaydet
+   - "Kadıköy" sorgusu 2. kez sorulduğunda API'ye gitmesin
+   - Kod: backend/cache/ klasörüne geocode_cache.db ekle
+
+2. **Error Handling**
+   - Nominatim "yer bulunamadı" durumunda ne olacak?
+   - Alternatif öneriler sun: "Kadıköyy → Kadıköy'ü mü demek istediniz?"
+   - Frontend'de friendly error messages
+
+3. **Multi-step Geocoding**
+   - "Kadıköy Parkı" → Önce "Parkı" çıkar → "Kadıköy" ara
+   - Türkçe stop words listesi: "dan", "den", "ya", "ye" vb.
+   - Backend regex preprocessing önemli
+
+## 📊 OTURUM İSTATİSTİKLERİ
+
+- Tamamlanan görev: 3
+- Devam eden görev: 1
+- Değişen dosya: 4
+- Eklenen satır: +608 (tahmini)
+- Silinen satır: -0
+- Çözülen bug: 2 (kavram kargaşası)
+- Yeni fikir: 5
+
+## 🎯 YARIN YAPILACAKLAR (ÖNCELİK SIRASI)
+
+1. [P0] **Faz 1 Başlat: geocoder.py Oluştur**
+   - Nominatim API wrapper fonksiyonu yaz
+   - Rate limiting ekle (1 req/sec)
+   - Cache mekanizması oluştur
+   - Error handling: yer bulunamazsa ne olacak?
+   - Test et: "Kadıköy", "Trabzon Ortahisar", "Konya Selçuklu"
+
+2. [P1] **Nominatim API Test**
+   - Manuel test: `requests.get("https://nominatim.openstreetmap.org/search...")`
+   - Türkiye şehirlerinin dönüp dönmediğini kontrol et
+   - User-Agent header ekle (zorunlu)
+   - Response formatını incele (lat, lon, display_name vb.)
+
+3. [P2] **Faz 2 Planı Detaylandır: nlp_engine.py**
+   - Türkçe regex patterns belirle: "X'den Y'ye", "X ile Y arası", "X'e git"
+   - Stop words listesi hazırla: "den", "dan", "a", "e", "ya", "ye"
+   - Multi-location parsing: "A, B ve C'yi gez"
+   - Soru formatı: "Kadıköy'de neler var?" → POI search
+
+## 📝 ÖZEL NOTLAR
+
+- **Nominatim API kuralı:** User-Agent header eklemek ZORUNLU, yoksa IP ban olur
+- **Cache stratejisi:** Aynı gün içinde aynı yer tekrar sorulursa API'ye gitme
+- **Türkiye şehirleri:** OSM'de Türkiye şehir/ilçe/mahalle verileri %95 oranında tam
+- **Fuzzy matching:** "Kadıköyy" gibi typo'lara karşı Levenshtein distance kullan
+- **Rate limit:** Nominatim free tier: 1 request/second (60/dakika değil!)
+
+## ⚠️ DİKKAT EDİLECEKLER
+
+1. **Nominatim API Etiketi**
+   - Her istekte `User-Agent: OpenRoutePlanner/1.0 (contact@email.com)` header'ı ekle
+   - Eksik olursa IP ban riski var
+   - Dökümantasyon: https://nominatim.org/release-docs/develop/api/Search/
+
+2. **Türkçe Karakter Sorunları**
+   - "Kadıköy", "İstanbul", "Çankaya" gibi karakterler URL encoding ile gönderilmeli
+   - Python `requests` kütüphanesi otomatik encode ediyor ama kontrol et
+
+3. **Alternatif Sonuçlar**
+   - "Kadıköy" sorgusu 2 şehirde olabilir (İstanbul + Balıkesir)
+   - Frontend'de kullanıcıya seçim sunmalıyız
+   - Backend: Nominatim'den gelen tüm sonuçları dön (limit=5)
+
+4. **Test Coverage**
+   - Türkiye şehirleri: İstanbul, Ankara, İzmir, Trabzon, Konya
+   - İlçeler: Kadıköy, Beşiktaş, Selçuklu, Ortahisar
+   - Mahalleler: Moda, Fikirtepe
+   - POI: "Kadıköy Parkı", "İstinye Park AVM"
+
+## 🔖 BOOKMARK / REFERANSLAR
+
+### Nominatim API:
+- Dökümantasyon: https://nominatim.org/release-docs/develop/api/Search/
+- Usage Policy: https://operations.osmfoundation.org/policies/nominatim/
+- Rate limit: 1 request/saniye (burst değil!)
+
+### Geocoding Best Practices:
+- Fuzzy matching için: python-Levenshtein kütüphanesi
+- Türkçe NLP için: simplemma (lemmatization)
+- Regex test: regex101.com
+
+### Proje Dosyaları:
+- osm-kavramlari.md: Detaylı OSM ekosistemi açıklaması
+- nominatim-osm-basit.md: Basitleştirilmiş Nominatim açıklaması
+- progress/2026-02.md: Aylık ilerleme takibi
+- öneriler.md: 21 onaylı özellik listesi
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Oturum sonu raporu - 28.02.2026 ~22:00
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
