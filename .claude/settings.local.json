@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__serena__list_dir",
+      "mcp__web-search-prime__webSearchPrime",
+      "Bash(node:*)",
+      "Bash(npx:*)",
+      "Bash(claude:*)",
+      "Bash(cd C:\\\\Users\\\\Gaming\\\\Desktop\\\\projects\\\\routeplanner\\\\openrouteplanner:*)",
+      "Bash(where node:*)",
+      "Bash(cat:*)",
+      "Bash(python3:*)",
+      "mcp__tavily__tavily_search",
+      "Bash(echo mem command not found in PATH:*)",
+      "Bash(powershell:*)",
+      "Bash(python:*)",
+      "Bash(npm install:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "tavily"
+  ]
+}

@@ -1,7 +1,15 @@
 {
   "mcpServers": {
     "tavily": {
-      "url": "https://mcp.tavily.com/mcp/?tavilyApiKey=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"
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "tavily-mcp@latest"],
+      "env": {
+        "TAVILY_API_KEY": "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"
+      }
+    },
+    "claude-mem": {
+      "command": "npx",
+      "args": ["-y", "@thedotmack/claude-mem"]
     }
   }
 }

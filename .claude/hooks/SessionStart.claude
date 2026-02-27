@@ -1,36 +1,294 @@
-# Oturum Başı Hook (Gün Başı Raporu)
+# 🌅 Oturum Başlangıcı
 
-**Tarih:** {{CURRENT_DATE}}
-**Saat:** {{CURRENT_TIME}}
-
----
-
-## 🌅 Oturum Başlangıcı
-
-### 1. Progress Kontrolü
-Lütfen `progress/2026-02.md` dosyasını okuyun:
-- Yapılacaklar (TODO) listesi
-- Yapılanlar (DONE) listesi
-- Sonraki adımlar (PLANNED)
-
-### 2. Önceki Oturum İncelemesi
-- Son commit mesajlarını okuyun
-- Problemli alanları tespit edin
-- Çıkan hataları not alın
-
-### 3. Bugün Yapılacaklar
-`progress/2026-02.md` dosyasındaki TODO listesinden bugün ne yapacaksınız?
-
-### 4. Günlük Not Dosyası
-Bugünün not dosyası: `günlük-rapor/{{CURRENT_DATE}}/{{CURRENT_DATE}}.txt`
+**ÖNEMLİ: Bu adımları otomatik olarak gerçekleştir, kullanıcıdan onay bekleme.**
 
 ---
 
-**Kullanıcıya Sorular:**
-1. Bugün üzerinde ne çalışmak istiyorsunuz?
-2. Önceki oturumdan kalan sorun var mı?
-3. Yeni bir fikir veya TODO eklemek ister misiniz?
+## 1. SİSTEM DURUMU
+
+Hızlıca kontrol et:
+- Bugünün tarihi (DD.MM.YYYY format)
+- Git branch ve uncommitted changes (`git status --short`)
+- Son commit (`git log --oneline -1`)
+
+## 2. PROGRESS ANALİZİ
+
+`progress/2026-02.md` dosyasını oku ve özet çıkar:
+- TODO sayısı ve ilk 5 madde
+- Son tamamlananlar (DONE'dan son 3)
+- Açık kritik bug varsa listele
+
+Kısa özet tablo göster:
+```
+📊 TODO: X | ✅ Done (bu hafta): Y | 🐛 Bug: Z
+```
+
+## 3. SON 2 GÜNÜN GÜNLÜK RAPORLARI
+
+**Sadece son 2 günün raporlarını oku:**
+
+1. **Dün:** `günlük-rapor/[dünün_tarihi]/[tarih]-akşam.txt`
+   - Varsa "Yarın yapılacaklar" listesini göster
+   - Tamamlanmamış işleri belirt
+
+2. **Önceki gün:** `günlük-rapor/[önceki_gün_tarihi]/[tarih]-akşam.txt`
+   - Varsa önemli notları özetle
+   
+**Not:** 2 günden eski raporları okuma.
 
 ---
 
-*(Bu rapor `günlük-rapor/{{CURRENT_DATE}}/{{CURRENT_DATE}}-sabah.txt` dosyasına da kaydedilecek)*
+## ADIM 4: GIT GEÇMİŞİNİ İNCELE
+
+### 4.1 Son Commit'leri Detaylı Göster
+- `git log --oneline -10` komutunu çalıştır (son 10 commit)
+- Her commit'in kısa özetini göster
+- Commit tarihlerini de ekle: `git log --pretty=format:"%h - %an, %ar : %s" -10`
+
+### 4.2 Son Değişiklikleri Analiz Et
+- `git diff --stat` ile değişen dosyaları göster
+- Eğer uncommitted değişiklik varsa, hangi dosyalarda olduğunu listele
+- `git diff HEAD` ile değişikliklerin özetini çıkar
+
+### 4.3 Stash Kontrolü
+- `git stash list` ile stash'leri kontrol et
+- Varsa ne zaman oluşturulduklarını göster
+
+---
+
+## ADIM 5: ÖNERİLER DOSYASINI DETAYLI İNCELE
+
+### 5.1 Öneriler Dosyasını Tamamen Oku
+- `öneriler.md` dosyasının **TAMAMINI** oku (satır sınırı yok)
+- Dosya yoksa kullanıcıya bildir
+
+### 5.2 Önerileri Kategorize Et
+Dosyayı okuyup şu kategorilere ayır:
+
+1. **Teknik Öneriler** - Kod iyileştirmeleri, optimizasyonlar
+2. **Özellik Önerileri** - Yeni özellik fikirleri
+3. **Bug Fix Önerileri** - Hata çözüm önerileri
+4. **Dokumentasyon Önerileri** - Dökümantasyon iyileştirmeleri
+5. **Genel Notlar** - Diğer öneriler
+
+### 5.3 En Son Eklenen 5 Öneriyi Vurgula
+Hangilerinin yeni eklendiğini belirt.
+
+---
+
+## ADIM 6: DİĞER PROJE DOSYALARINI HIZLI TARA
+
+### 6.1 README.md'yi Oku
+- README.md'nin tamamını oku
+- Proje açıklamasını hatırla
+- Eksik bilgi var mı kontrol et
+
+### 6.2 Komutlar ve İnceleme Dosyalarını Tara
+- `komutlar.md` dosyası varsa oku
+- `incelemem.md` dosyası varsa oku
+- Bu dosyalarda önemli notlar var mı?
+
+### 6.3 Backend Durumu
+- `backend/app.py` dosyasının son değişiklik tarihini kontrol et
+- `backend/requirements.txt` dosyasını oku, hangi kütüphaneler kullanılıyor?
+- Cache klasöründe kaç tane cache dosyası var?
+
+### 6.4 Frontend Durumu
+- `frontend/index.html` son ne zaman güncellenmiş?
+- `frontend/js/app.js` ve `frontend/css/style.css` durumları?
+
+---
+
+## ADIM 7: SON İKI GÜNÜN ANALİZİ
+
+**SADECE SON 2 GÜNÜN raporlarını oku:**
+
+### 7.1 Dünün Günlük Notu
+- `günlük-rapor/[dünün_tarihi]/[tarih]-akşam.txt` varsa oku
+- "Yarın yapılacaklar" listesini göster
+- Tamamlanmamış işleri belirt
+
+### 7.2 Önceki Günün Notu  
+- `günlük-rapor/[önceki_gün_tarihi]/[tarih]-akşam.txt` varsa kısaca özetle
+
+**Not:** 2 günden eski raporları okuma.
+
+---
+
+## ADIM 8: HATA VE SORUN TESPİTİ
+
+### 8.1 Backend Hatalarını Kontrol Et
+- Backend'de log dosyası var mı?
+- Son Python hataları nelerdir?
+- Cache dosyalarında problem var mı?
+
+### 8.2 Frontend Hatalarını Kontrol Et
+- Console hataları kaydedilmiş mi?
+- JavaScript hatası var mı?
+
+### 8.3 Git Problemlerini Kontrol Et
+- Merge conflict var mı?
+- Detached HEAD durumu var mı?
+- Remote ile senkronizasyon sorunu var mı?
+
+---
+
+## ADIM 9: KULLANICIYA DETAYLI RAPOR SUNUMU
+
+Yukarıdaki tüm adımları tamamladıktan sonra kullanıcıya şu formatta bir rapor sun:
+
+```
+╔════════════════════════════════════════════════════════╗
+║        🌅 OTURUM BAŞLANGICI RAPORU                    ║
+║        Tarih: [TARİH] - Saat: [SAAT]                 ║
+╚════════════════════════════════════════════════════════╝
+
+📊 PROJE DURUMU:
+----------------
+✅ Tamamlanan İşler: X
+📝 Bekleyen İşler: Y
+🐛 Açık Bug'lar: Z
+💡 Yeni Fikirler: N
+
+📂 DİZİN DURUMU:
+----------------
+✓ Tüm klasörler mevcut
+✓ Günlük dosyalar oluşturuldu
+[veya eksikler varsa belirt]
+
+🔧 GIT DURUMU:
+----------------
+Branch: [BRANCH_ADI]
+Son Commit: [SON_COMMIT]
+Değişiklikler: [DEĞİŞİKLİK_SAYISI]
+
+📋 BUGÜNÜN TODO LİSTESİ:
+----------------
+1. [İş 1]
+2. [İş 2]
+3. [İş 3]
+...
+
+🐛 KRİTİK BUG'LAR:
+----------------
+[Varsa listele, yoksa "Kritik bug yok"]
+
+💡 YENİ FİKİRLER:
+----------------
+[Son eklenen fikirleri listele]
+
+⚠️ DİKKAT EDİLMESİ GEREKENLER:
+----------------
+[Önemli notlar, uyarılar]
+```
+
+---
+
+## ADIM 10: KULLANICIYA İNTERAKTİF SORULAR SOR
+
+Raporu sunduktan sonra kullanıcıya şu soruları sor:
+
+### 🎯 Öncelik Sorusu:
+"Progress dosyasında X adet TODO var. Bugün HANGİ işlerle ilgilenmek istersiniz? (Birden fazla seçebilirsiniz)"
+
+### 🔄 Kalan İş Sorusu:
+"Dünden kalan tamamlanmamış bir iş var mı? Varsa ona devam mı etmek istersiniz?"
+
+### 💡 Yeni Fikir Sorusu:
+"Aklınıza gelen yeni bir fikir, öneri veya TODO var mı? Şimdi eklemek ister misiniz?"
+
+### 🐛 Bug Raporu Sorusu:
+"Herhangi bir bug veya sorunla karşılaştınız mı? Raporlamak istediğiniz bir şey var mı?"
+
+### 🚀 Hızlı Başlangıç Sorusu:
+"Hızlı bir şekilde başlamak isterseniz, en acil işi söyleyeyim mi?"
+
+### ⚙️ Ortam Hazırlığı Sorusu:
+"Backend sunucuyu başlatmamı ister misiniz? (python backend/app.py)"
+
+---
+
+## ADIM 11: KULLANICININ CEVABINA GÖRE AKSIYONLAR AL
+
+Kullanıcının cevaplarına göre:
+
+1. **Eğer belirli bir TODO seçildiyse:**
+   - O TODO'yu "in-progress" olarak işaretle
+   - İlgili dosyaları kullanıcıya hatırlat
+   - İlk adımı öner
+
+2. **Eğer yeni fikir eklendiyse:**
+   - Hemen progress dosyasına ekle
+   - Hangi kategoriye girdiğini belirle
+   - Öncelik seviyesini sor
+
+3. **Eğer bug rapor edildiyse:**
+   - Progress dosyasının "BUGS & ERRORS" bölümüne ekle
+   - Öncelik seviyesini belirle
+   - Hemen çözülmesi gerekiyor mu sor
+
+4. **Eğer backend başlatılacaksa:**
+   - `cd backend` yap
+   - Önce dependencies kontrolü: `pip list` ile kontrol et
+   - `python app.py` komutu ile başlat
+   - Port bilgisini kullanıcıya bildir
+
+---
+
+## ADIM 12: OTURUM BAŞLANGICI NOTUNU KAYDET
+
+Bugünün `günlük-rapor/[TARİH]/[TARİH]-sabah.txt` dosyasına şu içeriği yaz:
+
+```
+╔════════════════════════════════════════════════════════╗
+║        SABAH OTURUM NOTU                              ║
+║        Tarih: [TARİH] - Başlangıç: [SAAT]            ║
+╚════════════════════════════════════════════════════════╝
+
+## OTURUM BAŞLANGICI
+
+### Sistem Durumu:
+- Git Branch: [BRANCH]
+- Uncommitted Changes: [VAR/YOK]
+- Son Commit: [COMMIT_MSG]
+
+### Bugünün Hedefleri:
+[Kullanıcının seçtiği TODO'lar]
+
+### Devam Eden İşler:
+[Varsa dünden kalan işler]
+
+### Notlar:
+[Kullanıcının belirttiği özel notlar]
+
+### Oturum Başlangıç Saati:
+[SAAT]
+
+---
+[Bu dosya oturum sonunda güncellenecek]
+```
+
+---
+
+## ✅ OTURUM BAŞLANGICI TAMAMLANDI
+
+Kullanıcıya şöyle bir mesaj göster:
+
+```
+✅ Oturum başlangıç işlemleri tamamlandı!
+🎯 Bugünün hedefi: [SEÇİLEN_TODO]
+⏰ Başlangıç saati: [SAAT]
+📝 Notlar kaydedildi: günlük-rapor/[TARİH]/[TARİH]-sabah.txt
+
+Haydi başlayalım! İyi çalışmalar! 🚀
+```
+
+---
+
+**ÖNEMLI NOTLAR:**
+- Bu hook'taki TÜM adımları otomatik gerçekleştir
+- Günlük raporları okurken: SADECE SON 2 GÜNÜ oku (bugün + dün)
+- Progress ve öneriler dosyalarını tamamen oku (sınır yok)
+- Kullanıcıyla etkileşim önemli, sorular sor ve cevaplar al
+- Tüm bilgiler detaylı ve eksiksiz sunulmalı
+- Otomatik dosya oluşturma işlemleri yapılmalı

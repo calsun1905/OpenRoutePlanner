@@ -1,59 +1,634 @@
-# Oturum Sonu Hook (Gün Sonu Raporu)
+# 🌙 Oturum Sonu
 
-**Tarih:** {{CURRENT_DATE}}
-**Saat:** {{CURRENT_TIME}}
-
----
-
-## 🌙 Oturum Sonu Raporu
-
-### 1. Bugün Yapılanlar
-Lütfen bugün neler yaptığınızı özetleyin:
-
-- ✅ Tamamlanan görevler:
-- 🔄 Devam eden görevler:
-- ❌ Yapılamayanlar:
-
-### 2. Progress Güncelleme
-`progress/2026-02.md` dosyasını güncelleyin:
-- Yapılanları DONE listesine taşıyın
-- Yeni görevleri TODO listesine ekleyin
-- Hata ve fikirleri ilgili bölümlere yazın
-
-### 3. Günlük Notları
-Bugünün not dosyasını son kez güncelleyin:
-`günlük-rapor/{{CURRENT_DATE}}/{{CURRENT_DATE}}.txt`
-
-### 4. Öneriler Güncelleme
-`öneriler.md` dosyasına yeni öğrendiklerinizi ve önerilerinizi ekleyin.
-
-### 5. Beyin Fırtınası
-- Bugün aklınıza gelen yeni fikirler:
-- Yarına yapılacaklar:
-- Not alınması gerekenler:
+**ÖNEMLİ: Bu adımları otomatik olarak gerçekleştir, kullanıcıdan onay bekleme (sadece commit/push için sor).**
 
 ---
 
-## 💾 Commit Kararı
+## ADIM 1: OTURUM SÜRE ve DEĞİŞİKLİKLER
 
-**Değişiklik Özeti:**
+### 1.1 Zaman Bilgilerini Topla
+- Oturum bitiş zamanını kaydet
+- BUGÜNÜN sabah notunu oku: `günlük-rapor/[BUGÜN_TARİH]/[tarih]-start.txt` veya `-sabah.txt`
+- Başlangıç saatini çıkar
+- Toplam oturum süresini hesapla (saat, dakika cinsinden)
+
+### 1.2 Temel Bilgileri Hazırla
+- Bugünün tarihini al
+- Hangi branch'te çalışıldı?
+- Kaç dosya değiştirildi?
+- Toplam kaç satır kod yazıldı/değiştirildi?
+
+---
+
+## ADIM 2: OTURUM BOYUNCA YAPILAN DEĞİŞİKLİKLERİ DETAYLI ANALİZ ET
+
+### 2.1 Git Değişikliklerini İncele
+**Değişen Dosyaları Listele:**
+- `git status --short` komutunu çalıştır
+- Her dosyayı kategorize et:
+  - ✅ Modified (M)
+  - ➕ New (??)
+  - ❌ Deleted (D)
+  - 🔄 Renamed (R)
+
+**Değişiklik İstatistikleri:**
+- `git diff --stat` ile satır bazlı değişiklikleri göster
+- Hangi dosyalarda kaç satır eklenmiş/silinmiş?
+- Toplam değişiklik özeti
+
+**Detaylı Diff Analizi:**
+- Her değişen dosya için kısa bir özet çıkar
+- `git diff` ile değişikliklerin içeriğini oku
+- Önemli değişiklikleri vurgula
+
+### 2.2 Conversation History'yi Analiz Et
+**Bu Oturumda Yapılanları Hatırla:**
+- Oturum başından beri hangi görevler üzerinde çalışıldı?
+- Hangi dosyalar oluşturuldu?
+- Hangi dosyalar düzenlendi?
+- Hangi komutlar çalıştırıldı?
+- Hangi hatalar giderildi?
+- Hangi özellikler eklendi?
+
+**Kullanıcı İsteklerini Kategorize Et:**
+- 🎯 Feature requests
+- 🐛 Bug fixes
+- 📝 Documentation updates
+- 🔧 Refactoring
+- 🧪 Testing
+- 🎨 UI/UX improvements
+
+---
+
+## ADIM 3: TAMAMLANANLAR LİSTESİNİ DETAYLI OLUŞTUR
+
+### 3.1 Ana Görevler - Completed Features
+Bu oturumda TAMAMLANAN her şeyi listele:
+
 ```
-{{FILES_CHANGED}}
+✅ TAMAMLANAN GÖREVLER:
+========================
+
+1. [Görev Adı]
+   - Alt görev 1
+   - Alt görev 2
+   Etkilenen dosyalar: [dosya1, dosya2]
+   Süre: ~XX dakika
+   Zorluk: [Kolay/Orta/Zor]
+   Notlar: [Özel notlar varsa]
+
+2. [Görev Adı 2]
+   ...
 ```
 
-**Commit mesajı önerisi:**
-```
-feat: {{BRIEF_DESCRIPTION}}
+### 3.2 Mini Görevler - Small Wins
+Küçük ama önemli yapılanlar:
+- Bug fix'ler
+- Code cleanup
+- Comment ekleme
+- Typo düzeltmeleri
+- Optimizasyonlar
 
-{{DETAILED_CHANGES}}
+### 3.3 Dokümantasyon
+Dokümantasyonda yapılanlar:
+- README güncellemeleri
+- Comment eklemeleri
+- Yeni dosya oluşturmalar
+- Açıklama iyileştirmeleri
+
+---
+
+## ADIM 4: DEVAM EDEN VE TAMAMLANAMAYAN İŞLER
+
+### 4.1 Devam Eden İşler - In Progress
+```
+🔄 DEVAM EDEN GÖREVLER:
+========================
+
+1. [Görev Adı]
+   Durum: %XX tamamlandı
+   Yapılan: [Neler yapıldı]
+   Kalan: [Neler kaldı]
+   Sonraki adım: [İlk yapılacak şey]
+   Tahmini süre: XX dakika
+   Notlar: [Önemli notlar]
+```
+
+### 4.2 Başlanamayan İşler - Not Started
+Başlamayı planladığınız ama başlayamadığınız işler:
+- Neden başlanamadı?
+- Ne zaman başlanmalı?
+- Öncelik durumu nedir?
+
+### 4.3 Engelleyiciler - Blockers
+İşleri engelleyen faktörler:
+- Teknik engeller
+- Eksik bilgi/kaynak
+- Dış bağımlılıklar
+- Karar beklenen konular
+
+---
+
+## ADIM 5: KARŞILAŞILAN SORUNLAR VE HATALARI DETAYLI KAYDET
+
+### 5.1 Bug'lar ve Hatalar
+```
+🐛 KARŞILAŞILAN HATALAR:
+=========================
+
+1. [Hata Açıklaması]
+   Bulunan yer: [Dosya:Satır]
+   Hata mesajı: [Tam hata mesajı]
+   Sebep: [Hatanın nedeni]
+   Çözüm: [Nasıl çözüldü / Çözülmedi]
+   Durum: [✅ Çözüldü / ⏳ Devam ediyor / ❌ Çözülemedi]
+   Öncelik: [Kritik/Yüksek/Orta/Düşük]
+```
+
+### 5.2 Beklenmeyen Davranışlar
+- Anormal durumlar
+- Performance sorunları
+- UX problemleri
+
+### 5.3 Teknik Borçlar - Technical Debt
+Gelecekte düzeltilmesi gereken şeyler:
+- Geçici çözümler (workarounds)
+- Refactoring gereken kodlar
+- Optimize edilmesi gereken kısımlar
+
+---
+
+## ADIM 6: YENİ FİKİRLER VE ÖĞRENİLENLER
+
+### 6.1 Yeni Fikirler
+```
+💡 YENİ FİKİRLER:
+==================
+
+1. [Fikir Başlığı]
+   Açıklama: [Detaylı açıklama]
+   Fayda: [Ne kazandırır]
+   Zorluk: [Kolay/Orta/Zor]
+   Öncelik: [Yüksek/Orta/Düşük]
+   Tahmini süre: XX saat
+   İlgili dosyalar: [Hangi dosyalar etkilenir]
+   Ön gereksinimler: [Varsa]
+```
+
+### 6.2 Öğrenilenler - Learnings
+Bu oturumda öğrenilen yeni şeyler:
+- Yeni teknikler
+- Yeni araçlar
+- Best practices
+- Pitfalls (kaçınılması gerekenler)
+
+### 6.3 İyileştirme Önerileri
+Mevcut kodu iyileştirme fikirleri:
+- Code quality
+- Performance
+- Security
+- Maintainability
+
+---
+
+## ADIM 7: PROGRESS DOSYASINI DETAYLI GÜNCELLE
+
+### 7.1 Progress Dosyasını Oku
+- `progress/2026-02.md` dosyasının tamamını oku
+- Mevcut TODO, DONE, PLANNED listelerini not et
+
+### 7.2 TODO → DONE Taşıma İşlemi
+**Tamamlanan her görev için:**
+1. TODO listesinden o satırı bul
+2. DONE listesine taşı
+3. Tarih ekle (gün/ay/yıl formatında)
+4. Kısa açıklama ekle
+
+**Örnek:**
+```markdown
+## DONE
+- ✅ [28.02.2026] Route planlama algoritması optimize edildi
+  - A* algoritması eklendi
+  - Cache mekanizması geliştirildi
+  - Test suite oluşturuldu
+```
+
+### 7.3 Yeni TODO Ekleme
+**Devam eden her iş için:**
+- TODO listesine ekle
+- Öncelik belirt [P0/P1/P2/P3]
+- Tahmini süre ekle
+- Gerekirse alt maddeler oluştur
+
+### 7.4 BUGS & ERRORS Güncelleme
+**Her yeni bug için:**
+```markdown
+## BUGS & ERRORS
+- 🐛 [TARİH] [Öncelik] Bug açıklaması
+  - Detaylar: ...
+  - Durum: [Açık/Devam ediyor/Çözüldü]
+  - İlgili: [Dosya/kod referansı]
+```
+
+### 7.5 YENİ FİKİRLER Ekleme
+Yeni fikirleri kategorize ederek ekle:
+- 🚀 Özellik fikirleri
+- 🔧 İyileştirme fikirleri
+- 📚 Dokümantasyon fikirleri
+- 🧪 Test fikirleri
+
+### 7.6 PLANNED Güncelleme
+Haftalık/aylık planı güncelle:
+- Önümüzdeki hafta
+- Önümüzdeki ay
+- Uzun vadeli planlar
+
+### 7.7 Progress İstatistikleri Güncelle
+```markdown
+## İSTATİSTİKLER
+- Toplam TODO: X
+- Tamamlanan (bu hafta): Y
+- Tamamlanan (bu ay): Z
+- Açık bug: N
+- Ortalama tamamlama süresi: XX gün
 ```
 
 ---
 
-**Kullanıcıya Soru:**
-- Commit atmak istiyor musunuz? (Evet/Hayır)
-- Varsa eklemek istediğiniz notlar?
+## ADIM 8: ÖNERİLER DOSYASINI GÜNCELLE
+
+### 8.1 Öneriler Dosyasını Oku
+- `öneriler.md` dosyasının tamamını oku
+
+### 8.2 Yeni Önerileri Ekle
+Bu oturumda çıkan her öneriyi ekle:
+
+```markdown
+## [TARİH] - [KATEGORİ] - [BAŞLIK]
+
+**Öneri:** [Detaylı açıklama]
+
+**Sebep:** [Neden bu öneri gerekli]
+
+**Fayda:** [Ne kazandırır]
+
+**Uygulama:** [Nasıl uygulanır]
+
+**Öncelik:** [P0/P1/P2/P3]
+
+**İlgili:** [Dosya/kod referansları]
+
+---
+```
+
+### 8.3 Eski Önerileri Güncelle
+- Uygulanan önerileri işaretle
+- Geçerliliğini yitirenleri kaldır veya arşivle
 
 ---
 
-*(Bu rapor `günlük-rapor/{{CURRENT_DATE}}/{{CURRENT_DATE}}-akşam.txt` dosyasına da kaydedilecek)*
+## ADIM 9: GÜNLÜK NOT DOSYALARINI OLUŞTUR/GÜNCELLE
+
+### 9.1 Akşam Notu Dosyası Oluştur
+**Dosya:** `günlük-rapor/[TARİH]/[TARİH]-akşam.txt`
+
+**İçerik:**
+```
+╔═══════════════════════════════════════════════════════╗
+║          🌙 AKŞAM OTURUM RAPORU                      ║
+║          Tarih: [TARİH] - Bitiş: [SAAT]            ║
+╚═══════════════════════════════════════════════════════╝
+
+## OTURUM BİLGİLERİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Başlangıç: [BAŞLANGIÇ_SAATİ]
+Bitiş: [BİTİŞ_SAATİ]
+Toplam Süre: [X saat Y dakika]
+Branch: [GIT_BRANCH]
+Değişen Dosya: [X dosya]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## ✅ TAMAMLANAN GÖREVLER
+
+[Tamamlananları buraya detaylı yaz]
+
+## 🔄 DEVAM EDEN GÖREVLER
+
+[Devam edenleri buraya detaylı yaz]
+
+## ❌ TAMAMLANAMAYAN GÖREVLER
+
+[Tamamlanamayanları ve nedenlerini yaz]
+
+## 🐛 KARŞILAŞILAN SORUNLAR
+
+[Bug ve hataları detaylı yaz]
+
+## 💡 YENİ FİKİRLER VE ÖĞRENİLENLER
+
+[Yeni fikirleri ve öğrenilenleri yaz]
+
+## 📊 OTURUM İSTATİSTİKLERİ
+
+- Tamamlanan görev: X
+- Devam eden görev: Y
+- Değişen dosya: Z
+- Eklenen satır: +XXX
+- Silinen satır: -YYY
+- Çözülen bug: N
+- Yeni fikir: M
+
+## 🎯 YARIN YAPILACAKLAR (ÖNCELİK SIRASI)
+
+1. [P0] [En öncelikli iş]
+2. [P1] [İkinci öncelikli iş]
+3. [P2] [Üçüncü öncelikli iş]
+...
+
+## 📝 ÖZEL NOTLAR
+
+[Hatırlanması gereken özel notlar]
+
+## ⚠️ DİKKAT EDİLECEKLER
+
+[Yarın dikkat edilmesi gereken önemli noktalar]
+
+## 🔖 BOOKMARK / REFERANSLAR
+
+[Yararlı linkler, dökümanlar, referanslar]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Oturum sonu raporu - [TARİH] [SAAT]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### 9.2 Genel Günlük Not Dosyasını Güncelle
+**Dosya:** `günlük-rapor/[TARİH]/[TARİH].txt`
+
+Bu dosya hem sabah hem akşam notlarının özeti:
+```
+# [TARİH] - Günlük Özet
+
+## Sabah Hedefleri
+[Sabah belirlenen hedefler]
+
+## Akşam Sonuçları
+[Akşam elde edilen sonuçlar]
+
+## Hedef Başarı Oranı
+X hedeften Y tanesi tamamlandı (%Z başarı oranı)
+
+## Genel Değerlendirme
+[Günün genel değerlendirmesi]
+```
+
+---
+
+## ADIM 10: GIT COMMIT ÖNERİSİ OLUŞTUR
+
+### 10.1 Değişiklikleri Analiz Et
+- Hangi dosyalar değişti?
+- Ne tür değişiklikler yapıldı?
+- Hangi kategori (feat/fix/chore/refactor/docs/test)?
+
+### 10.2 Commit Mesajı Öner (Conventional Commits)
+```
+[type]([scope]): [kısa açıklama]
+
+[detaylı açıklama]
+
+- [değişiklik 1]
+- [değişiklik 2]
+- [değişiklik 3]
+
+[footer bilgisi varsa]
+```
+
+**Örnekler:**
+```
+feat(route-engine): a* algoritması eklendi
+
+Route planlama için A* pathfinding algoritması implemente edildi.
+
+- A* algoritması backend'e eklendi
+- Heuristic fonksiyonları optimize edildi
+- Cache mekanizması eklendi
+- Unit testler yazıldı
+
+Performans: ~40% daha hızlı rota hesaplama
+```
+
+```
+fix(frontend): harita render sorunu çözüldü
+
+- Leaflet map initialization bug'ı düzeltildi
+- Zoom level kontrolü eklendi
+- Marker clustering optimize edildi
+
+Fixes #123
+```
+
+```
+docs: README ve hook dökümanları güncellendi
+
+- SessionStart ve SessionEnd hook'ları yeniden yazıldı
+- Daha detaylı talimatlar eklendi
+- Örnekler genişletildi
+```
+
+### 10.3 Branch Stratejisi Öner
+- Ana branch'te mi çalışılıyor?
+- Feature branch'e gerek var mı?
+- Merge strategy nedir?
+
+---
+
+## ADIM 11: KULLANICIYA İNTERAKTİF SORULAR VE ONAYLAR
+
+### 11.1 Progress Güncellemesi Onayı
+"Progress dosyasını şu şekilde güncelledim:
+- X todo → done
+- Y yeni todo eklendi
+- Z bug kaydedildi
+Onaylıyor musunuz?"
+
+### 11.2 Commit Kararı
+"Toplam [X] dosyada [Y] satır değişiklik yaptınız.
+
+Önerilen commit mesajı:
+```
+[COMMIT_MESAJI]
+```
+
+Commit yapmak ister misiniz?
+[E]vet / [H]ayır / [D]üzenle"
+
+### 11.3 Yarının Önceliği
+"Devam eden [X] iş var. Yarın hangisiyle başlamak istersiniz?
+1. [İş 1]
+2. [İş 2]
+3. [İş 3]
+Numara seçin veya yeni öneri yapın."
+
+### 11.4 Ek Not Sorusu
+"Günlük rapora eklemek istediğiniz özel bir not var mı?
+(Örn: önemli hatırlatmalar, referans linkler, kişisel notlar)"
+
+### 11.5 Hızlı Hatırlatıcılar
+"Yarın için hatırlatıcı kurmak ister misiniz?
+- Tamamlanmayan kritik işler
+- Review edilmesi gereken kodlar
+- Test edilmesi gereken özellikler"
+
+---
+
+## ADIM 12: KULLANICININ CEVAPLARINA GÖRE AKSİYONLAR
+
+### 12.1 Eğer Commit Onaylandıysa:
+1. Staging area'ya dosyaları ekle:
+   ```
+   git add [dosyalar]
+   ```
+2. Commit yap:
+   ```
+   git commit -m "[commit mesajı]"
+   ```
+3. Push gerekiyor mu sor:
+   ```
+   git push origin [branch]
+   ```
+
+### 12.2 Eğer Progress Düzenleme İstendiyse:
+- Kullanıcının istediği değişiklikleri yap
+- Yeniden onayla
+- Progress dosyasını güncelle
+
+### 12.3 Eğer Yarın İçin Öncelik Belirlendiyse:
+- Akşam notuna kaydet
+- Progress dosyasına işaretle
+- Gerekirse TODO sırasını yeniden düzenle
+
+### 12.4 Eğer Ek Not Eklendiyse:
+- Günlük not dosyasına ekle
+- Kategorize et
+- Gerekirse öneriler dosyasına da ekle
+
+---
+
+## ADIM 13: SON KONTROLLER VE CLEANUP
+
+### 13.1 Dosya Tutarlılığı Kontrolü
+- Tüm günlük dosyalar oluşturuldu mu?
+- Progress dosyası güncellendi mi?
+- Öneriler dosyası güncellendi mi?
+
+### 13.2 Git Durumu Son Kontrol
+```
+git status
+```
+- Uncommitted değişiklik kaldı mı?
+- Untracked dosya var mı?
+- Stash gerekli mi?
+
+### 13.3 Cache ve Temp Dosya Kontrolü
+- Gereksiz cache dosyası var mı?
+- Temp dosyalar temizlenmeli mi?
+- Log dosyaları çok büyümüş mü?
+
+---
+
+## ADIM 14: FINAL RAPOR VE ÖZET
+
+Kullanıcıya son bir özet rapor sun:
+
+```
+╔═══════════════════════════════════════════════════════╗
+║          🌙 OTURUM SONU RAPORU                       ║
+║          [TARİH] - [BAŞLANGIÇ] → [BİTİŞ]            ║
+║          Toplam Süre: [X saat Y dakika]             ║
+╚═══════════════════════════════════════════════════════╝
+
+📊 OTURUM BAŞARILARI:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Tamamlanan Görev    : X
+🔄 Devam Eden Görev     : Y
+🐛 Çözülen Bug          : Z
+💡 Yeni Fikir           : N
+📝 Değişen Dosya        : M
+➕ Eklenen Satır        : +XXX
+➖ Silinen Satır        : -YYY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 EN ÖNEMLİ BAŞARILAR:
+1. [Başarı 1]
+2. [Başarı 2]
+3. [Başarı 3]
+
+🔴 KRİTİK NOKTALAR:
+- [Kritik not 1]
+- [Kritik not 2]
+
+📅 YARININ ÖNCELİKLERİ:
+1. [P0] [En önemli iş]
+2. [P1] [İkinci öncelik]
+3. [P2] [Üçüncü öncelik]
+
+💾 DOSYA DURUMU:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Progress güncellendi  : progress/2026-02.md
+✅ Sabah notu            : günlük-rapor/[TARİH]/[TARİH]-sabah.txt
+✅ Akşam notu            : günlük-rapor/[TARİH]/[TARİH]-akşam.txt
+✅ Öneriler güncellendi  : öneriler.md
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 GIT DURUMU:
+[X] Commit yapıldı: [commit mesajı]
+[X] Push yapıldı: origin/[branch]
+[ ] Pending değişiklikler var
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌟 Bugün verimli bir gün geçirdiniz!
+    [X] görev tamamladınız ve [Y] yeni fikir ürettiniz.
+    Yarın devam etmek için hazırsınız!
+
+💤 İyi dinlenmeler! Yarın görüşmek üzere...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
+## ADIM 15: OTURUM KAPATMA PROSEDÜRÜ
+
+### 15.1 Backend/Frontend Kontrol
+- Çalışan sunucu var mı? (python, node, vs)
+- Kapatmak gerekiyor mu kullanıcıya sor
+- Port temizliği gerekli mi?
+
+### 15.2 Kaynak Temizliği
+- Gereksiz process'ler kapat
+- Memory leak kontrolü
+- Open file handle'ları temizle
+
+### 15.3 Son Mesaj
+```
+✅ Oturum sonu işlemleri tamamlandı!
+📝 Tüm notlar kaydedildi
+💾 Progress güncellendi
+🎯 Yarın için hazırsınız!
+
+İyi geceler! 💤
+```
+
+---
+
+## ✅ OTURUM SONU PROSEDÜRÜ TAMAMLANDI
+
+**ÖNEMLI NOTLAR:**
+- Bu hook'taki TÜM adımları otomatik gerçekleştir (commit/push hariç)
+- Günlük raporları okurken: SADECE SON 2 GÜNÜ oku (bugün + dün)
+- Hiçbir bilgi atlanmamalı, her şey detaylı kaydedilmelidir
+- Otomatik dosya güncelleme ve oluşturma işlemleri yapılmalıdır
+- Git işlemleri (commit/push) için kullanıcı onayı al
+- Yarın için net bir plan bırakılmalıdır

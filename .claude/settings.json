@@ -1,0 +1,6 @@
+{
+  "autoApprove": true,
+  "permissions": {
+    "mode": "auto"
+  }
+}
