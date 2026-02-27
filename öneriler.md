@@ -26,6 +26,74 @@
 
 ---
 
+## 🚀 OpenRoutePlanner - Brainstorm Fikirleri (27.02.2026)
+
+**Proje Hedefi:** Öğrenme projesi, Google Maps benzeri, genel amaçlı, genişletilebilir
+
+### 1. 🗺️ Rota Özellikleri
+
+| Fikir | Açıklama | Öncelik | Durum |
+|-------|----------|---------|-------|
+| 🚗 **Transport Modu** | Yürüme, bisiklet, araba, toplu taşıma | Yüksek | ✅ Seçildi |
+| ⏱️ **Canlı Trafik** | Gerçek zamanlı trafik verisi | Orta | ✅ Seçildi |
+| 🛣️ **Rota Tipleri** | En hızlı, en kısa, en ekonomik, scenery route | Yüksek | ✅ Seçildi |
+| 🔄 **Alternatif Rotalar** | 2-3 farklı rota seçeneği | Yüksek | ✅ Seçildi |
+| 📍 **Ara Noktalar** | Rota üstünde duraklar ekleme | Orta | ✅ Seçildi |
+| ✏️ **Rota Notları (Souls-style)** | Harita noktalarına işaretçi/not ekleme ("İleride tünel var", "Dikkat") | Çok Yüksek | ✅ Yeni Seçildi |
+
+### 2. 🤖 AI Özellikleri
+
+| Fikir | Açıklama | Öncelik |
+|-------|----------|---------|
+| 💬 **Doğal Dil Sorgu** | "Boğaz turu yapacak rota ayarla" gibi | Çok Yüksek |
+| 🎯 **Kişiselleştirilmiş Öneri** | Kullanıcının geçmişine göre rota | Orta |
+| 📊 **Yerel Zeka** | "Bu bölgede neler yapabilirim?" | Yüksek |
+| 🏆 **Akıllı POI** | İlgi alanına göre mekan önerisi | Yüksek |
+| 🌤️ **Hava Durumu** | Rota planlarken hava durumu | Düşük |
+
+### 3. 📍 POI & Keşif
+
+| Fikr | Açıklama | Öncelik |
+|-------|----------|---------|
+| ⭐ **Derecelendirme** | Kullanıcı puanlaması | Orta |
+| 📸 **Fotoğraf Galeri** | POI fotoğrafları | Düşük |
+| 🔍 **Filtreleme** | Kafe, müze, park vb. filtrele | Yüksek |
+| 💰 **Fiyat Aralığı** | Ücretsiz/ücretli yerler | Orta |
+| ⏰ **Çalışma Saatleri** | Açık/kapalı bilgisi | Orta |
+| 📱 **İletişim** | Telefon, web sitesi | Düşük |
+
+### 4. 📱 Kullanıcı Deneyimi
+
+| Fikir | Açıklama | Öncelik |
+|-------|----------|---------|
+| 💾 **Kaydedilen Rotalar** | Favori rotalar | Yüksek |
+| 📊 **Geçmiş** | Daha önce nereye gitmiş | Orta |
+| 🔔 **Bildirimler** | Yakındaki ilginç yerler | Düşük |
+| 🌙 **Dark Mode** | Gece modu | Orta |
+| 🗣️ **Sesli Rehber** | Rota sırasında sesli yönlendirme | Orta |
+| 📐 **Harita Modları** | Uydu, cadde, arazi | Orta |
+
+### 5. 🚀 Teknik Özellikler
+
+| Fikır | Açıklama | Öncelik |
+|-------|----------|---------|
+| 📴 **Offline Mod** | İnternet yokken çalışma | Orta |
+| 🌍 **Çoklu Dil** | TR, EN, DE vb. | Düşük |
+| 📊 **Analytics** | Kullanıcı davranışını izleme | Düşük |
+| 🔐 **Kullanıcı Sistemi** | Giriş/kayıt | Orta |
+| ☁️ **Cloud Sync** | Verileri senkronizasyon | Düşük |
+| 🔄 **API** | Dış uygulamalar için API | Orta |
+
+### 💡 Öğrenme Fırsatları
+
+Bu proje sayesinde öğrenebileceğin:
+- **AI/ML:** Doğal dil işleme, kişiselleştirme
+- **Frontend:** Harita kütüphaneleri (Leaflet, Mapbox)
+- **Backend:** API tasarımı, cache stratejileri
+- **DevOps:** Cloud deployment, analytics
+
+---
+
 ## 🔧 Araç Kullanımı İpuçları
 
 ### GSD Komutları:
