@@ -1,0 +1,59 @@
+# Oturum Sonu Hook (Gün Sonu Raporu)
+
+**Tarih:** {{CURRENT_DATE}}
+**Saat:** {{CURRENT_TIME}}
+
+---
+
+## 🌙 Oturum Sonu Raporu
+
+### 1. Bugün Yapılanlar
+Lütfen bugün neler yaptığınızı özetleyin:
+
+- ✅ Tamamlanan görevler:
+- 🔄 Devam eden görevler:
+- ❌ Yapılamayanlar:
+
+### 2. Progress Güncelleme
+`progress/2026-02.md` dosyasını güncelleyin:
+- Yapılanları DONE listesine taşıyın
+- Yeni görevleri TODO listesine ekleyin
+- Hata ve fikirleri ilgili bölümlere yazın
+
+### 3. Günlük Notları
+Bugünün not dosyasını son kez güncelleyin:
+`günlük-rapor/{{CURRENT_DATE}}/{{CURRENT_DATE}}.txt`
+
+### 4. Öneriler Güncelleme
+`öneriler.md` dosyasına yeni öğrendiklerinizi ve önerilerinizi ekleyin.
+
+### 5. Beyin Fırtınası
+- Bugün aklınıza gelen yeni fikirler:
+- Yarına yapılacaklar:
+- Not alınması gerekenler:
+
+---
+
+## 💾 Commit Kararı
+
+**Değişiklik Özeti:**
+```
+{{FILES_CHANGED}}
+```
+
+**Commit mesajı önerisi:**
+```
+feat: {{BRIEF_DESCRIPTION}}
+
+{{DETAILED_CHANGES}}
+```
+
+---
+
+**Kullanıcıya Soru:**
+- Commit atmak istiyor musunuz? (Evet/Hayır)
+- Varsa eklemek istediğiniz notlar?
+
+---
+
+*(Bu rapor `günlük-rapor/{{CURRENT_DATE}}/{{CURRENT_DATE}}-akşam.txt` dosyasına da kaydedilecek)*

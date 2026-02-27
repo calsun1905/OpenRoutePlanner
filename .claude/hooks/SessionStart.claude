@@ -1,0 +1,36 @@
+# Oturum Başı Hook (Gün Başı Raporu)
+
+**Tarih:** {{CURRENT_DATE}}
+**Saat:** {{CURRENT_TIME}}
+
+---
+
+## 🌅 Oturum Başlangıcı
+
+### 1. Progress Kontrolü
+Lütfen `progress/2026-02.md` dosyasını okuyun:
+- Yapılacaklar (TODO) listesi
+- Yapılanlar (DONE) listesi
+- Sonraki adımlar (PLANNED)
+
+### 2. Önceki Oturum İncelemesi
+- Son commit mesajlarını okuyun
+- Problemli alanları tespit edin
+- Çıkan hataları not alın
+
+### 3. Bugün Yapılacaklar
+`progress/2026-02.md` dosyasındaki TODO listesinden bugün ne yapacaksınız?
+
+### 4. Günlük Not Dosyası
+Bugünün not dosyası: `günlük-rapor/{{CURRENT_DATE}}/{{CURRENT_DATE}}.txt`
+
+---
+
+**Kullanıcıya Sorular:**
+1. Bugün üzerinde ne çalışmak istiyorsunuz?
+2. Önceki oturumdan kalan sorun var mı?
+3. Yeni bir fikir veya TODO eklemek ister misiniz?
+
+---
+
+*(Bu rapor `günlük-rapor/{{CURRENT_DATE}}/{{CURRENT_DATE}}-sabah.txt` dosyasına da kaydedilecek)*
