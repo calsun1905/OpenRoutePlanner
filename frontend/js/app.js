@@ -1,6 +1,6 @@
 /**
  * app.js — OpenTrip Frontend Application
- * 
+ *
  * Harita etkileşimi, API iletişimi, rota gösterimi ve POI arama.
  */
 
@@ -44,6 +44,9 @@ const elLoadingOverlay = document.getElementById("loadingOverlay");
 const elLoadingText = document.getElementById("loadingText");
 const elBtnClearPois = document.getElementById("btnClearPois");
 const elToastContainer = document.getElementById("toastContainer");
+const elPlaceSearchInput = document.getElementById("placeSearchInput");
+const elBtnSearchPlace = document.getElementById("btnSearchPlace");
+const elSearchResults = document.getElementById("searchResults");
 
 // ========== CUSTOM MARKER ICON ==========
 function createNumberedIcon(number) {
@@ -139,7 +142,7 @@ function updatePointsList() {
                     <span class="point-coords">${p[0].toFixed(4)}, ${p[1].toFixed(4)}</span>
                 </div>
                 <button class="btn-remove" onclick="removePoint(${i})" title="Sil">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 6M6 6l12 12"/></svg>
                 </button>
             </div>
         `;
@@ -426,3 +429,99 @@ document.querySelectorAll(".btn-poi").forEach((btn) => {
 
 // İlk bildirim
 showToast("Haritaya tıklayarak başlayın! 🗺️", "info");
+
+
+// ========== PLACE SEARCH (GEOCODING) ==========
+
+// Enter tuşu ile arama
+elPlaceSearchInput.addEventListener("keypress", function (e) {
+    if (e.key === "Enter") {
+        searchPlace();
+    }
+});
+
+// Arama butonu
+elBtnSearchPlace.addEventListener("click", searchPlace);
+
+/**
+ * Yer ismi ile arama yapar (Geocoding API)
+ */
+async function searchPlace() {
+    const query = elPlaceSearchInput.value.trim();
+
+    if (!query) {
+        showToast("Lütfen bir yer ismi girin", "error");
+        return;
+    }
+
+    if (query.length < 2) {
+        showToast("Arama terimi çok kısa", "error");
+        return;
+    }
+
+    showLoading("Yer aranıyor...");
+
+    try {
+        const response = await fetch(`${API_BASE}/geocode`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ place: query }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.status === "error") {
+            throw new Error(data.message || "Yer bulunamadı");
+        }
+
+        displaySearchResult(data);
+        showToast(`Bulundu: ${data.display_name}`, "success");
+
+    } catch (error) {
+        console.error("Geocoding hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+        elSearchResults.style.display = "none";
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Arama sonucunu gösterir
+ */
+function displaySearchResult(data) {
+    elSearchResults.style.display = "block";
+
+    elSearchResults.innerHTML = `
+        <div class="search-result-item" onclick="selectSearchResult(${data.lat}, ${data.lon}, '${escapeHtml(data.display_name)}')">
+            <div class="search-result-name">📍 ${escapeHtml(data.display_name)}</div>
+            <div class="search-result-coords">${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}</div>
+        </div>
+    `;
+}
+
+/**
+ * Arama sonucuna tıklanınca haritaya ekler
+ */
+function selectSearchResult(lat, lon, name) {
+    // Haritayı o noktaya odakla
+    map.setView([lat, lon], 16);
+
+    // Noktayı ekle
+    addPoint(lat, lon);
+
+    // Input ve sonuçları temizle
+    elPlaceSearchInput.value = "";
+    elSearchResults.style.display = "none";
+
+    showToast(`"${name}" rotaya eklendi`, "success");
+}
+
+/**
+ * HTML kaçış karakterleri
+ */
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+}

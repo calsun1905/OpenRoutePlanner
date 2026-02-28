@@ -9,6 +9,7 @@ import os
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from graph_manager import get_graph, get_graph_for_points, search_pois
+from geocoder import geocode, reverse_geocode, geocode_batch
 from route_engine import (
     solve_tsp,
     build_full_route,
@@ -178,6 +179,124 @@ def api_search_pois():
 def health_check():
     """Sunucu sağlık kontrolü."""
     return jsonify({"status": "ok", "message": "OpenTrip API çalışıyor!"})
+
+
+@app.route("/api/geocode", methods=["POST"])
+def api_geocode():
+    """
+    Yer ismini koordinata çevirir.
+
+    Request Body:
+        {
+            "place": "Kadıköy Parkı, İstanbul"
+        }
+
+    Response:
+        {
+            "status": "success",
+            "lat": 40.990,
+            "lon": 29.029,
+            "display_name": "Kadıköy Parkı, İstanbul, Türkiye",
+            "cached": false
+        }
+    """
+    try:
+        data = request.get_json()
+
+        if not data or "place" not in data:
+            return jsonify({"error": "'place' alanı gerekli."}), 400
+
+        place_name = data["place"]
+        result = geocode(place_name)
+
+        if result["status"] == "error":
+            return jsonify(result), 404
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"[API] Geocode hatası: {e}")
+        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+
+
+@app.route("/api/reverse-geocode", methods=["POST"])
+def api_reverse_geocode():
+    """
+    Koordinatı yer ismine çevirir.
+
+    Request Body:
+        {
+            "lat": 40.990,
+            "lon": 29.029
+        }
+
+    Response:
+        {
+            "status": "success",
+            "display_name": "Kadıköy, İstanbul, Türkiye",
+            "address": "{...}",
+            "cached": false
+        }
+    """
+    try:
+        data = request.get_json()
+
+        if not data or "lat" not in data or "lon" not in data:
+            return jsonify({"error": "'lat' ve 'lon' alanları gerekli."}), 400
+
+        lat = data["lat"]
+        lon = data["lon"]
+        result = reverse_geocode(lat, lon)
+
+        if result["status"] == "error":
+            return jsonify(result), 404
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"[API] Reverse geocode hatası: {e}")
+        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+
+
+@app.route("/api/geocode/batch", methods=["POST"])
+def api_geocode_batch():
+    """
+    Toplu geocoding işlemi.
+
+    Request Body:
+        {
+            "places": ["Kadıköy", "Beşiktaş", "Taksim"]
+        }
+
+    Response:
+        {
+            "results": [
+                {"status": "success", "lat": 40.99, "lon": 29.03, ...},
+                {"status": "success", "lat": 41.04, "lon": 29.00, ...},
+                ...
+            ]
+        }
+    """
+    try:
+        data = request.get_json()
+
+        if not data or "places" not in data:
+            return jsonify({"error": "'places' alanı gerekli (liste)."}), 400
+
+        places = data["places"]
+
+        if not isinstance(places, list):
+            return jsonify({"error": "'places' bir liste olmalı."}), 400
+
+        if len(places) > 10:
+            return jsonify({"error": "En fazla 10 yer adı aynı anda işlenebilir."}), 400
+
+        results = geocode_batch(places)
+        return jsonify({"results": results})
+
+    except Exception as e:
+        print(f"[API] Batch geocode hatası: {e}")
+        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 
 @app.route("/")
