@@ -60,6 +60,16 @@ openroute/
 
 2. 🏛️ **POI Arama** - Müze, kafe vb. mekanları bulur
 
+3. 🔎 **Yer İsmi ile Arama** - `/api/geocode`
+   - Yer ismini koordinata çevirir (Nominatim API)
+   - Memory + SQLite cache ile hızlı
+   - Rate limiting: 1 req/s
+
+4. 🧠 **Doğal Dil Sorgu (Prototype)** - `nlp_engine.py` ⚠️
+   - Regex tabanlı prototype tamamlandı
+   - 6 sorgu tipi destekleniyor
+   - **DEĞİŞECEK:** Yeni nesil hibrit sistem planlanıyor (Regex + spaCy NER)
+
 ### Öğrenilenler:
 - ✅ Global değişkenler: `_graph_cache`, `_poi_cache` (cache mekanizması)
 
@@ -70,11 +80,13 @@ openroute/
 - **Cache:** Uygulamanın hızını artırmak için kullanılan kısa süreli hafıza
 - **TSP:** Gezgin Satıcı Problemi - noktaları en mantıklı sırada ziyaret etme algoritması
 
-## 📅 Son Güncelleme: 27.02.2026 - 22:13
+## 📅 Son Güncelleme: 28.02.2026 - ~00:30
 
 **Bu oturum:**
-- ✅ SessionEnd hook çalıştı
-- 📝 Son commit: ""
+- ✅ geocoder.py modülü tamamlandı
+- ✅ nlp_engine.py prototype tamamlandı (Regex tabanlı)
+- ⚠️ NLP sistemi yeniden yapılandırılacak (Hibrit: Regex + spaCy NER)
+- 📝 Son commit: "feat: doğal dil sorgu ile yer arama özelliği eklendi" (215bd40)
 - 📁 Çalışma dizini: OpenRoutePlanner
 
 ---

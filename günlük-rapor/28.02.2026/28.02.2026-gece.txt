@@ -1,0 +1,148 @@
+╔═══════════════════════════════════════════════════════╗
+║          🌙 GECE OTURUM RAPORU                       ║
+║          Tarih: 28.02.2026 - Saat: ~00:30             ║
+╚═══════════════════════════════════════════════════════╝
+
+## OTURUM BİLGİLERİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Başlangıç: ~23:30
+Bitiş: ~00:30
+Toplam Süre: ~1 saat
+Branch: batu.feature
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## ✅ TAMAMLANAN GÖREVLER
+
+### 1. nlp_engine.py Prototype Implementasyonu
+   Durum: ✅ %100 TAMAMLANDI (PROTOTYPE)
+   Süre: ~45 dakika
+   Zorluk: Orta
+
+   Yapılan işler:
+   - nlp_engine.py modülü oluşturuldu (433 satır)
+   - 6 farklı regex pattern tanımlandı
+   - Türkçe stop words listesi (60+ kelime)
+   - Türkçe edat ayrıştırma (_clean_text fonksiyonu)
+   - Confidence scoring sistemi (0.0 - 1.0)
+   - Test fonksiyonu eklendi
+
+   Desteklenen sorgu tipleri:
+   - route: "Kadıköy'den Beşiktaş'a rota"
+   - route: "İstanbul'dan Ankara'ya nasıl giderim"
+   - multi: "Kadıköy, Beşiktaş ve Taksim'i gez"
+   - poi: "Kadıköy'de neler var?"
+   - poi: "Beşiktaş'ta neleri önerirsin"
+   - single: "Taksim'e git"
+
+   Regex Pattern'ler:
+   - PATTERN_ROUTE_1: X'den Y'ye rota
+   - PATTERN_ROUTE_2: X ile Y arası
+   - PATTERN_ROUTE_EXTENDED: X'den Y'ye nasıl giderim
+   - PATTERN_MULTI_1/1b: X, Y ve Z'yi gez
+   - PATTERN_POI_QUERY 1/2/3: X'de neler var/öner
+   - PATTERN_SINGLE_DEST: X'e git
+
+### 2. Mimari Karar Verme
+   Durum: ✅ KARAR ALINDI
+   Süre: ~15 dakika
+
+   Yapılan değerlendirme:
+   - Regex yaklaşımı sınırlı ve kırılgan
+   - Typo tolerance yok
+   - Bağlamayı anlayamıyor
+   - Ölçeklenemez
+
+   Alınan karar:
+   - **Hibrit sistem** planlanıyor
+   - Regex: Basit sorgular için (1ms)
+   - spaCy NER: Karmaşık sorgular için (50ms)
+   - Türkçe model: tr_core_news_md
+   - Hız birinci öncelik, doğruluk ikinci
+
+## 🔄 DEVAM EDEN GÖREVLER
+
+### 1. Doğal Dil Sorgu - Faz 2.5: Yeni Nesil Mimari
+   Durum: Planlama aşaması
+   Yapılacak:
+   - spaCy kurulumu
+   - tr_core_news_md modeli entegrasyonu
+   - Hibrit akış: Regex → spaCy → Fallback
+   - A/B test altyapısı
+
+## 🐛 KARŞILAŞILAN SORUNLAR
+
+*(Bu oturumda ciddi bir sorunla karşılaşılmadı)*
+
+## 💡 YENİ FİKİRLER VE ÖĞRENİLENLER
+
+### Öğrenilenler:
+
+1. **Regex Tabanlı NLP Sınırlamaları**
+   - Typo tolerant değil
+   - Bağlamayı anlamaz
+   - Her pattern için kod yazmak gerekir
+   - Scale etmesi zor
+
+2. **Türkçe Edat Ayrıştırma**
+   - "Kadıköy'de" → "Kadıköy de" şeklinde ayrılmalı
+   - Tüm ekler: 'de, 'da, 'den, 'dan, 'te, 'ta, 'ne, 'na
+   - Regex ile: r"('de|'da|...)" → r" \1"
+
+3. **Confidence Scoring**
+   - Her pattern'e farklı güven skoru
+   - 0.95 = En spesifik pattern
+   - 0.40 = Fallback tahmin
+
+### Kararlar:
+
+1. **Hibrit Sistem**
+   - Regex hızlı ama sınırlı
+   - spaCy doğru ama yavaş
+   - İkili birleşim = en iyi
+
+## 📊 OTURUM İSTATİSTİKLERİ
+
+- Tamamlanan görev: 2
+- Devam eden görev: 1
+- Değişen dosya: 3
+- Eklenen satır: +433 (nlp_engine.py)
+- Yeni karar: Hibrit mimari
+
+## 🎯 SIRADAKİ ADIMLAR
+
+1. [P0] **Faz 2.5 Başlat: spaCy Entegrasyonu**
+   - pip install spacy
+   - python -m spacy download tr_core_news_md
+   - NER testleri yap
+   - Hibrit akışı kodla
+
+2. [P1] **Faz 3: API Endpoint (/api/natural-query)**
+   - nlp_engine + geocoder kombinasyonu
+   - Doğal dil sorgusu → Koordinat → Rota
+
+3. [P2] **Faz 4: Frontend Chat Input**
+   - Sohbet benzeri input kutusu
+   - Öneri/autocomplete desteği
+
+## 📝 ÖZEL NOTLAR
+
+- nlp_engine.py prototype olarak korunacak
+- spaCy entegrasyonundan sonra regex fallback olarak kalacak
+- Commit mesajı hazırlandı, henüz atılmadı
+- Türkçe NER model kalitesi test edilmeli
+
+## ⚠️ DEĞİŞİKLİK KARARI
+
+**nlp_engine.py Değişecek:**
+- Regex yaklaşımı ana sistem olmayacak
+- spaCy NER ana sistem olacak
+- Regex fallback (yedek) olarak kalacak
+
+**Neden:**
+- Hız = Birinci öncelik
+- Doğruluk = İkinci öncelik
+- Türkçe desteği = Zorunlu
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Oturum sonu raporu - 28.02.2026 ~00:30
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

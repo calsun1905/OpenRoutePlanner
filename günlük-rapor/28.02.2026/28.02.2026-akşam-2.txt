@@ -1,0 +1,148 @@
+╔═══════════════════════════════════════════════════════╗
+║          🌙 AKŞAM OTURUM RAPORU (2)                    ║
+║          Tarih: 28.02.2026 - Saat: ~23:30             ║
+╚═══════════════════════════════════════════════════════╝
+
+## OTURUM BİLGİLERİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Başlangıç: ~22:30
+Bitiş: ~23:30
+Toplam Süre: ~1 saat
+Branch: batu.feature
+Commit: 215bd40
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## ✅ TAMAMLANAN GÖREVLER
+
+### 1. Doğal Dil Sorgu - Faz 1: geocoder.py Implementasyonu
+   Durum: ✅ %100 TAMAMLANDI
+   Süre: ~45 dakika
+   Zorluk: Orta
+
+   Yapılan işler:
+   - geocoder.py modülü oluşturuldu (345 satır)
+   - Nominatim API entegrasyonu yapıldı
+   - Çift katmanlı cache: Memory + SQLite
+   - Rate limiting: 1 req/s (decorator ile)
+   - 3 API fonksiyonu: geocode(), reverse_geocode(), geocode_batch()
+   - Exception sınıfları: LocationNotFoundError, NetworkError, InvalidQueryError
+
+   Backend değişiklikleri:
+   - backend/geocoder.py (yeni dosya)
+   - backend/app.py (3 endpoint eklendi)
+   - requirements.txt (requests==2.32.3 eklendi)
+
+### 2. Frontend Arama Özelliği
+   Durum: ✅ %100 TAMAMLANDI
+   Süre: ~30 dakika
+   Zorluk: Kolay-Orta
+
+   Yapılan işler:
+   - Sidebar'a "Yer İsmi ile Ara" bölümü eklendi
+   - Arama inputu + buton + sonuç alanı
+   - CSS stilleri: search-input, btn-search, search-results
+   - JS fonksiyonları: searchPlace(), displaySearchResult(), selectSearchResult()
+   - Enter tuşu ile arama desteği
+   - Sonuca tıklayınca harita odaklanıyor + rota ekleniyor
+
+   Frontend değişiklikleri:
+   - frontend/index.html (arama bölümü eklendi)
+   - frontend/css/style.css (arama stilleri eklendi)
+   - frontend/js/app.js (geocoding fonksiyonları eklendi)
+
+### 3. Kullanıcı Testi ve Geri Alma/Ekleme Döngüsü
+   Durum: ✅ TAMAMLANDI
+   Süre: ~15 dakika
+
+   Yapılan işler:
+   - Kullanıcı öncesi/sonrası farkı görmek istedi
+   - Tüm özelliği geri alındı (öncesi haline döndürüldü)
+   - Kullanıcı farkı gördükten sonra tekrar eklendi
+   - öncesi/ klasörü oluşturuldu (karşılaştırma için)
+
+### 4. Commit Atma
+   Durum: ✅ TAMAMLANDI
+   Commit: 215bd40
+   Mesaj: "feat: doğal dil sorgu ile yer arama özelliği eklendi"
+
+## 🔄 DEVAM EDEN GÖREVLER
+
+### 1. Doğal Dil Sorgu - Faz 2: nlp_engine.py
+   Durum: %0 (planlama aşaması)
+   Yapılacak:
+   - Türkçe regex parser yazılacak
+   - "X'den Y'ye" gibi sorgular çözümlenecek
+   - Stop words listesi hazırlanacak
+   - Multi-location parsing desteği
+
+## 🐛 KARŞILAŞILAN SORUNLAR
+
+*(Bu oturumda ciddi bir sorunla karşılaşılmadı)*
+
+## 💡 YENİ FİKİRLER VE ÖĞRENİLENLER
+
+### Öğrenilenler:
+
+1. **Nominatim API Kullanımı**
+   - User-Agent header ZORUNLU (IP ban koruması)
+   - Rate limit: 1 req/s (burst değil, sürekli)
+   - Response format: JSON (lat, lon, display_name, address)
+
+2. **Cache Stratejisi**
+   - Memory cache: Uygulama ömrü boyunca
+   - SQLite cache: Kalıcı depolama
+   - Önce memory → SQLite → API (3 katmanlı kontrol)
+
+3. **Frontend UX**
+   - Enter tuşu desteği önemli
+   - Sonuca tıklayınca harita zoom yapmalı
+   - Loading state gösterilmeli
+   - Hata mesajları friendly olmalı
+
+## 📊 OTURUM İSTATİSTİKLERİ
+
+- Tamamlanan görev: 3
+- Devam eden görev: 1
+- Değişen dosya: 6
+- Eklenen satır: +865
+- Silinen satır: -4
+- Commit: 1 (215bd40)
+
+## 🎯 SIRADAKİ ADIMLAR (ÖNCELİK SIRASI)
+
+1. [P0] **Faz 2 Başlat: nlp_engine.py**
+   - Türkçe regex patterns belirle
+   - Stop words listesi hazırla
+   - "X'den Y'ye rota" sorgularını çözümle
+   - Multi-location parsing: "A, B ve C'yi gez"
+
+2. [P1] **Faz 3: API Endpoint (/api/natural-query)**
+   - nlp_engine + geocoder kombinasyonu
+   - Frontend'den doğal dil sorgusu al
+   - Koordinatlara çevirip rota oluştur
+
+3. [P2] **Faz 4: Frontend Chat Input**
+   - Sohbet benzeri input kutusu
+   - Geçmiş sorgular göster
+   - Öneri/autocomplete desteği
+
+## 📝 ÖZEL NOTLAR
+
+- geocoder.py modülü tamamen çalışır durumda
+- Cache veritabanı: backend/cache/geocodes.db
+- Test için: "Kadıköy", "Beşiktaş", "Taksim Meydanı" yazıp dene
+- Nominatim API ücretsiz, ancak 1 req/s limit var
+
+## 🔖 BOOKMARK / REFERANSLAR
+
+### Nominatim API:
+- Dökümantasyon: https://nominatim.org/release-docs/develop/api/Search/
+- Usage Policy: https://operations.osmfoundation.org/policies/nominatim/
+
+### Proje Dosyaları:
+- backend/geocoder.py (345 satır)
+- progress/2026-02.md (güncellendi)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Oturum sonu raporu - 28.02.2026 ~23:30
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

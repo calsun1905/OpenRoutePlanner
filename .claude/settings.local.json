@@ -14,7 +14,9 @@
       "Bash(echo mem command not found in PATH:*)",
       "Bash(powershell:*)",
       "Bash(python:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
