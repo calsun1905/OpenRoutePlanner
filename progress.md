@@ -60,15 +60,19 @@ openroute/
 
 2. 🏛️ **POI Arama** - Müze, kafe vb. mekanları bulur
 
-3. 🔎 **Yer İsmi ile Arama** - `/api/geocode`
+3. 🔎 **Yer İsmi ile Arama** - `/api/geocode` ✅ YENİ EKLENDİ
    - Yer ismini koordinata çevirir (Nominatim API)
    - Memory + SQLite cache ile hızlı
    - Rate limiting: 1 req/s
+   - Frontend arama kutusu eklendi
+   - Commit: 215bd40
 
-4. 🧠 **Doğal Dil Sorgu (Prototype)** - `nlp_engine.py` ⚠️
-   - Regex tabanlı prototype tamamlandı
-   - 6 sorgu tipi destekleniyor
-   - **DEĞİŞECEK:** Yeni nesil hibrit sistem planlanıyor (Regex + spaCy NER)
+4. 🧠 **Doğal Dil Sorgu Sistemi (Prototype → Geliştiriliyor)**
+   - **Mevcut Durum:** Regex tabanlı prototype tamamlandı (`nlp_engine.py`)
+   - **Sorun:** Regex sınırlı, typo tolerant değil, bağlamayı anlamıyor
+   - **Plan:** Hibrit sisteme geçiş (Regex + spaCy NER)
+   - **Gelecek:** Transformer/LLM entegrasyonu değerlendiriliyor
+   - **Durum:** Aktif geliştirme aşamasında
 
 ### Öğrenilenler:
 - ✅ Global değişkenler: `_graph_cache`, `_poi_cache` (cache mekanizması)
@@ -80,14 +84,27 @@ openroute/
 - **Cache:** Uygulamanın hızını artırmak için kullanılan kısa süreli hafıza
 - **TSP:** Gezgin Satıcı Problemi - noktaları en mantıklı sırada ziyaret etme algoritması
 
-## 📅 Son Güncelleme: 28.02.2026 - ~00:30
+## 📅 Son Güncelleme: 28.02.2026 - ~01:00
 
-**Bu oturum:**
-- ✅ geocoder.py modülü tamamlandı
-- ✅ nlp_engine.py prototype tamamlandı (Regex tabanlı)
-- ⚠️ NLP sistemi yeniden yapılandırılacak (Hibrit: Regex + spaCy NER)
-- 📝 Son commit: "feat: doğal dil sorgu ile yer arama özelliği eklendi" (215bd40)
-- 📁 Çalışma dizini: OpenRoutePlanner
+**Bu oturumda yapılanlar:**
+1. ✅ **Arama Özelliği Eklendi** (geocoder.py + Frontend)
+   - Nominatim API entegrasyonu
+   - Yer ismi → Koordinat dönüşümü
+   - Cache mekanizması
+   - Frontend arama kutusu
+   - Commit: 215bd40
+
+2. ✅ **Doğal Dil Sorgu Prototype** (nlp_engine.py)
+   - Regex tabanlı ayrıştırıcı
+   - 6 sorgu tipi destekleniyor
+   - **Sınırlama:** Typo tolerant değil, bağlamayı anlayamıyor
+
+3. 🔄 **Mimari Kararı: Hibrit Sisteme Geçiş**
+   - Regex: Basit sorgular (1ms)
+   - spaCy NER: Karmaşık sorgular (50ms)
+   - Gelecek: Transformer/LLM değerlendirmesi
+
+**Sonraki adım:** spaCy entegrasyonu
 
 ---
 ---

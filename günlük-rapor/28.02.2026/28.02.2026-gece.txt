@@ -52,11 +52,18 @@ Branch: batu.feature
    - Bağlamayı anlayamıyor
    - Ölçeklenemez
 
+   Değerlendirilen Seçenekler:
+   1. **spaCy** - Hızlı, offline, orta kalite
+   2. **BERT/Transformer** - Doğru, yavaş, yerel (dbmdz/bert-base-turkish-cased)
+   3. **LLM API** - En güçlü, ücretli, internet şart
+   4. **Hibrit** - En mantıklı
+
    Alınan karar:
    - **Hibrit sistem** planlanıyor
    - Regex: Basit sorgular için (1ms)
    - spaCy NER: Karmaşık sorgular için (50ms)
-   - Türkçe model: tr_core_news_md
+   - Türkçe model: tr_core_news_md (öncelik)
+   - **Gelecek:** BERT veya LLM entegrasyonu değerlendirilecek
    - Hız birinci öncelik, doğruluk ikinci
 
 ## 🔄 DEVAM EDEN GÖREVLER
@@ -116,11 +123,17 @@ Branch: batu.feature
    - NER testleri yap
    - Hibrit akışı kodla
 
-2. [P1] **Faz 3: API Endpoint (/api/natural-query)**
+2. [P1] **NLP Model Değerlendirmesi**
+   - BERT model testi (dbmdz/bert-base-turkish-cased)
+   - spaCy vs BERT karşılaştırması
+   - Hız/doğruluk/maliyet analizi
+   - Final mimari kararı
+
+3. [P2] **Faz 3: API Endpoint (/api/natural-query)**
    - nlp_engine + geocoder kombinasyonu
    - Doğal dil sorgusu → Koordinat → Rota
 
-3. [P2] **Faz 4: Frontend Chat Input**
+4. [P3] **Faz 4: Frontend Chat Input**
    - Sohbet benzeri input kutusu
    - Öneri/autocomplete desteği
 
@@ -130,6 +143,12 @@ Branch: batu.feature
 - spaCy entegrasyonundan sonra regex fallback olarak kalacak
 - Commit mesajı hazırlandı, henüz atılmadı
 - Türkçe NER model kalitesi test edilmeli
+
+**NLP Sistemi Geleceği:**
+- Regex prototype → Sınırlı, hızlı
+- spaCy NER → Hibrit ana sistemi (planlanan)
+- BERT/Transformer → Daha güçlü, değerlendirilecek
+- LLM API → En güçlü, maliyetli, son çare
 
 ## ⚠️ DEĞİŞİKLİK KARARI
 
