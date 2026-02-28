@@ -1,0 +1,156 @@
+╔═══════════════════════════════════════════════════════╗
+║          🌙 AKŞAM OTURUM RAPORU - 3                  ║
+║          Tarih: 28.02.2026 - Saat: ~20:30           ║
+╚═══════════════════════════════════════════════════════╝
+
+## OTURUM BİLGİLERİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Başlangıç: ~19:45
+Bitiş: ~20:30
+Toplam Süre: ~45 dakika
+Branch: main
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## ✅ TAMAMLANAN GÖREVLER
+
+### 1. Proje Durumu Analizi (SessionStart Hook)
+   - Tüm proje dosyaları incelendi
+   - Günlük raporlar okundu (27.02 ve 28.02)
+   - Mevcut durum belirlendi
+   Etkilenen dosyalar: Tüm proje dosyaları
+   Süre: ~15 dakika
+
+### 2. Mevcut Kod İncelemesi
+   - geocoder.py: ✅ Tamam (Nominatim API, cache, rate limiting)
+   - nlp_engine.py: ✅ Tamam (Regex tabanlı, 6 sorgu tipi)
+   - index.html: ✅ Tamam (Arama kutusu + buton eklendi)
+   - app.js: ✅ Tamam (searchPlace() fonksiyonu çalışıyor)
+   Süre: ~10 dakika
+   Notlar: Arama özelliği ve prototype hazır!
+
+### 3. BERT Modeli Seçimi ve Araştırması
+   - Türkçe BERT modelleri karşılaştırıldı
+   - Cased vs Uncased farkı öğrenildi
+   - PyTorch vs TensorFlow seçimi yapıldı
+   - **Seçilen Model:** dbmdz/bert-base-turkish-uncased
+   - **Seçim Nedeni:**
+     * Kullanıcı sorguları büyük/küçük harf umursamaz
+     * Daha tolerant (KADIKÖY = kadıköy = Kadıköy)
+     * Arama için ideal
+     * PyTorch ile daha iyi entegrasyon
+   - Fiziksel Gereksinimler Belirlendi:
+     * Disk: ~440 MB
+     * RAM: ~1.5 GB
+     * Kullanıcı makinesi: 32 GB RAM + 12 GB GPU (çok rahat!)
+   Etkilenen dosyalar: [progress.md]
+   Süre: ~20 dakika
+
+## 🔄 DEVAM EDEN GÖREVLER
+
+### 1. Doğal Dil Sorgu - Faz 3: BERT Entegrasyonu
+   Durum: %0 tamamlandı (model seçildi, kurulum başlamadı)
+   Yapılan:
+   - Model seçimi: dbmdz/bert-base-turkish-uncased
+   - PyTorch olarak karar verildi
+   - progress.md güncellendi
+   Kalan:
+   - transformers, torch, sentencepiece yükleme
+   - Modeli indir ve test et
+   - nlp_engine.py'ye BERT entegrasyonu
+   - Sorgu analizi yapısı
+   Sonraki adım: pip install ve model yükleme testi
+   Tahmini süre: 60-90 dakika
+
+## ❌ TAMAMLANAMAYAN GÖREVLER
+
+*(Yok)*
+
+## 🐛 KARŞILAŞILAN SORUNLAR
+
+*(Bu oturumda sorun yok)*
+
+## 💡 YENİ FİKİRLER VE ÖĞRENİLENLER
+
+### Öğrenilenler:
+
+1. **BERT Cased vs Uncased**
+   - Cased: Büyük/küçük harf önemli (resmi belgeler için)
+   - Uncased: Büyük/küçük harf önemsiz (arama için ideal)
+   - Örnek: "KADIKÖY" ve "kadıköy" uncased'de aynı token
+
+2. **PyTorch vs TensorFlow**
+   - PyTorch: Kod yazımı daha kolay, öğrenmesi daha keyifli
+   - TensorFlow: Production için daha iyi (TF Serving)
+   - Karar: Öğrenme projesi olduğu için PyTorch seçildi
+
+3. **Türkçe BERT Modelleri**
+   - dbmdz/bert-base-turkish-uncased: 440 MB, 110M parametre
+   - dbmdz/bert-turkish-large-cased: 1.3 GB, 340M parametre (daha güçlü ama ağır)
+   - google/muril-base-cased: Çoklu dil için
+
+4. **Model Gereksinimleri**
+   - Disk: 440 MB (model) + 855 MB (kütüphaneler)
+   - RAM: 1.5 GB çalışırken
+   - GPU ile çok daha hızlı (CPU: 200-500ms, GPU: 50-100ms)
+
+### Yeni Fikirler:
+
+*(Yok)*
+
+## 📊 OTURUM İSTATİSTİKLERİ
+
+- Tamamlanan görev: 3
+- Devam eden görev: 1
+- Değişen dosya: 1 (progress.md)
+- Eklenen satır: +15
+- Çözülen bug: 0
+- Yeni fikir: 0
+
+## 🎯 YARIN YAPILACAKLAR (ÖNCELİK SIRASI)
+
+1. [P0] **BERT Modelini Kur**
+   - pip install transformers torch sentencepiece
+   - Modeli indir ve test et
+   - Basit bir script ile çalıştırdığını doğrula
+
+2. [P1] **nlp_engine.py'ye BERT Entegre Et**
+   - Modeli global olarak yükle (lazy loading)
+   - Tokenizer'ı kullan
+   - Embeddings çıkarma fonksiyonu yaz
+
+3. [P2] **Sorgu Analizi Yapısı**
+   - BERT embeddings ile sorgu-tipi eşleştirme
+   - Route, multi, poi sorgularını ayır
+   - Test sorguları ile doğrula
+
+## 📝 ÖZEL NOTLAR
+
+- **Model Adı:** dbmdz/bert-base-turkish-uncased
+- **Backend:** PyTorch
+- **Cache:** ~/.cache/huggingface/hub/ (varsayılan)
+- **İlk Yükleme:** 5-10 saniye (indirme süresi hariç)
+- **Sonraki Yüklemeler:** 1-2 saniye (RAM'den)
+
+## ⚠️ DİKKAT EDİLECEKLER
+
+1. **transformers>=4.30.0** kullan (daha yeni versiyonlar uyumsuzluk olabilir)
+2. **torch>=2.0.0** gerekiyor
+3. İlk indirmede internet şart
+4. Model 440 MB, disk yerini kontrol et
+5. GPU varsa kullan (otomatik algılar)
+
+## 🔖 REFERANSLAR
+
+### Hugging Face Model:
+- https://huggingface.co/dbmdz/bert-base-turkish-uncased
+- Dökümantasyon: https://huggingface.co/docs/transformers
+
+### Öğrenilen Kaynaklar:
+- BERT Cased vs Uncased farkları
+- PyTorch vs TensorFlow karşılaştırma
+- Türkçe BERT modelleri incelemesi
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Oturum sonu raporu - 28.02.2026 ~20:30
+Sonraki faz: BERT kurulumu ve entegrasyonu
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -24,10 +24,11 @@ openroute/
 │
 └── günlük-rapor/                 ← Günlük notlar
     ├── 27.02.2026/
-    │   ├── 27.02.2026.txt        ← Günlük notlar
-    │   ├── 27.02.2026-sabah.txt  ← Oturum başı raporu
-    │   └── 27.02.2026-akşam.txt  ← Oturum sonu raporu
-    └── ...
+    │   └── 27.02.2026.txt        ← Tüm gün aynı dosya (sabah+akşam+gece)
+    ├── 28.02.2026/
+    │   └── 28.02.2026.txt        ← Tüm gün aynı dosya
+    └── 01.03.2026/
+        └── 01.03.2026.txt        ← Her gün = 1 dosya
 ```
 
 ---
@@ -67,11 +68,12 @@ openroute/
    - Frontend arama kutusu eklendi
    - Commit: 215bd40
 
-4. 🧠 **Doğal Dil Sorgu Sistemi (Prototype → Geliştiriliyor)**
-   - **Mevcut Durum:** Regex tabanlı prototype tamamlandı (`nlp_engine.py`)
-   - **Sorun:** Regex sınırlı, typo tolerant değil, bağlamayı anlamıyor
-   - **Plan:** Hibrit sisteme geçiş (Regex + spaCy NER)
-   - **Gelecek:** Transformer/LLM entegrasyonu değerlendiriliyor
+4. 🧠 **Doğal Dil Sorgu Sistemi (Regex Prototype → BERT'e Geçiliyor)**
+   - **Faz 1 (Tamam):** geocoder.py - Nominatim API, cache, rate limiting
+   - **Faz 2 (Tamam):** nlp_engine.py - Regex tabanlı prototype (6 sorgu tipi)
+   - **Faz 3 (Şu an):** BERT entegrasyonu - Typo tolerant ve bağlam anlayan sistem
+   - **Seçilen Model:** `dbmdz/bert-base-turkish-uncased`
+   - **Neden Uncased?** Kullanıcı sorguları büyük/küçük harf umursamaz, daha tolerant
    - **Durum:** Aktif geliştirme aşamasında
 
 ### Öğrenilenler:
@@ -99,12 +101,13 @@ openroute/
    - 6 sorgu tipi destekleniyor
    - **Sınırlama:** Typo tolerant değil, bağlamayı anlayamıyor
 
-3. 🔄 **Mimari Kararı: Hibrit Sisteme Geçiş**
-   - Regex: Basit sorgular (1ms)
-   - spaCy NER: Karmaşık sorgular (50ms)
-   - Gelecek: Transformer/LLM değerlendirmesi
+3. 🔄 **Mimari Kararı: BERT Model Entegrasyonu (28.02.2026 - Akşam)**
+   - Model: dbmdz/bert-base-turkish-uncased (PyTorch backend)
+   - Boyut: 440 MB disk, 1.5 GB RAM
+   - Neden Uncased? Arama sorguları için ideal (KADIKÖY = kadıköy)
+   - Amaç: Regex'in sınırlarını aşmak (typo tolerance, bağlam)
 
-**Sonraki adım:** spaCy entegrasyonu
+**Sonraki adım:** BERT modelini kurma ve test etme
 
 ---
 ---

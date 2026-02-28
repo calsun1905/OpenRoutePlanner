@@ -17,7 +17,13 @@
       "Bash(npm install:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git update-index:*)"
+      "Bash(git update-index:*)",
+      "mcp__zread__read_file",
+      "mcp__zread__get_repo_structure",
+      "Bash(git clone:*)",
+      "Bash(ln:*)",
+      "Bash(export:*)",
+      "Bash(curl:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

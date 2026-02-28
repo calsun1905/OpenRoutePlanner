@@ -134,4 +134,7 @@ Bu proje sayesinde öğrenebileceğin:
 
 - ⚠️ Her önemli adımda `progress/2026-02.md` güncelle
 - ⚠️ Commit sadece kullanıcı isteğiyle
-- ⚠️ Günlük notları `günlük-rapor/TARİH/TARİH.txt` dosyasına yaz
+- ⚠️ **Günlük rapor kuralı:** Her gün için SADECE 1 dosya
+  - Örnek: `günlük-rapor/01.03.2026/01.03.2026.txt`
+  - Sabah, öğlen, akşam... hepsi aynı dosyaya devam edilir
+  - Yeni gün sadece yeni tarih için açılır

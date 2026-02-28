@@ -1,11 +1,15 @@
 ---
-description: Projeyi her seferinde nasıl başlatırsın?
+description: Proje oturumunu yönetilen biçimde başlatır ve ilgili hookları çalıştırır.
 ---
 
-Bu projeyi her açtığında şu adımları izleyerek hızlıca çalıştırabilirsin:
+Bu komut her yeni bir yapay zeka sohbet oturumu açtığında, tüm geçmişi ve süreci hatırlayabilmemiz için tasarlanmıştır.
 
-### 1. Terminali Aç ve Doğru Klasöre Git
-VS Code terminalinde (veya PowerShell'de) ana dizinde olduğunu kontrol et.
+### 1. Oturum Başlangıç Hook'unu Çalıştır
+```bash
+# Agent, aşağıdaki dosyayı oku ve sadece Hızlı Başlangıç (Lite Mod) adımlarını VEYA tüm adımları uygula.
+# view_file('.claude/hooks/SessionStart.claude')
+```
+*Not: AI (Agent) bu dosyayı okuyacak, statüleri kontrol edecek ve sana günün özetini/sorularını sunacaktır.*
 
 ### 2. Sanal Ortamı (Venv) Aktif Et
 ```powershell
