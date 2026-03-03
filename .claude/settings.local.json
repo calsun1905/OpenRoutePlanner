@@ -1,0 +1,49 @@
+{
+  "env": {
+    "ANTHROPIC_API_KEY": "dsadasdsadasd.QANtNVDIkUJB1MKj",
+    "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.5-air",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.7",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-4.7"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(/plugin marketplace:*)",
+      "Bash(/plugin install:*)",
+      "Bash(node:*)",
+      "Bash(echo $APPDATA)",
+      "Bash(npm --version)",
+      "Bash(npx -y thedotmack/claude-mem --help)",
+      "Bash(claude plugin list)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/thedotmack/claude-mem/main/README.md\")",
+      "Bash(curl -s \"https://registry.npmjs.org/-/v1/search?text=claude-mem\")",
+      "Bash(npm info claude-mem)",
+      "Bash(npm view claude-mem bin)",
+      "Bash(npx -y claude-mem --help)",
+      "Bash(npm pack claude-mem --pack-destination=\"$TEMP\")",
+      "Bash(tar -tzf \"$TEMP/claude-mem-10.5.2.tgz\")",
+      "Bash(npm install -g claude-mem)",
+      "Bash(claude plugin marketplace add thedotmack/claude-mem)",
+      "Bash(claude plugin install claude-mem)",
+      "Bash(where claude)",
+      "mcp__serena__list_dir",
+      "Bash(\"c:/Users/Gaming/Desktop/projects/routeplanner/OpenRoutePlanner/günlük-rapor/03.03.2026/03.03.2026.txt\":*)",
+      "Bash(nvidia-smi)",
+      "Bash(python -c \":*)",
+      "Bash(python bert_nlp_engine.py)",
+      "Bash(python -c \"import app; print\\(''✅ app.py başarıyla yüklendi''\\)\")",
+      "Bash(python -c \"import app; print\\(''OK: app.py loaded successfully''\\)\")",
+      "Bash(timeout 5 python app.py)",
+      "Bash(python:*)"
+    ],
+    "mode": "auto"
+  },
+  "enabledPlugins": {
+    "glm-plan-usage@zai-coding-plugins": true,
+    "glm-plan-bug@zai-coding-plugins": true,
+    "claude-mem@thedotmack": true
+  },
+  "autoApprove": true
+}
