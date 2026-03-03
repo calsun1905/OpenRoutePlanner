@@ -257,7 +257,7 @@ def geocode(place_name: str) -> dict:
     # 1) Memory cache kontrol
     cache_key = place_name.lower()
     if cache_key in _geocode_cache:
-        print(f"[Geocoder] Memory cache hit: {place_name}")
+        # print(f"[Geocoder] Memory cache hit: {place_name}")
         return {
             "status": "success",
             **_geocode_cache[cache_key],
@@ -268,7 +268,7 @@ def geocode(place_name: str) -> dict:
     qhash = _query_hash(place_name)
     cached_data = _get_from_cache(qhash, "geocodes")
     if cached_data:
-        print(f"[Geocoder] SQLite cache hit: {place_name}")
+        # print(f"[Geocoder] SQLite cache hit: {place_name}")
         _geocode_cache[cache_key] = cached_data
         return {
             "status": "success",

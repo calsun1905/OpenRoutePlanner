@@ -49,6 +49,23 @@ def _save_routes(routes: List[Dict]):
         json.dump(routes, f, ensure_ascii=False, indent=2)
 
 
+def simplify_coords(coords: List[List[float]], tolerance: int = 3) -> List[List[float]]:
+    """
+    Koordinat listesini sıkıştırır — her N noktadan birini alır.
+    Rota kaydetme hızını artırır.
+    
+    Args:
+        coords: [[lat, lon], ...] listesi
+        tolerance: Kaç noktada bir alınacağı (varsayılan: 3)
+    
+    Returns:
+        Sıkıştırılmış koordinat listesi
+    """
+    if not coords or len(coords) <= 10:
+        return coords
+    return coords[::tolerance]
+
+
 def save_route(
     name: str,
     points: List[List[float]],

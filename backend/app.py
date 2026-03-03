@@ -99,22 +99,22 @@ def api_get_route():
 
         # 1) Seçilen noktaları kapsayan grafı al (otomatik bölge algılama)
         point_tuples = [(p[0], p[1]) for p in points]
-        print(f"[API] Noktalar için graf alınıyor: {len(points)} nokta")
+        # print(f"[API] Noktalar için graf alınıyor: {len(points)} nokta"))
         G = get_graph_for_points(point_tuples)
 
         # 2) Sıralama: TSP optimizasyonu veya kullanıcı sırası
         if optimize and len(point_tuples) > 2:
-            print(f"[API] TSP çözülüyor: {len(points)} nokta")
+            # print(f"[API] TSP çözülüyor: {len(points)} nokta"))
             optimized_order = solve_tsp(G, point_tuples)
         else:
-            print(f"[API] Sıralı rota: {len(points)} nokta")
+            # print(f"[API] Sıralı rota: {len(points)} nokta"))
             optimized_order = list(range(len(point_tuples)))
 
         # 3) Sıralanmış noktalar
         ordered_points = [point_tuples[i] for i in optimized_order]
 
         # 4) Tam rotayı oluştur (alternatif rota tipi ile)
-        print(f"[API] Tam rota oluşturuluyor... (Tip: {route_type})")
+        # print(f"[API] Tam rota oluşturuluyor... (Tip: {route_type})"))
         route_nodes = build_alternative_routes(G, ordered_points, route_type)
 
         if not route_nodes:
@@ -138,8 +138,8 @@ def api_get_route():
             "route_type": route_type,
         }
 
-        print(f"[API] Rota hesaplandı: {stats['total_distance_km']} km, "
-              f"~{stats['estimated_walk_minutes']} dk yürüme")
+        # print(f"[API] Rota hesaplandı: {stats['total_distance_km']} km, "
+        #       f"~{stats['estimated_walk_minutes']} dk yürüme")
         return jsonify(response)
 
     except Exception as e:
@@ -199,7 +199,7 @@ def api_get_alternative_routes():
             return jsonify({"error": "En az 2 nokta gereklidir."}), 400
 
         point_tuples = [(p[0], p[1]) for p in points]
-        print(f"[API] Alternatif rotalar hesaplanıyor: {len(points)} nokta")
+        # print(f"[API] Alternatif rotalar hesaplanıyor: {len(points)} nokta"))
         
         G = get_graph_for_points(point_tuples)
 
@@ -260,7 +260,7 @@ def api_get_alternative_routes():
         if not alternatives:
             return jsonify({"error": "Hiçbir alternatif rota hesaplanamadı."}), 400
 
-        print(f"[API] {len(alternatives)} alternatif rota hesaplandı")
+        # print(f"[API] {len(alternatives)} alternatif rota hesaplandı"))
         return jsonify({"alternatives": alternatives})
 
     except Exception as e:
@@ -304,7 +304,7 @@ def api_search_pois():
 
         cache_key = f"{place}::{category}"
         if cache_key in _poi_cache:
-            print(f"[API] POI cache'den döndürülüyor: {cache_key}")
+            # print(f"[API] POI cache'den döndürülüyor: {cache_key}"))
             pois = _poi_cache[cache_key]
         else:
             pois = search_pois(place, category)
@@ -312,7 +312,7 @@ def api_search_pois():
         return jsonify({"pois": pois})
 
     except Exception as e:
-        print(f"[API] POI arama hatası: {e}")
+        # print(f"[API] POI arama hatası: {e}"))
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 
@@ -533,7 +533,7 @@ def api_get_routes():
         })
     
     except Exception as e:
-        print(f"[API] Rota listeleme hatası: {e}")
+        # print(f"[API] Rota listeleme hatası: {e}"))
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 
@@ -556,7 +556,7 @@ def api_get_route_by_id(route_id):
         return jsonify({"route": route})
     
     except Exception as e:
-        print(f"[API] Rota getirme hatası: {e}")
+        # print(f"[API] Rota getirme hatası: {e}"))
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 
@@ -620,7 +620,7 @@ def api_delete_route(route_id):
         })
     
     except Exception as e:
-        print(f"[API] Rota silme hatası: {e}")
+        # print(f"[API] Rota silme hatası: {e}"))
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 
@@ -649,7 +649,7 @@ def api_toggle_favorite(route_id):
         })
     
     except Exception as e:
-        print(f"[API] Favori işlemi hatası: {e}")
+        # print(f"[API] Favori işlemi hatası: {e}"))
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 
@@ -704,7 +704,7 @@ def api_route_statistics():
         return jsonify(stats)
     
     except Exception as e:
-        print(f"[API] İstatistik hatası: {e}")
+        # print(f"[API] İstatistik hatası: {e}"))
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 
@@ -771,7 +771,7 @@ def api_create_timeline():
         return jsonify(timeline)
     
     except Exception as e:
-        print(f"[API] Timeline oluşturma hatası: {e}")
+        # print(f"[API] Timeline oluşturma hatası: {e}"))
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 
@@ -860,7 +860,7 @@ def api_optimize_timeline():
         return jsonify(result)
     
     except Exception as e:
-        print(f"[API] Optimizasyon hatası: {e}")
+        # print(f"[API] Optimizasyon hatası: {e}"))
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 

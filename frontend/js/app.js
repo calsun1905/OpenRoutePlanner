@@ -11,6 +11,7 @@ const API_BASE = "/api";
 let selectedPoints = [];
 let markers = [];
 let routePolyline = null;
+let routeGlowPolylines = [];  // Glow efektleri için ayrı takip
 let poiMarkers = [];
 let currentRouteData = null;
 
@@ -22,10 +23,9 @@ const map = L.map("map", {
 // Custom zoom control (sağ üste)
 L.control.zoom({ position: "topright" }).addTo(map);
 
-// Tile Layer — CartoDB Voyager (temiz, açık, modern stil)
-L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> | <a href="https://carto.com/">CARTO</a>',
-    subdomains: "abcd",
+// Tile Layer — OpenStreetMap Standard (Canlı, detaylı, dükkanlar görünür)
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
 }).addTo(map);
 
@@ -243,12 +243,9 @@ function clearRoute() {
         routePolyline = null;
     }
 
-    // Glow katmanlarını da temizle
-    map.eachLayer((layer) => {
-        if (layer instanceof L.Polyline && !(layer instanceof L.TileLayer)) {
-            map.removeLayer(layer);
-        }
-    });
+    // Glow katmanlarını temizle (routeGlowPolylines takip listesiyle)
+    routeGlowPolylines.forEach(layer => map.removeLayer(layer));
+    routeGlowPolylines = [];
 
     elRouteInfo.style.display = "none";
     currentRouteData = null;
@@ -601,12 +598,12 @@ async function showAlternativeRoutes() {
  */
 function displayAlternativeRoutes(alternatives) {
     elAlternativesPanel.style.display = "block";
-    
+
     let html = "";
-    
+
     alternatives.forEach((alt, index) => {
         const isActive = index === 0 ? "active" : "";
-        
+
         html += `
             <div class="alternative-card ${isActive}" data-route-type="${alt.type}">
                 <div class="alternative-header">
@@ -632,9 +629,9 @@ function displayAlternativeRoutes(alternatives) {
             </div>
         `;
     });
-    
+
     elAlternativesList.innerHTML = html;
-    
+
     // Panele scroll
     elAlternativesPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -644,16 +641,16 @@ function displayAlternativeRoutes(alternatives) {
  */
 function selectAlternativeRoute(routeType, routeCoords) {
     clearRoute();
-    
+
     // Rota renklerini belirle
     const routeColors = {
         shortest: "#6c5ce7",    // Mor
         fastest: "#00cec9",     // Turkuaz
         balanced: "#feca57"     // Sarı
     };
-    
+
     const color = routeColors[routeType] || "#6c5ce7";
-    
+
     // Rotayı çiz
     routePolyline = L.polyline(routeCoords, {
         color: color,
@@ -661,7 +658,7 @@ function selectAlternativeRoute(routeType, routeCoords) {
         opacity: 0.85,
         smoothFactor: 1,
     }).addTo(map);
-    
+
     // Glow efekti
     L.polyline(routeCoords, {
         color: color,
@@ -669,22 +666,22 @@ function selectAlternativeRoute(routeType, routeCoords) {
         opacity: 0.2,
         smoothFactor: 1,
     }).addTo(map);
-    
+
     // Haritayı rotaya sığdır
     map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
-    
+
     // Active sınıfını güncelle
     document.querySelectorAll(".alternative-card").forEach(card => {
         card.classList.remove("active");
     });
     document.querySelector(`[data-route-type="${routeType}"]`).classList.add("active");
-    
+
     const routeNames = {
         shortest: "En Kısa Rota",
         fastest: "En Hızlı Rota",
         balanced: "Dengeli Rota"
     };
-    
+
     showToast(`${routeNames[routeType]} seçildi! 🎯`, "success");
 }
 
@@ -699,7 +696,7 @@ function openSaveRouteModal() {
         showToast("Önce bir rota hesaplayın!", "error");
         return;
     }
-    
+
     elSaveRouteModal.style.display = "flex";
     document.getElementById("routeName").focus();
 }
@@ -722,22 +719,22 @@ async function confirmSaveRoute() {
     const name = document.getElementById("routeName").value.trim();
     const description = document.getElementById("routeDescription").value.trim();
     const tagsInput = document.getElementById("routeTags").value.trim();
-    
+
     if (!name) {
         showToast("Rota adı gerekli!", "error");
         return;
     }
-    
+
     if (!currentRouteData) {
         showToast("Kaydedilecek rota bulunamadı!", "error");
         return;
     }
-    
+
     // Etiketleri ayır
     const tags = tagsInput ? tagsInput.split(",").map(t => t.trim()).filter(t => t) : [];
-    
+
     showLoading("Rota kaydediliyor...");
-    
+
     try {
         const response = await fetch(`${API_BASE}/routes/save`, {
             method: "POST",
@@ -753,17 +750,17 @@ async function confirmSaveRoute() {
                 tags: tags
             }),
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || "Kaydetme hatası");
         }
-        
+
         closeSaveRouteModal();
         loadSavedRoutes(); // Listeyi yenile
         showToast(`"${name}" rotası kaydedildi! 💾`, "success");
-        
+
     } catch (error) {
         console.error("Rota kaydetme hatası:", error);
         showToast(`Hata: ${error.message}`, "error");
@@ -779,13 +776,13 @@ async function loadSavedRoutes() {
     try {
         const response = await fetch(`${API_BASE}/routes?sort_by=created_at&limit=10`);
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || "Rotalar yüklenemedi");
         }
-        
+
         displaySavedRoutes(data.routes);
-        
+
     } catch (error) {
         console.error("Rota yükleme hatası:", error);
         elSavedRoutesList.innerHTML = `<div class="empty-state"><p>Rotalar yüklenemedi</p></div>`;
@@ -800,17 +797,17 @@ function displaySavedRoutes(routes) {
         elSavedRoutesList.innerHTML = `<div class="empty-state"><p>Henüz kaydedilmiş rota yok</p></div>`;
         return;
     }
-    
+
     let html = "";
-    
+
     routes.forEach(route => {
         const date = new Date(route.created_at).toLocaleDateString("tr-TR", {
             day: "numeric",
             month: "short"
         });
-        
+
         const favoriteIcon = route.favorite ? "⭐" : "☆";
-        
+
         html += `
             <div class="saved-route-card">
                 <div class="saved-route-header">
@@ -841,7 +838,7 @@ function displaySavedRoutes(routes) {
             </div>
         `;
     });
-    
+
     elSavedRoutesList.innerHTML = html;
 }
 
@@ -850,25 +847,25 @@ function displaySavedRoutes(routes) {
  */
 async function loadRoute(routeId) {
     showLoading("Rota yükleniyor...");
-    
+
     try {
         const response = await fetch(`${API_BASE}/routes/${routeId}`);
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || "Rota yüklenemedi");
         }
-        
+
         const route = data.route;
-        
+
         // Mevcut noktaları temizle
         clearAllPoints();
-        
+
         // Rotanın noktalarını ekle
         route.points.forEach(([lat, lon]) => {
             addPoint(lat, lon);
         });
-        
+
         // Rotayı çiz
         currentRouteData = {
             route_coords: route.route_coords,
@@ -876,12 +873,12 @@ async function loadRoute(routeId) {
             estimated_walk_minutes: route.duration_minutes,
             route_type: route.route_type
         };
-        
+
         drawRoute(currentRouteData);
         showRouteInfo(currentRouteData);
-        
+
         showToast(`"${route.name}" rotası yüklendi! 📍`, "success");
-        
+
     } catch (error) {
         console.error("Rota yükleme hatası:", error);
         showToast(`Hata: ${error.message}`, "error");
@@ -898,18 +895,18 @@ async function toggleRouteFavorite(routeId) {
         const response = await fetch(`${API_BASE}/routes/${routeId}/favorite`, {
             method: "POST"
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || "Favori işlemi başarısız");
         }
-        
+
         loadSavedRoutes(); // Listeyi yenile
-        
+
         const message = data.is_favorite ? "Favorilere eklendi ⭐" : "Favorilerden çıkarıldı";
         showToast(message, "success");
-        
+
     } catch (error) {
         console.error("Favori işlemi hatası:", error);
         showToast(`Hata: ${error.message}`, "error");
@@ -923,21 +920,21 @@ async function deleteRoute(routeId) {
     if (!confirm("Bu rotayı silmek istediğinizden emin misiniz?")) {
         return;
     }
-    
+
     try {
         const response = await fetch(`${API_BASE}/routes/${routeId}`, {
             method: "DELETE"
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || "Silme işlemi başarısız");
         }
-        
+
         loadSavedRoutes(); // Listeyi yenile
         showToast("Rota silindi 🗑️", "success");
-        
+
     } catch (error) {
         console.error("Rota silme hatası:", error);
         showToast(`Hata: ${error.message}`, "error");
@@ -955,7 +952,7 @@ function showTimelinePlanner() {
         showToast("Önce bir rota hesaplayın!", "error");
         return;
     }
-    
+
     elTimelinePanel.style.display = "block";
     elTimelinePanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -968,28 +965,28 @@ async function generateTimeline() {
         showToast("Önce bir rota hesaplayın!", "error");
         return;
     }
-    
+
     const startTime = document.getElementById("startTime").value;
     const visitDuration = parseInt(document.getElementById("visitDuration").value);
-    
+
     if (!startTime) {
         showToast("Başlangıç saati seçin!", "error");
         return;
     }
-    
+
     showLoading("Zaman çizelgesi oluşturuluyor...");
-    
+
     try {
         // Noktalar arası mesafeleri hesapla
         const segmentDistances = calculateSegmentDistances();
-        
+
         // Nokta bilgilerini hazırla
         const points = selectedPoints.map((point, index) => ({
             name: `Nokta ${index + 1}`,
             lat: point[0],
             lon: point[1]
         }));
-        
+
         const response = await fetch(`${API_BASE}/timeline/create`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1001,16 +998,16 @@ async function generateTimeline() {
                 transport_mode: "walking"
             }),
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || "Zaman çizelgesi oluşturulamadı");
         }
-        
+
         displayTimeline(data);
         showToast("Zaman çizelgesi oluşturuldu! ⏰", "success");
-        
+
     } catch (error) {
         console.error("Timeline hatası:", error);
         showToast(`Hata: ${error.message}`, "error");
@@ -1026,11 +1023,11 @@ function calculateSegmentDistances() {
     if (!currentRouteData || !currentRouteData.total_distance_km) {
         return [];
     }
-    
+
     // Basit yaklaşım: toplam mesafeyi nokta sayısına böl
     const numSegments = selectedPoints.length - 1;
     const avgDistance = currentRouteData.total_distance_km / numSegments;
-    
+
     return Array(numSegments).fill(avgDistance);
 }
 
@@ -1039,10 +1036,10 @@ function calculateSegmentDistances() {
  */
 function displayTimeline(timeline) {
     elTimelineDisplay.style.display = "block";
-    
+
     const totalHours = Math.floor(timeline.total_duration_minutes / 60);
     const totalMins = timeline.total_duration_minutes % 60;
-    
+
     let html = `
         <div class="timeline-summary">
             <div class="timeline-stat">
@@ -1061,10 +1058,10 @@ function displayTimeline(timeline) {
         
         <div class="timeline-items">
     `;
-    
+
     timeline.schedule.forEach((item, index) => {
         const isLast = index === timeline.schedule.length - 1;
-        
+
         html += `
             <div class="timeline-item">
                 <div class="timeline-marker">${index + 1}</div>
@@ -1092,8 +1089,8 @@ function displayTimeline(timeline) {
             </div>
         `;
     });
-    
+
     html += `</div>`;
-    
+
     elTimelineDisplay.innerHTML = html;
 }
