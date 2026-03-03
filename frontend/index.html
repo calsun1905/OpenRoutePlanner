@@ -105,6 +105,36 @@
                 </svg>
                 Rotayı Hesapla
             </button>
+            <button class="btn btn-secondary" id="btnShowAlternatives" disabled style="margin-top: 8px;">
+                🔀 Alternatif Rotalar
+            </button>
+            <button class="btn btn-secondary" id="btnShowTimeline" disabled style="margin-top: 8px;">
+                ⏰ Zaman Planla
+            </button>
+        </div>
+
+        <!-- Alternative Routes Panel (hidden initially) -->
+        <div class="section" id="alternativesPanel" style="display: none;">
+            <h2>🔀 Alternatif Rotalar</h2>
+            <div id="alternativesList" class="alternatives-list"></div>
+        </div>
+
+        <!-- Timeline Panel (hidden initially) -->
+        <div class="section" id="timelinePanel" style="display: none;">
+            <h2>⏰ Zaman Planlaması</h2>
+            <div class="timeline-settings">
+                <div class="form-group-inline">
+                    <label for="startTime">Başlangıç Saati:</label>
+                    <input type="time" id="startTime" class="time-input" value="09:00">
+                </div>
+                <div class="form-group-inline">
+                    <label for="visitDuration">Varsayılan Süre:</label>
+                    <input type="number" id="visitDuration" class="number-input" value="30" min="5" max="180" step="5">
+                    <span class="input-suffix">dk</span>
+                </div>
+                <button class="btn btn-primary btn-sm" id="btnGenerateTimeline">Zaman Çizelgesi Oluştur</button>
+            </div>
+            <div id="timelineDisplay" class="timeline-display" style="display: none;"></div>
         </div>
 
         <!-- Route Info (hidden initially) -->
@@ -124,12 +154,32 @@
                     <span class="stat-value" id="statStops">—</span>
                 </div>
             </div>
+            <button class="btn btn-success" id="btnSaveRoute" style="margin-bottom: 8px;">
+                💾 Rotayı Kaydet
+            </button>
             <a href="#" target="_blank" class="btn btn-secondary" id="btnGoogleMaps" style="display: none;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
                 </svg>
                 Google Maps'te Aç
             </a>
+        </div>
+
+        <!-- Saved Routes Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>💾 Kaydedilen Rotalar</h2>
+                <button class="btn-icon" id="btnRefreshRoutes" title="Yenile">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="savedRoutesList" class="saved-routes-list">
+                <div class="empty-state">
+                    <p>Henüz kaydedilmiş rota yok</p>
+                </div>
+            </div>
         </div>
 
         <!-- POI Search -->
@@ -166,6 +216,34 @@
 
     <!-- Toast Container -->
     <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Save Route Modal -->
+    <div id="saveRouteModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💾 Rotayı Kaydet</h2>
+                <button class="modal-close" id="btnCloseSaveModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="routeName">Rota Adı *</label>
+                    <input type="text" id="routeName" class="form-input" placeholder="Örn: Kadıköy Turu" required>
+                </div>
+                <div class="form-group">
+                    <label for="routeDescription">Açıklama</label>
+                    <textarea id="routeDescription" class="form-textarea" rows="3" placeholder="Bu rota hakkında notlar..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="routeTags">Etiketler (virgülle ayırın)</label>
+                    <input type="text" id="routeTags" class="form-input" placeholder="tarihi, kültürel, romantik">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="btnCancelSave">İptal</button>
+                <button class="btn btn-primary" id="btnConfirmSave">Kaydet</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

@@ -25,7 +25,8 @@
       "Bash(export:*)",
       "Bash(curl:*)",
       "Bash(huggingface-cli scan-cache:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(sqlite3:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

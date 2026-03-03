@@ -47,6 +47,20 @@ const elToastContainer = document.getElementById("toastContainer");
 const elPlaceSearchInput = document.getElementById("placeSearchInput");
 const elBtnSearchPlace = document.getElementById("btnSearchPlace");
 const elSearchResults = document.getElementById("searchResults");
+const elBtnShowAlternatives = document.getElementById("btnShowAlternatives");
+const elAlternativesPanel = document.getElementById("alternativesPanel");
+const elAlternativesList = document.getElementById("alternativesList");
+const elBtnSaveRoute = document.getElementById("btnSaveRoute");
+const elSaveRouteModal = document.getElementById("saveRouteModal");
+const elBtnCloseSaveModal = document.getElementById("btnCloseSaveModal");
+const elBtnCancelSave = document.getElementById("btnCancelSave");
+const elBtnConfirmSave = document.getElementById("btnConfirmSave");
+const elSavedRoutesList = document.getElementById("savedRoutesList");
+const elBtnRefreshRoutes = document.getElementById("btnRefreshRoutes");
+const elBtnShowTimeline = document.getElementById("btnShowTimeline");
+const elTimelinePanel = document.getElementById("timelinePanel");
+const elBtnGenerateTimeline = document.getElementById("btnGenerateTimeline");
+const elTimelineDisplay = document.getElementById("timelineDisplay");
 
 // ========== CUSTOM MARKER ICON ==========
 function createNumberedIcon(number) {
@@ -153,6 +167,8 @@ function updatePointsList() {
 function updateButtons() {
     elBtnClearAll.disabled = selectedPoints.length === 0;
     elBtnCalculate.disabled = selectedPoints.length < 2;
+    elBtnShowAlternatives.disabled = selectedPoints.length < 2;
+    elBtnShowTimeline.disabled = selectedPoints.length < 2 || !currentRouteData;
 }
 
 // ========== ROUTE CALCULATION ==========
@@ -413,6 +429,14 @@ function showToast(message, type = "info") {
 elBtnClearAll.addEventListener("click", clearAllPoints);
 elBtnCalculate.addEventListener("click", calculateRoute);
 elBtnClearPois.addEventListener("click", clearPois);
+elBtnShowAlternatives.addEventListener("click", showAlternativeRoutes);
+elBtnSaveRoute.addEventListener("click", openSaveRouteModal);
+elBtnCloseSaveModal.addEventListener("click", closeSaveRouteModal);
+elBtnCancelSave.addEventListener("click", closeSaveRouteModal);
+elBtnConfirmSave.addEventListener("click", confirmSaveRoute);
+elBtnRefreshRoutes.addEventListener("click", loadSavedRoutes);
+elBtnShowTimeline.addEventListener("click", showTimelinePlanner);
+elBtnGenerateTimeline.addEventListener("click", generateTimeline);
 
 // POI butonları
 document.querySelectorAll(".btn-poi").forEach((btn) => {
@@ -429,6 +453,9 @@ document.querySelectorAll(".btn-poi").forEach((btn) => {
 
 // İlk bildirim
 showToast("Haritaya tıklayarak başlayın! 🗺️", "info");
+
+// Kaydedilmiş rotaları yükle
+loadSavedRoutes();
 
 
 // ========== PLACE SEARCH (GEOCODING) ==========
@@ -524,4 +551,549 @@ function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
+}
+
+
+// ========== ALTERNATIVE ROUTES ==========
+
+/**
+ * Alternatif rotaları gösterir
+ */
+async function showAlternativeRoutes() {
+    if (selectedPoints.length < 2) {
+        showToast("En az 2 nokta seçmelisiniz!", "error");
+        return;
+    }
+
+    showLoading("Alternatif rotalar hesaplanıyor...");
+
+    const optimize = document.getElementById("chkOptimize").checked;
+
+    try {
+        const response = await fetch(`${API_BASE}/get-alternative-routes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                points: selectedPoints,
+                optimize: optimize,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Bilinmeyen hata");
+        }
+
+        displayAlternativeRoutes(data.alternatives);
+        showToast(`${data.alternatives.length} alternatif rota bulundu! 🔀`, "success");
+
+    } catch (error) {
+        console.error("Alternatif rota hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Alternatif rotaları listeler
+ */
+function displayAlternativeRoutes(alternatives) {
+    elAlternativesPanel.style.display = "block";
+    
+    let html = "";
+    
+    alternatives.forEach((alt, index) => {
+        const isActive = index === 0 ? "active" : "";
+        
+        html += `
+            <div class="alternative-card ${isActive}" data-route-type="${alt.type}">
+                <div class="alternative-header">
+                    <span class="alternative-icon">${alt.icon}</span>
+                    <div class="alternative-info">
+                        <h3 class="alternative-name">${alt.name}</h3>
+                        <p class="alternative-desc">${alt.description}</p>
+                    </div>
+                </div>
+                <div class="alternative-stats">
+                    <div class="alternative-stat">
+                        <span class="stat-icon">📏</span>
+                        <span class="stat-text">${alt.distance_km} km</span>
+                    </div>
+                    <div class="alternative-stat">
+                        <span class="stat-icon">⏱️</span>
+                        <span class="stat-text">${alt.duration_minutes} dk</span>
+                    </div>
+                </div>
+                <button class="btn-select-route" onclick="selectAlternativeRoute('${alt.type}', ${JSON.stringify(alt.route_coords).replace(/"/g, '&quot;')})">
+                    Bu Rotayı Seç
+                </button>
+            </div>
+        `;
+    });
+    
+    elAlternativesList.innerHTML = html;
+    
+    // Panele scroll
+    elAlternativesPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/**
+ * Seçilen alternatif rotayı haritada gösterir
+ */
+function selectAlternativeRoute(routeType, routeCoords) {
+    clearRoute();
+    
+    // Rota renklerini belirle
+    const routeColors = {
+        shortest: "#6c5ce7",    // Mor
+        fastest: "#00cec9",     // Turkuaz
+        balanced: "#feca57"     // Sarı
+    };
+    
+    const color = routeColors[routeType] || "#6c5ce7";
+    
+    // Rotayı çiz
+    routePolyline = L.polyline(routeCoords, {
+        color: color,
+        weight: 5,
+        opacity: 0.85,
+        smoothFactor: 1,
+    }).addTo(map);
+    
+    // Glow efekti
+    L.polyline(routeCoords, {
+        color: color,
+        weight: 10,
+        opacity: 0.2,
+        smoothFactor: 1,
+    }).addTo(map);
+    
+    // Haritayı rotaya sığdır
+    map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
+    
+    // Active sınıfını güncelle
+    document.querySelectorAll(".alternative-card").forEach(card => {
+        card.classList.remove("active");
+    });
+    document.querySelector(`[data-route-type="${routeType}"]`).classList.add("active");
+    
+    const routeNames = {
+        shortest: "En Kısa Rota",
+        fastest: "En Hızlı Rota",
+        balanced: "Dengeli Rota"
+    };
+    
+    showToast(`${routeNames[routeType]} seçildi! 🎯`, "success");
+}
+
+
+// ========== SAVE ROUTE ==========
+
+/**
+ * Rota kaydetme modalını açar
+ */
+function openSaveRouteModal() {
+    if (!currentRouteData) {
+        showToast("Önce bir rota hesaplayın!", "error");
+        return;
+    }
+    
+    elSaveRouteModal.style.display = "flex";
+    document.getElementById("routeName").focus();
+}
+
+/**
+ * Rota kaydetme modalını kapatır
+ */
+function closeSaveRouteModal() {
+    elSaveRouteModal.style.display = "none";
+    // Formu temizle
+    document.getElementById("routeName").value = "";
+    document.getElementById("routeDescription").value = "";
+    document.getElementById("routeTags").value = "";
+}
+
+/**
+ * Rotayı kaydeder
+ */
+async function confirmSaveRoute() {
+    const name = document.getElementById("routeName").value.trim();
+    const description = document.getElementById("routeDescription").value.trim();
+    const tagsInput = document.getElementById("routeTags").value.trim();
+    
+    if (!name) {
+        showToast("Rota adı gerekli!", "error");
+        return;
+    }
+    
+    if (!currentRouteData) {
+        showToast("Kaydedilecek rota bulunamadı!", "error");
+        return;
+    }
+    
+    // Etiketleri ayır
+    const tags = tagsInput ? tagsInput.split(",").map(t => t.trim()).filter(t => t) : [];
+    
+    showLoading("Rota kaydediliyor...");
+    
+    try {
+        const response = await fetch(`${API_BASE}/routes/save`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: name,
+                description: description,
+                points: selectedPoints,
+                route_coords: currentRouteData.route_coords,
+                distance_km: currentRouteData.total_distance_km,
+                duration_minutes: currentRouteData.estimated_walk_minutes,
+                route_type: currentRouteData.route_type || "shortest",
+                tags: tags
+            }),
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || "Kaydetme hatası");
+        }
+        
+        closeSaveRouteModal();
+        loadSavedRoutes(); // Listeyi yenile
+        showToast(`"${name}" rotası kaydedildi! 💾`, "success");
+        
+    } catch (error) {
+        console.error("Rota kaydetme hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Kaydedilmiş rotaları yükler
+ */
+async function loadSavedRoutes() {
+    try {
+        const response = await fetch(`${API_BASE}/routes?sort_by=created_at&limit=10`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || "Rotalar yüklenemedi");
+        }
+        
+        displaySavedRoutes(data.routes);
+        
+    } catch (error) {
+        console.error("Rota yükleme hatası:", error);
+        elSavedRoutesList.innerHTML = `<div class="empty-state"><p>Rotalar yüklenemedi</p></div>`;
+    }
+}
+
+/**
+ * Kaydedilmiş rotaları listeler
+ */
+function displaySavedRoutes(routes) {
+    if (!routes || routes.length === 0) {
+        elSavedRoutesList.innerHTML = `<div class="empty-state"><p>Henüz kaydedilmiş rota yok</p></div>`;
+        return;
+    }
+    
+    let html = "";
+    
+    routes.forEach(route => {
+        const date = new Date(route.created_at).toLocaleDateString("tr-TR", {
+            day: "numeric",
+            month: "short"
+        });
+        
+        const favoriteIcon = route.favorite ? "⭐" : "☆";
+        
+        html += `
+            <div class="saved-route-card">
+                <div class="saved-route-header">
+                    <h3 class="saved-route-name">${escapeHtml(route.name)}</h3>
+                    <button class="btn-favorite" onclick="toggleRouteFavorite('${route.id}')" title="Favori">
+                        ${favoriteIcon}
+                    </button>
+                </div>
+                ${route.description ? `<p class="saved-route-desc">${escapeHtml(route.description)}</p>` : ""}
+                <div class="saved-route-stats">
+                    <span>📏 ${route.distance_km} km</span>
+                    <span>⏱️ ${route.duration_minutes} dk</span>
+                    <span>📅 ${date}</span>
+                </div>
+                ${route.tags && route.tags.length > 0 ? `
+                    <div class="saved-route-tags">
+                        ${route.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
+                    </div>
+                ` : ""}
+                <div class="saved-route-actions">
+                    <button class="btn-load-route" onclick="loadRoute('${route.id}')">
+                        📍 Yükle
+                    </button>
+                    <button class="btn-delete-route" onclick="deleteRoute('${route.id}')" title="Sil">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    elSavedRoutesList.innerHTML = html;
+}
+
+/**
+ * Kaydedilmiş rotayı yükler
+ */
+async function loadRoute(routeId) {
+    showLoading("Rota yükleniyor...");
+    
+    try {
+        const response = await fetch(`${API_BASE}/routes/${routeId}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || "Rota yüklenemedi");
+        }
+        
+        const route = data.route;
+        
+        // Mevcut noktaları temizle
+        clearAllPoints();
+        
+        // Rotanın noktalarını ekle
+        route.points.forEach(([lat, lon]) => {
+            addPoint(lat, lon);
+        });
+        
+        // Rotayı çiz
+        currentRouteData = {
+            route_coords: route.route_coords,
+            total_distance_km: route.distance_km,
+            estimated_walk_minutes: route.duration_minutes,
+            route_type: route.route_type
+        };
+        
+        drawRoute(currentRouteData);
+        showRouteInfo(currentRouteData);
+        
+        showToast(`"${route.name}" rotası yüklendi! 📍`, "success");
+        
+    } catch (error) {
+        console.error("Rota yükleme hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Rotayı favorilere ekler/çıkarır
+ */
+async function toggleRouteFavorite(routeId) {
+    try {
+        const response = await fetch(`${API_BASE}/routes/${routeId}/favorite`, {
+            method: "POST"
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || "Favori işlemi başarısız");
+        }
+        
+        loadSavedRoutes(); // Listeyi yenile
+        
+        const message = data.is_favorite ? "Favorilere eklendi ⭐" : "Favorilerden çıkarıldı";
+        showToast(message, "success");
+        
+    } catch (error) {
+        console.error("Favori işlemi hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    }
+}
+
+/**
+ * Rotayı siler
+ */
+async function deleteRoute(routeId) {
+    if (!confirm("Bu rotayı silmek istediğinizden emin misiniz?")) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/routes/${routeId}`, {
+            method: "DELETE"
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || "Silme işlemi başarısız");
+        }
+        
+        loadSavedRoutes(); // Listeyi yenile
+        showToast("Rota silindi 🗑️", "success");
+        
+    } catch (error) {
+        console.error("Rota silme hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    }
+}
+
+
+// ========== TIME PLANNING ==========
+
+/**
+ * Zaman planlama panelini gösterir
+ */
+function showTimelinePlanner() {
+    if (!currentRouteData || selectedPoints.length < 2) {
+        showToast("Önce bir rota hesaplayın!", "error");
+        return;
+    }
+    
+    elTimelinePanel.style.display = "block";
+    elTimelinePanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/**
+ * Zaman çizelgesi oluşturur
+ */
+async function generateTimeline() {
+    if (!currentRouteData) {
+        showToast("Önce bir rota hesaplayın!", "error");
+        return;
+    }
+    
+    const startTime = document.getElementById("startTime").value;
+    const visitDuration = parseInt(document.getElementById("visitDuration").value);
+    
+    if (!startTime) {
+        showToast("Başlangıç saati seçin!", "error");
+        return;
+    }
+    
+    showLoading("Zaman çizelgesi oluşturuluyor...");
+    
+    try {
+        // Noktalar arası mesafeleri hesapla
+        const segmentDistances = calculateSegmentDistances();
+        
+        // Nokta bilgilerini hazırla
+        const points = selectedPoints.map((point, index) => ({
+            name: `Nokta ${index + 1}`,
+            lat: point[0],
+            lon: point[1]
+        }));
+        
+        const response = await fetch(`${API_BASE}/timeline/create`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                points: points,
+                segment_distances: segmentDistances,
+                start_time: startTime,
+                visit_duration: visitDuration,
+                transport_mode: "walking"
+            }),
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || "Zaman çizelgesi oluşturulamadı");
+        }
+        
+        displayTimeline(data);
+        showToast("Zaman çizelgesi oluşturuldu! ⏰", "success");
+        
+    } catch (error) {
+        console.error("Timeline hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Segment mesafelerini hesaplar (basitleştirilmiş)
+ */
+function calculateSegmentDistances() {
+    if (!currentRouteData || !currentRouteData.total_distance_km) {
+        return [];
+    }
+    
+    // Basit yaklaşım: toplam mesafeyi nokta sayısına böl
+    const numSegments = selectedPoints.length - 1;
+    const avgDistance = currentRouteData.total_distance_km / numSegments;
+    
+    return Array(numSegments).fill(avgDistance);
+}
+
+/**
+ * Zaman çizelgesini görüntüler
+ */
+function displayTimeline(timeline) {
+    elTimelineDisplay.style.display = "block";
+    
+    const totalHours = Math.floor(timeline.total_duration_minutes / 60);
+    const totalMins = timeline.total_duration_minutes % 60;
+    
+    let html = `
+        <div class="timeline-summary">
+            <div class="timeline-stat">
+                <span class="timeline-stat-label">Başlangıç</span>
+                <span class="timeline-stat-value">🕐 ${timeline.start_time}</span>
+            </div>
+            <div class="timeline-stat">
+                <span class="timeline-stat-label">Bitiş</span>
+                <span class="timeline-stat-value">🕐 ${timeline.end_time}</span>
+            </div>
+            <div class="timeline-stat">
+                <span class="timeline-stat-label">Toplam Süre</span>
+                <span class="timeline-stat-value">⏱️ ${totalHours}s ${totalMins}dk</span>
+            </div>
+        </div>
+        
+        <div class="timeline-items">
+    `;
+    
+    timeline.schedule.forEach((item, index) => {
+        const isLast = index === timeline.schedule.length - 1;
+        
+        html += `
+            <div class="timeline-item">
+                <div class="timeline-marker">${index + 1}</div>
+                <div class="timeline-content">
+                    <div class="timeline-point-name">${escapeHtml(item.point_name)}</div>
+                    <div class="timeline-times">
+                        <span class="timeline-time">
+                            <span class="timeline-time-label">Varış:</span>
+                            <span class="timeline-time-value">${item.arrival_time}</span>
+                        </span>
+                        <span class="timeline-time">
+                            <span class="timeline-time-label">Ayrılış:</span>
+                            <span class="timeline-time-value">${item.departure_time}</span>
+                        </span>
+                    </div>
+                    <div class="timeline-duration">
+                        ⏱️ ${item.visit_duration_minutes} dakika kalış
+                    </div>
+                    ${!isLast ? `
+                        <div class="timeline-travel">
+                            🚶‍♂️ ${item.next_travel_time_minutes} dakika yürüyüş
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `</div>`;
+    
+    elTimelineDisplay.innerHTML = html;
 }
