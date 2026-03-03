@@ -5,3 +5,10 @@ __pycache__/
 backend/data/*.graphml
 .env
 *.log
+
+# İndirilen yapay zeka modelleri
+backend/models/*
+!backend/models/.gitkeep
+!backend/models/bert-base-turkish-uncased/
+backend/models/bert-base-turkish-uncased/*
+!backend/models/bert-base-turkish-uncased/.gitkeep

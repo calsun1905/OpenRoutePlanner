@@ -23,7 +23,9 @@
       "Bash(git clone:*)",
       "Bash(ln:*)",
       "Bash(export:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(huggingface-cli scan-cache:*)",
+      "Bash(dir:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -1,0 +1,44 @@
+╔════════════════════════════════════════════════════════╗
+║        OTURUM BAŞLANGICI                              ║
+║        Tarih: 03.03.2026 - Başlangıç: 10:02          ║
+╚════════════════════════════════════════════════════════╝
+
+### Sistem Durumu:
+- Git Branch: main
+- Uncommitted Changes: YOK
+- Son Commit: f50f580
+
+### Bu Oturumun Hedefleri:
+- Doğal Dil Sorgu Faz 2.5: BERT modelinin (dbmdz/bert-base-turkish-uncased) Hugging Face CLI kullanılarak projeye entegre edilmesi.
+
+### Devam Eden İşler:
+- nlp_engine.py modülünün BERT tabanlı hibrit sisteme dönüştürülmesi çalışmasına başlanacak.
+
+### Notlar:
+- Kullanıcı önceliği BERT modeline verdi. Modelin huggingface-cli üzerinden indirilmesi kararlaştırıldı.
+
+---
+
+## ✅ FAZ 2.5 TAMAMLANDI: BERT Model Entegrasyonu (10:25)
+
+### Yapılanlar:
+1. ✅ requirements.txt güncellendi (transformers, torch, sentence-transformers)
+2. ✅ bert_engine.py oluşturuldu (440 MB, CUDA destekli)
+3. ✅ Model indirildi ve cache'lendi
+4. ✅ Test başarılı: Typo tolerance çalışıyor!
+
+### Test Sonuçları:
+| Test | Benzerlik |
+|------|-----------|
+| Kadıköy vs Kadıköy | 1.0000 (aynı) |
+| Kadıköy vs Kadiköy | 0.9511 (typo tolerance!) |
+| Kadıköy vs Kadikoy | 0.9511 (typo tolerance!) |
+| Taksim Meydanı vs Taksim | 0.9268 |
+
+### Teknik Detaylar:
+- Model: dbmdz/bert-base-turkish-uncased
+- Device: CUDA (GPU aktif)
+- Embedding boyutu: 768
+- Singleton pattern ile global cache
+
+---
