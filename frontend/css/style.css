@@ -491,12 +491,18 @@ body {
 /* --- POI Grid --- */
 .poi-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+}
+
+@media (max-width: 768px) {
+    .poi-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 .btn-poi {
-    padding: 10px 12px;
+    padding: 8px 6px;
     background: var(--bg-card);
     color: var(--text-primary);
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -1421,4 +1427,149 @@ body {
     padding-top: 6px;
     border-top: 1px solid rgba(255, 255, 255, 0.04);
     margin-top: 6px;
+}
+
+/* --- Saved Locations --- */
+.saved-locations-list {
+    max-height: 250px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+}
+
+.saved-location-card {
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all var(--transition-fast);
+    animation: slideIn 0.3s ease;
+    cursor: pointer;
+}
+
+.saved-location-card:hover {
+    background: var(--bg-card-hover);
+    border-color: rgba(108, 92, 231, 0.3);
+    transform: translateX(4px);
+}
+
+.saved-location-icon {
+    font-size: 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(108, 92, 231, 0.1);
+    border-radius: 50%;
+    color: var(--accent-primary);
+}
+
+.saved-location-info {
+    flex: 1;
+}
+
+.saved-location-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 2px 0;
+}
+
+.saved-location-address {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+.saved-location-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ic-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    padding: 2px;
+}
+
+.ic-btn:hover {
+    opacity: 1;
+}
+
+.ic-btn-route {
+    color: var(--accent-success);
+}
+
+.ic-btn-delete {
+    color: var(--accent-danger);
+}
+
+/* --- Icon Selector for Modal --- */
+.icon-selector {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.icon-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 1.4rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-btn:hover {
+    background: var(--bg-card-hover);
+    transform: translateY(-2px);
+}
+
+.icon-btn.active {
+    background: rgba(108, 92, 231, 0.2);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 10px rgba(108, 92, 231, 0.3);
+}
+
+/* --- Location Specific Leaflet Markers --- */
+.location-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--bg-card);
+    border-radius: 50%;
+    border: 3px solid var(--accent-primary);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    font-size: 1.2rem;
+    transition: transform 0.2s;
+}
+
+.location-marker:hover {
+    transform: scale(1.1);
+    z-index: 1000 !important;
+}
+
+.location-marker-hidden {
+    display: none !important;
 }

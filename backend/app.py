@@ -34,6 +34,12 @@ from time_planner import (
     check_time_conflicts,
     optimize_schedule,
 )
+from location_storage import (
+    save_location,
+    get_all_locations,
+    update_location,
+    delete_location,
+)
 
 # Frontend klasörünün yolu
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
@@ -861,6 +867,99 @@ def api_optimize_timeline():
     
     except Exception as e:
         # print(f"[API] Optimizasyon hatası: {e}"))
+        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+
+
+# =============================================================================
+# KULLANICI LOKASYON API'LERİ
+# =============================================================================
+
+@app.route("/api/locations", methods=["GET"])
+def api_get_locations():
+    """
+    Kaydedilmiş tüm lokasyonları getirir.
+    """
+    try:
+        sort_by = request.args.get("sort_by", "created_at")
+        limit = request.args.get("limit", type=int)
+        
+        locations = get_all_locations(sort_by=sort_by, limit=limit)
+        
+        return jsonify({
+            "locations": locations,
+            "count": len(locations)
+        })
+    except Exception as e:
+        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+
+
+@app.route("/api/locations", methods=["POST"])
+def api_save_location():
+    """
+    Yeni bir lokasyon kaydeder.
+    """
+    try:
+        data = request.get_json()
+        
+        required_fields = ["name", "lat", "lon"]
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"'{field}' alanı gerekli."}), 400
+                
+        location = save_location(
+            name=data["name"],
+            lat=data["lat"],
+            lon=data["lon"],
+            icon_type=data.get("icon_type", "star"),
+            address=data.get("address", "")
+        )
+        
+        return jsonify({
+            "status": "success",
+            "location": location,
+            "message": f"'{location['name']}' konumu kaydedildi!"
+        })
+    except Exception as e:
+        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+
+
+@app.route("/api/locations/<location_id>", methods=["DELETE"])
+def api_delete_location(location_id):
+    """
+    Lokasyonu siler.
+    """
+    try:
+        success = delete_location(location_id)
+        
+        if not success:
+            return jsonify({"error": "Lokasyon bulunamadı"}), 404
+            
+        return jsonify({
+            "status": "success",
+            "message": "Lokasyon silindi"
+        })
+    except Exception as e:
+        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+
+
+@app.route("/api/locations/<location_id>", methods=["PUT"])
+def api_update_location(location_id):
+    """
+    Lokasyonu günceller.
+    """
+    try:
+        data = request.get_json()
+        location = update_location(location_id, data)
+        
+        if not location:
+            return jsonify({"error": "Lokasyon bulunamadı"}), 404
+            
+        return jsonify({
+            "status": "success",
+            "location": location,
+            "message": "Lokasyon güncellendi"
+        })
+    except Exception as e:
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 

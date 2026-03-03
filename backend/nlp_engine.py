@@ -12,6 +12,17 @@ Desteklenen sorgu türleri:
 
 import re
 from typing import Dict, List, Optional, Any
+try:
+    from location_storage import get_all_locations
+except ImportError:
+    try:
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from location_storage import get_all_locations
+    except ImportError:
+        def get_all_locations(): return []
+
 
 
 # =============================================================================
@@ -142,6 +153,9 @@ def _extract_place_names(text: str) -> List[str]:
     Returns:
         list[str]: Yer isimleri listesi
     """
+    # Kayıtlı özel lokasyonları kontrol et
+    custom_locations = [loc.get("name", "").lower() for loc in get_all_locations() if loc.get("name")]
+    
     # Virgül ile ayrılmış yerleri ayır
     parts = text.split(',')
 
@@ -151,6 +165,12 @@ def _extract_place_names(text: str) -> List[str]:
         words = []
         for word in part.split():
             word_lower = word.lower()
+            
+            # Eğer kelime kullanıcının kaydettiği özel bir lokasyonsa (Ev, İş vb.) silme!
+            if word_lower in custom_locations:
+                words.append(word)
+                continue
+                
             if word_lower not in STOP_WORDS:
                 words.append(word)
         place = ' '.join(words).strip()

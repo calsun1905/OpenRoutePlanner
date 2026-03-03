@@ -1,0 +1,59 @@
+Loading graph...
+[GraphManager] Cache'den okunuyor: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\point_41.0259_28.9800_1582.graphml
+Graph loaded.
+Finding paths between 3143473571 and 278344485...
+[RouteEngine] === GERÇEK ALTERNATÝF ROTALAR AÇILIYOR === 3143473571 -> 278344485
+[RouteEngine] Aday 1: 3.06 km, 57 nodes
+[RouteEngine] Aday 2: 3.06 km, 59 nodes
+[RouteEngine] Aday 3: 3.06 km, 58 nodes
+[RouteEngine] Aday 4: 3.06 km, 58 nodes
+[RouteEngine] Aday 5: 3.06 km, 58 nodes
+[RouteEngine] Aday 6: 3.06 km, 58 nodes
+[RouteEngine] Aday 7: 3.06 km, 58 nodes
+[RouteEngine] Aday 8: 3.06 km, 58 nodes
+[RouteEngine] Aday 9: 3.06 km, 58 nodes
+[RouteEngine] Aday 10: 3.06 km, 60 nodes
+[RouteEngine] Aday 11: 3.06 km, 57 nodes
+[RouteEngine] Aday 12: 3.06 km, 60 nodes
+[RouteEngine] Aday 13: 3.06 km, 59 nodes
+[RouteEngine] Aday 14: 3.06 km, 59 nodes
+[RouteEngine] Aday 15: 3.06 km, 60 nodes
+[RouteEngine] Toplam 15 aday yol bulundu
+[RouteEngine] = SHORTEST secildi: 3.06 km
+[RouteEngine] Aday 2 overlap: 96.61%
+[RouteEngine] Aday 3 overlap: 98.28%
+[RouteEngine] Aday 4 overlap: 98.28%
+[RouteEngine] Aday 5 overlap: 91.67%
+[RouteEngine] Aday 6 overlap: 85.48%
+[RouteEngine] Aday 7 overlap: 88.52%
+[RouteEngine] Aday 8 overlap: 94.92%
+[RouteEngine] Aday 9 overlap: 98.28%
+[RouteEngine] Aday 10 overlap: 95.00%
+[RouteEngine] Aday 11 overlap: 96.55%
+[RouteEngine] Aday 12 overlap: 95.00%
+[RouteEngine] Aday 13 overlap: 90.16%
+[RouteEngine] Aday 14 overlap: 96.61%
+[RouteEngine] Aday 15 overlap: 88.71%
+[RouteEngine] = FASTEST secildi (idx 6): 3.06 km (overlap: 85.48%)
+[RouteEngine] Aday 2 combined overlap: 89.71%
+[RouteEngine] Aday 3 combined overlap: 91.20%
+[RouteEngine] Aday 4 combined overlap: 92.69%
+[RouteEngine] Aday 5 combined overlap: 92.50%
+[RouteEngine] Aday 7 combined overlap: 92.57%
+[RouteEngine] Aday 8 combined overlap: 92.54%
+[RouteEngine] Aday 9 combined overlap: 91.20%
+[RouteEngine] Aday 10 combined overlap: 88.27%
+[RouteEngine] Aday 11 combined overlap: 89.55%
+[RouteEngine] Aday 12 combined overlap: 89.69%
+[RouteEngine] Aday 13 combined overlap: 83.72%
+[RouteEngine] Aday 14 combined overlap: 91.16%
+[RouteEngine] Aday 15 combined overlap: 89.52%
+[RouteEngine] = BALANCED secildi (idx 13): 3.06 km (overlap: 83.72%)
+[RouteEngine] === TOPLAM 3 FARKLI ALTERNATÝF ROTA BULUNDU ===
+[RouteEngine] Alternatif 1 (shortest): 57 nodes, 3.06 km
+[RouteEngine] Alternatif 2 (fastest): 58 nodes, 3.06 km
+[RouteEngine] Alternatif 3 (balanced): 59 nodes, 3.06 km
+Result:
+Type: shortest, Distance: 3.06, Nodes: 57
+Type: fastest, Distance: 3.06, Nodes: 58
+Type: balanced, Distance: 3.06, Nodes: 59

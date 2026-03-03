@@ -5,6 +5,13 @@ Rotalar için zaman çizelgesi oluşturur.
 Başlangıç saati, ziyaret süreleri ve varış/ayrılış zamanlarını hesaplar.
 """
 
+import sys
+import io
+# UTF-8 encoding için stdout ayarla (Windows terminal desteği)
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 

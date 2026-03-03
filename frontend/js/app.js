@@ -62,6 +62,25 @@ const elTimelinePanel = document.getElementById("timelinePanel");
 const elBtnGenerateTimeline = document.getElementById("btnGenerateTimeline");
 const elTimelineDisplay = document.getElementById("timelineDisplay");
 
+// Saved Locations elements
+const elSavedLocationsList = document.getElementById("savedLocationsList");
+const elBtnToggleSavedLocations = document.getElementById("btnToggleSavedLocations");
+const elBtnRefreshLocations = document.getElementById("btnRefreshLocations");
+const elIconLocationVisible = document.getElementById("iconLocationVisible");
+
+const elSaveLocationModal = document.getElementById("saveLocationModal");
+const elBtnCloseLocationModal = document.getElementById("btnCloseLocationModal");
+const elBtnCancelLocation = document.getElementById("btnCancelLocation");
+const elBtnConfirmSaveLocation = document.getElementById("btnConfirmSaveLocation");
+const elLocationName = document.getElementById("locationName");
+const elLocationLat = document.getElementById("locationLat");
+const elLocationLon = document.getElementById("locationLon");
+const elLocationAddress = document.getElementById("locationAddress");
+const locationIconBtns = document.querySelectorAll("#locationIconSelector .icon-btn");
+
+let showSavedLocationsOnMap = true;
+let customLocationMarkers = [];
+
 // ========== CUSTOM MARKER ICON ==========
 function createNumberedIcon(number) {
     return L.divIcon({
@@ -97,8 +116,17 @@ function addPoint(lat, lng) {
         icon: createNumberedIcon(index + 1),
     }).addTo(map);
 
+    // Sağ tıklama menüsü - Konumu Kaydet
+    marker.on('contextmenu', function (e) {
+        openSaveLocationModal(lat, lng, `Nokta ${index + 1}`);
+    });
+
     marker.bindPopup(
-        `<strong>Nokta ${index + 1}</strong><br>${lat.toFixed(5)}, ${lng.toFixed(5)}`
+        `<strong>Nokta ${index + 1}</strong><br>${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
+         <button class="btn btn-primary btn-sm" style="margin-top: 8px; width: 100%;" 
+            onclick="openSaveLocationModal(${lat}, ${lng}, 'Nokta ${index + 1}')">
+            📍 Konumu Kaydet
+         </button>`
     );
 
     markers.push(marker);
@@ -201,6 +229,7 @@ async function calculateRoute() {
         currentRouteData = data;
         drawRoute(data);
         showRouteInfo(data);
+        updateButtons();  // Buton durumlarını güncelle
         showToast("Rota başarıyla hesaplandı! ✨", "success");
 
     } catch (error) {
@@ -435,6 +464,22 @@ elBtnRefreshRoutes.addEventListener("click", loadSavedRoutes);
 elBtnShowTimeline.addEventListener("click", showTimelinePlanner);
 elBtnGenerateTimeline.addEventListener("click", generateTimeline);
 
+// Saved Location event listeners
+elBtnRefreshLocations.addEventListener("click", loadSavedLocations);
+elBtnToggleSavedLocations.addEventListener("click", toggleSavedLocationsVisibility);
+elBtnCloseLocationModal.addEventListener("click", closeSaveLocationModal);
+elBtnCancelLocation.addEventListener("click", closeSaveLocationModal);
+elBtnConfirmSaveLocation.addEventListener("click", confirmSaveLocation);
+
+// Icon selector behavior
+locationIconBtns.forEach(btn => {
+    btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        locationIconBtns.forEach(b => b.classList.remove("active"));
+        this.classList.add("active");
+    });
+});
+
 // POI butonları
 document.querySelectorAll(".btn-poi").forEach((btn) => {
     btn.addEventListener("click", function () {
@@ -451,9 +496,9 @@ document.querySelectorAll(".btn-poi").forEach((btn) => {
 // İlk bildirim
 showToast("Haritaya tıklayarak başlayın! 🗺️", "info");
 
-// Kaydedilmiş rotaları yükle
+// Kaydedilmiş rotaları ve yerleri yükle
 loadSavedRoutes();
-
+loadSavedLocations();
 
 // ========== PLACE SEARCH (GEOCODING) ==========
 
@@ -520,6 +565,10 @@ function displaySearchResult(data) {
         <div class="search-result-item" onclick="selectSearchResult(${data.lat}, ${data.lon}, '${escapeHtml(data.display_name)}')">
             <div class="search-result-name">📍 ${escapeHtml(data.display_name)}</div>
             <div class="search-result-coords">${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}</div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:5px; width: 100%; border: 1px solid rgba(255,255,255,0.1);" 
+                onclick="event.stopPropagation(); openSaveLocationModal(${data.lat}, ${data.lon}, '${escapeHtml(data.display_name).split(',')[0]}')">
+                💾 Bu Konumu Kaydet
+            </button>
         </div>
     `;
 }
@@ -659,13 +708,14 @@ function selectAlternativeRoute(routeType, routeCoords) {
         smoothFactor: 1,
     }).addTo(map);
 
-    // Glow efekti
-    L.polyline(routeCoords, {
+    // Glow efekti - tracking listesine ekle
+    const glow = L.polyline(routeCoords, {
         color: color,
         weight: 10,
         opacity: 0.2,
         smoothFactor: 1,
     }).addTo(map);
+    routeGlowPolylines.push(glow);
 
     // Haritayı rotaya sığdır
     map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
@@ -675,6 +725,20 @@ function selectAlternativeRoute(routeType, routeCoords) {
         card.classList.remove("active");
     });
     document.querySelector(`[data-route-type="${routeType}"]`).classList.add("active");
+
+    // currentRouteData'yı seçilen alternatif rota ile güncelle
+    if (alternativeRoutesCache[routeType]) {
+        const altData = alternativeRoutesCache[routeType];
+        currentRouteData = {
+            route_coords: routeCoords,
+            total_distance_km: altData.distance_km,
+            estimated_walk_minutes: altData.duration_minutes,
+            route_type: routeType
+        };
+    }
+
+    // Butonları güncelle
+    updateButtons();
 
     const routeNames = {
         shortest: "En Kısa Rota",
@@ -876,6 +940,7 @@ async function loadRoute(routeId) {
 
         drawRoute(currentRouteData);
         showRouteInfo(currentRouteData);
+        updateButtons();  // Buton durumlarını güncelle
 
         showToast(`"${route.name}" rotası yüklendi! 📍`, "success");
 
@@ -1093,4 +1158,232 @@ function displayTimeline(timeline) {
     html += `</div>`;
 
     elTimelineDisplay.innerHTML = html;
+}
+
+// ========== SAVED LOCATIONS (KAYITLI YERLER) ==========
+
+// İkon haritası
+const locationEmojiMap = {
+    home: "🏠",
+    work: "💼",
+    school: "🎓",
+    gym: "🏋️",
+    market: "🛒",
+    star: "⭐",
+    marker: "📍"
+};
+
+/**
+ * Konum kaydetme modalını açar
+ */
+window.openSaveLocationModal = function (lat, lon, defaultName = "") {
+    elLocationLat.value = lat;
+    elLocationLon.value = lon;
+    elLocationName.value = defaultName;
+    elLocationAddress.value = ""; // Reverse geocoding ile de doldurulabilir (şimdilik boş kalsın)
+
+    // Default marker'ı sıfırla
+    locationIconBtns.forEach(b => b.classList.remove("active"));
+    document.querySelector('#locationIconSelector [data-icon="marker"]').classList.add("active");
+
+    elSaveLocationModal.style.display = "flex";
+    elLocationName.focus();
+};
+
+function closeSaveLocationModal() {
+    elSaveLocationModal.style.display = "none";
+    elLocationName.value = "";
+}
+
+/**
+ * Konumu sunucuya kaydeder
+ */
+async function confirmSaveLocation() {
+    const name = elLocationName.value.trim();
+    const lat = parseFloat(elLocationLat.value);
+    const lon = parseFloat(elLocationLon.value);
+    const address = elLocationAddress.value.trim();
+
+    const activeIconBtn = document.querySelector('#locationIconSelector .icon-btn.active');
+    const iconType = activeIconBtn ? activeIconBtn.dataset.icon : "marker";
+
+    if (!name) {
+        showToast("Konum adı gerekli!", "error");
+        return;
+    }
+
+    if (isNaN(lat) || isNaN(lon)) {
+        showToast("Geçersiz koordinatlar!", "error");
+        return;
+    }
+
+    showLoading("Konum kaydediliyor...");
+
+    try {
+        const response = await fetch(`${API_BASE}/locations`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: name,
+                lat: lat,
+                lon: lon,
+                icon_type: iconType,
+                address: address
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Kaydetme hatası");
+        }
+
+        closeSaveLocationModal();
+        loadSavedLocations(); // Listeyi yenile
+        showToast(`"${name}" konumu kaydedildi! 📍`, "success");
+
+    } catch (error) {
+        console.error("Konum kaydetme hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    } finally {
+        hideLoading();
+    }
+}
+
+/**
+ * Sunucudan kayıtlı konumları getir ve ekrana çiz
+ */
+async function loadSavedLocations() {
+    try {
+        const response = await fetch(`${API_BASE}/locations?limit=20`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Konumlar yüklenemedi");
+        }
+
+        displaySavedLocationsSidebar(data.locations);
+
+        if (showSavedLocationsOnMap) {
+            drawSavedLocationsOnMap(data.locations);
+        }
+
+    } catch (error) {
+        console.error("Konum yükleme hatası:", error);
+        elSavedLocationsList.innerHTML = `<div class="empty-state"><p>Yer imleri yüklenemedi</p></div>`;
+    }
+}
+
+function displaySavedLocationsSidebar(locations) {
+    if (!locations || locations.length === 0) {
+        elSavedLocationsList.innerHTML = `<div class="empty-state"><p>Henüz kayıtlı yeriniz yok</p></div>`;
+        return;
+    }
+
+    let html = "";
+    locations.forEach(loc => {
+        const emoji = locationEmojiMap[loc.icon_type] || "📍";
+
+        html += `
+            <div class="saved-location-card" onclick="zoomToLocation(${loc.lat}, ${loc.lon}, '${escapeHtml(loc.name)}')">
+                <div class="saved-location-icon">${emoji}</div>
+                <div class="saved-location-info">
+                    <h3 class="saved-location-name">${escapeHtml(loc.name)}</h3>
+                    <p class="saved-location-address">Kullanım: ${loc.usage_count}</p>
+                </div>
+                <div class="saved-location-actions" onclick="event.stopPropagation()">
+                    <button class="ic-btn ic-btn-route" onclick="addPoint(${loc.lat}, ${loc.lon})" title="Rotaya Ekle">
+                        ＋
+                    </button>
+                    <button class="ic-btn ic-btn-delete" onclick="deleteSavedLocation('${loc.id}')" title="Sil">
+                        ✖
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    elSavedLocationsList.innerHTML = html;
+}
+
+window.zoomToLocation = function (lat, lon, name) {
+    map.setView([lat, lon], 16);
+    // showToast(`${name} konumuna gidildi`, "info");
+};
+
+async function deleteSavedLocation(locationId) {
+    if (!confirm("Bu konumu silmek istediğinizden emin misiniz?")) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/locations/${locationId}`, {
+            method: "DELETE"
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Silme işlemi başarısız");
+        }
+
+        loadSavedLocations(); // Backendi ve haritayı yenile
+        showToast("Konum silindi 🗑️", "success");
+
+    } catch (error) {
+        console.error("Konum silme hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    }
+}
+
+/**
+ * Haritadaki markerları çizer
+ */
+function drawSavedLocationsOnMap(locations) {
+    clearSavedLocationMarkers();
+
+    locations.forEach(loc => {
+        const emoji = locationEmojiMap[loc.icon_type] || "📍";
+
+        const icon = L.divIcon({
+            className: "custom-marker-wrapper",
+            html: `<div class="location-marker">${emoji}</div>`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+            popupAnchor: [0, -18],
+        });
+
+        const marker = L.marker([loc.lat, loc.lon], { icon: icon }).addTo(map);
+        marker.bindPopup(`<strong>${escapeHtml(loc.name)}</strong><br>
+                          <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="addPoint(${loc.lat}, ${loc.lon})">Rotaya Ekle</button>`);
+
+        customLocationMarkers.push(marker);
+    });
+}
+
+function clearSavedLocationMarkers() {
+    customLocationMarkers.forEach(m => map.removeLayer(m));
+    customLocationMarkers = [];
+}
+
+function toggleSavedLocationsVisibility() {
+    showSavedLocationsOnMap = !showSavedLocationsOnMap;
+
+    if (showSavedLocationsOnMap) {
+        // İkonu aktif göz yap
+        elIconLocationVisible.innerHTML = `
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+        `;
+        elIconLocationVisible.style.stroke = "currentColor";
+        loadSavedLocations(); // Yeniden yükleyip çizsin
+    } else {
+        // İkonu kapalı göz yap
+        elIconLocationVisible.innerHTML = `
+            <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path>
+            <line x1="1" y1="1" x2="23" y2="23"></line>
+        `;
+        elIconLocationVisible.style.stroke = "var(--text-muted)";
+        clearSavedLocationMarkers();
+    }
 }

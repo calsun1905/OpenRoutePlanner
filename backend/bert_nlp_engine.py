@@ -34,6 +34,18 @@ except ImportError:
     except ImportError:
         get_all_turkey_places = None
 
+try:
+    from location_storage import get_all_locations
+except ImportError:
+    try:
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from location_storage import get_all_locations
+    except ImportError:
+        def get_all_locations(): return []
+
+
 
 # =============================================================================
 # SORGU TİPLERİ İÇİN BERT EMBEDding TEMPLATES
@@ -99,15 +111,28 @@ class PlaceDatabase:
         self._seed_turkish_places()
 
     def _seed_turkish_places(self):
-        """Türkiye'nin tüm yer isimlerini yükler."""
+        """Türkiye'nin tüm yer isimlerini ve KULLANICI LOKASYONLARINI yükler."""
+        # 1. Kullanıcı lokasyonlarını ekle (Yüksek öncelikli)
         try:
-            # Türkiye veritabanından al
-            all_places = get_all_turkey_places()
+            user_locations = get_all_locations()
+            user_loc_count = 0
+            for loc in user_locations:
+                name = loc.get("name", "").strip()
+                if name:
+                    self.add_place(name)
+                    user_loc_count += 1
+            if user_loc_count > 0:
+                print(f"[PlaceDB] {user_loc_count} özel kullanıcı lokasyonu eklendi.")
+        except Exception as e:
+            print(f"[PlaceDB] Kullanıcı lokasyonları yüklenemedi: {e}")
 
-            for place in all_places:
-                self.add_place(place)
-
-            print(f"[PlaceDB] Türkiye veritabanı yüklendi: {len(self._place_names)} yer")
+        # 2. Türkiye veritabanını ekle
+        try:
+            if get_all_turkey_places:
+                all_places = get_all_turkey_places()
+                for place in all_places:
+                    self.add_place(place)
+                print(f"[PlaceDB] Türkiye veritabanı yüklendi: Toplam {len(self._place_names)} yer")
         except Exception as e:
             print(f"[PlaceDB] Türkiye verisi yüklenemedi: {e}")
             print("[PlaceDB] Yedek popüler yerler yükleniyor...")

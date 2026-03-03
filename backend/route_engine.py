@@ -201,140 +201,166 @@ def generate_google_maps_link(ordered_points: list) -> str:
 
 def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int = 3) -> list:
     """
-    İki nokta arası alternatif rotalar bulur.
-    
-    Stratejiler:
-    1. En Kısa Rota - Minimum mesafe (length weight)
-    2. En Hızlı Rota - Büyük yolları tercih eder (highway priority)
-    3. Dengeli Rota - Mesafe ve yol tipi dengesi
-    
+    İki nokta arası GERÇEK alternatif rotalar bulur.
+    Yen's K-Shortest Paths algoritmasını kullanarak FARKLI güzergahlar üretir.
+
     Args:
         G: NetworkX grafiği
         origin_node: Başlangıç düğümü
         dest_node: Hedef düğüm
         num_routes: Kaç alternatif rota isteniyor (varsayılan 3)
-    
+
     Returns:
-        list[dict]: Alternatif rotalar
-        [
-            {
-                "type": "shortest",
-                "name": "En Kısa Rota",
-                "nodes": [...],
-                "distance_km": 4.5,
-                "duration_minutes": 55,
-                "description": "En az mesafe"
-            },
-            ...
-        ]
+        list[dict]: Alternatif rotalar (shortest, fastest, balanced)
     """
     alternatives = []
-    
-    # 1. EN KISA ROTA (Minimum mesafe)
+
+    # Rota tipi tanımlamaları
+    route_types = [
+        {"type": "shortest", "name": "En Kısa Rota", "icon": "📏", "description": "Minimum mesafe"},
+        {"type": "fastest", "name": "En Hızlı Rota", "icon": "⚡", "description": "Büyük yolları tercih eder"},
+        {"type": "balanced", "name": "Dengeli Rota", "icon": "⚖️", "description": "Hız ve mesafe dengesi"}
+    ]
+
+    def count_overlap(nodes1, nodes2):
+        """İki rota arasındaki node overlap oranını hesaplar"""
+        set1 = set(nodes1)
+        set2 = set(nodes2)
+        if not set1 or not set2:
+            return 1.0
+        intersection = len(set1 & set2)
+        union = len(set1 | set2)
+        return intersection / union if union > 0 else 1.0
+
     try:
-        shortest_nodes = nx.shortest_path(G, origin_node, dest_node, weight="length")
-        shortest_stats = calculate_route_stats(G, shortest_nodes)
-        
+        print(f"[RouteEngine] === GERÇEK ALTERNATİF ROTALAR AÇILIYOR === {origin_node} -> {dest_node}")
+
+        # Yen's K-Shortest Paths algorithm (nx.shortest_simple_paths) doesn't support MultiDiGraphs.
+        # We temporarily convert the graph to a simple DiGraph to find the node sequences.
+        G_simple = nx.DiGraph(G)
+
+        # K-shortest paths generator'ı oluştur (tek seferde!)
+        k_paths_generator = nx.shortest_simple_paths(G_simple, origin_node, dest_node, weight="length")
+
+        # İlk 10-15 yolu al ve aralarından en farklı 3'ünü seç
+        candidate_paths = []
+        max_candidates = 15  # Maksimum aday yol
+
+        for i, path_nodes in enumerate(k_paths_generator):
+            if i >= max_candidates:
+                break
+
+            path_stats = calculate_route_stats(G, path_nodes)
+            candidate_paths.append({
+                "nodes": path_nodes,
+                "distance_km": path_stats["total_distance_km"],
+                "duration_minutes": path_stats["estimated_walk_minutes"],
+                "length": len(path_nodes)
+            })
+            print(f"[RouteEngine] Aday {i+1}: {path_stats['total_distance_km']} km, {len(path_nodes)} nodes")
+
+        print(f"[RouteEngine] Toplam {len(candidate_paths)} aday yol bulundu")
+
+        if not candidate_paths:
+            print(f"[RouteEngine] HATA: Hiç yol bulunamadı!")
+            return []
+
+        # 1. En kısa yol mutlaka ilk alternatif olsun
+        shortest = candidate_paths[0]
         alternatives.append({
             "type": "shortest",
-            "name": "En Kısa Rota",
-            "icon": "📏",
-            "nodes": shortest_nodes,
-            "distance_km": shortest_stats["total_distance_km"],
-            "duration_minutes": shortest_stats["estimated_walk_minutes"],
-            "description": "Minimum mesafe, en az yürüme"
+            "name": route_types[0]["name"],
+            "icon": route_types[0]["icon"],
+            "nodes": shortest["nodes"],
+            "distance_km": shortest["distance_km"],
+            "duration_minutes": shortest["duration_minutes"],
+            "description": route_types[0]["description"]
         })
-    except nx.NetworkXNoPath:
-        pass
-    
-    # 2. EN HIZLI ROTA (Büyük yolları tercih eder)
-    try:
-        # Yol tipine göre ağırlık hesapla
-        def speed_weight(u, v, d):
-            length = d.get("length", 1)
-            highway = d.get("highway", "residential")
-            
-            # Büyük yollar daha hızlı
-            speed_multipliers = {
-                "motorway": 0.5,      # Çok hızlı
-                "trunk": 0.6,
-                "primary": 0.7,
-                "secondary": 0.8,
-                "tertiary": 0.9,
-                "residential": 1.0,
-                "service": 1.1,
-                "footway": 1.2,       # Yavaş
-                "path": 1.3
-            }
-            
-            # Highway string veya liste olabilir
-            if isinstance(highway, list):
-                highway = highway[0]
-            
-            multiplier = speed_multipliers.get(highway, 1.0)
-            return length * multiplier
-        
-        fastest_nodes = nx.shortest_path(G, origin_node, dest_node, weight=speed_weight)
-        fastest_stats = calculate_route_stats(G, fastest_nodes)
-        
-        # En kısa rotadan farklıysa ekle
-        if fastest_nodes != shortest_nodes:
+        print(f"[RouteEngine] = SHORTEST secildi: {shortest['distance_km']} km")
+
+        # 2. En farklı ikinci yolu bul (minimum overlap)
+        if len(candidate_paths) > 1:
+            best_second_idx = 1
+            min_overlap = 1.0
+
+            for idx in range(1, len(candidate_paths)):
+                overlap = count_overlap(shortest["nodes"], candidate_paths[idx]["nodes"])
+                print(f"[RouteEngine] Aday {idx+1} overlap: {overlap:.2%}")
+                if overlap < min_overlap:
+                    min_overlap = overlap
+                    best_second_idx = idx
+
+            second_path = candidate_paths[best_second_idx]
             alternatives.append({
                 "type": "fastest",
-                "name": "En Hızlı Rota",
-                "icon": "⚡",
-                "nodes": fastest_nodes,
-                "distance_km": fastest_stats["total_distance_km"],
-                "duration_minutes": fastest_stats["estimated_walk_minutes"],
-                "description": "Büyük yolları tercih eder, daha hızlı"
+                "name": route_types[1]["name"],
+                "icon": route_types[1]["icon"],
+                "nodes": second_path["nodes"],
+                "distance_km": second_path["distance_km"],
+                "duration_minutes": second_path["duration_minutes"],
+                "description": route_types[1]["description"]
             })
-    except (nx.NetworkXNoPath, Exception):
-        pass
-    
-    # 3. DENGELI ROTA (Mesafe ve yol tipi dengesi)
-    try:
-        def balanced_weight(u, v, d):
-            length = d.get("length", 1)
-            highway = d.get("highway", "residential")
-            
-            # Orta seviye tercihler
-            balance_multipliers = {
-                "motorway": 0.8,
-                "trunk": 0.85,
-                "primary": 0.9,
-                "secondary": 0.95,
-                "tertiary": 1.0,
-                "residential": 1.0,
-                "service": 1.05,
-                "footway": 1.1,
-                "path": 1.15
-            }
-            
-            if isinstance(highway, list):
-                highway = highway[0]
-            
-            multiplier = balance_multipliers.get(highway, 1.0)
-            return length * multiplier
-        
-        balanced_nodes = nx.shortest_path(G, origin_node, dest_node, weight=balanced_weight)
-        balanced_stats = calculate_route_stats(G, balanced_nodes)
-        
-        # Diğer rotalardan farklıysa ekle
-        if balanced_nodes not in [alt["nodes"] for alt in alternatives]:
+            print(f"[RouteEngine] = FASTEST secildi (idx {best_second_idx+1}): {second_path['distance_km']} km (overlap: {min_overlap:.2%})")
+
+        # 3. En farklı üçüncü yolu bul (hem birinciyle hem ikinciyle minimum overlap)
+        if len(candidate_paths) > 2:
+            best_third_idx = 2
+            min_combined_overlap = 1.0
+
+            for idx in range(1, len(candidate_paths)):
+                if idx == best_second_idx:
+                    continue  # İkinci olarak seçileni atla
+
+                overlap1 = count_overlap(shortest["nodes"], candidate_paths[idx]["nodes"])
+                overlap2 = count_overlap(candidate_paths[best_second_idx]["nodes"], candidate_paths[idx]["nodes"])
+                avg_overlap = (overlap1 + overlap2) / 2
+
+                print(f"[RouteEngine] Aday {idx+1} combined overlap: {avg_overlap:.2%}")
+
+                if avg_overlap < min_combined_overlap:
+                    min_combined_overlap = avg_overlap
+                    best_third_idx = idx
+
+            third_path = candidate_paths[best_third_idx]
             alternatives.append({
                 "type": "balanced",
-                "name": "Dengeli Rota",
-                "icon": "⚖️",
-                "nodes": balanced_nodes,
-                "distance_km": balanced_stats["total_distance_km"],
-                "duration_minutes": balanced_stats["estimated_walk_minutes"],
-                "description": "Mesafe ve konfor dengesi"
+                "name": route_types[2]["name"],
+                "icon": route_types[2]["icon"],
+                "nodes": third_path["nodes"],
+                "distance_km": third_path["distance_km"],
+                "duration_minutes": third_path["duration_minutes"],
+                "description": route_types[2]["description"]
             })
-    except (nx.NetworkXNoPath, Exception):
-        pass
-    
-    # En fazla num_routes kadar döndür
-    return alternatives[:num_routes]
+            print(f"[RouteEngine] = BALANCED secildi (idx {best_third_idx+1}): {third_path['distance_km']} km (overlap: {min_combined_overlap:.2%})")
+
+        print(f"[RouteEngine] === TOPLAM {len(alternatives)} FARKLI ALTERNATİF ROTA BULUNDU ===")
+
+        # Her alternatif için node sayısını logla
+        for i, alt in enumerate(alternatives):
+            print(f"[RouteEngine] Alternatif {i+1} ({alt['type']}): {len(alt['nodes'])} nodes, {alt['distance_km']} km")
+
+    except Exception as e:
+        print(f"[RouteEngine] KRİTİK HATA: {e}")
+        import traceback
+        traceback.print_exc()
+
+        # Fallback: En azından en kısa rotayı döndür
+        try:
+            shortest_nodes = nx.shortest_path(G, origin_node, dest_node, weight="length")
+            shortest_stats = calculate_route_stats(G, shortest_nodes)
+            return [{
+                "type": "shortest",
+                "name": route_types[0]["name"],
+                "icon": route_types[0]["icon"],
+                "nodes": shortest_nodes,
+                "distance_km": shortest_stats["total_distance_km"],
+                "duration_minutes": shortest_stats["estimated_walk_minutes"],
+                "description": "Tek mevcut rota"
+            }]
+        except:
+            return []
+
+    return alternatives
 
 
 def build_alternative_routes(G, ordered_points: list, route_type: str = "shortest") -> list:
