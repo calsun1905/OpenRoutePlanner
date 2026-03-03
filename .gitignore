@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 backend/data/*.graphml
+backend/data/saved_routes.json
 .env
 *.log
 
