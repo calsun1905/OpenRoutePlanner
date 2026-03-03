@@ -71,13 +71,12 @@ openroute/
    - Mesafe/süre hesaplar
    - Google Maps linki üretir
 
-2. 🔀 **Alternatif Rotalar** - `/api/get-alternative-routes` ✅ YENİ
+2. 🔀 **Alternatif Rotalar** - `/api/get-alternative-routes` ❌ SORUNLU
    - En Kısa Rota (shortest) - Minimum mesafe
    - En Hızlı Rota (fastest) - Büyük yolları tercih eder
    - Dengeli Rota (balanced) - Mesafe ve hız arası denge
-   - ⚠️ Bilinen sorunlar:
-     - Alternatif seçildiğinde önceki rota haritada kalıyor
-     - Seçim sonrası alternatiflerin güncellenmesi gerekiyor
+   - ❌ **Durum:** Birden fazla düzeltme denendi (Yen's K-Shortest Paths dahil), hala 3 seçenek aynı rotayı gösteriyor
+   - ⚠️ Köklü algoritma değişikliği veya farklı yaklaşım gerekebilir
    - Commit: 27af924
 
 3. 💾 **Rota Kaydetme/Yükleme** ✅ YENİ
@@ -89,12 +88,13 @@ openroute/
      - "Önce rotayı hesaplayın" uyarısı hatalı çalışıyor (rota zaten hesaplanmış)
    - Commit: bb19215
 
-4. ⏰ **Zaman Bazlı Planlama** ✅ YENİ (Prototip)
+4. ⏰ **Zaman Bazlı Planlama** ❌ SORUNLU (Prototip)
    - Başlangıç saati seçimi
    - Varış/ayrılış saatleri hesaplama
    - Ziyaret ve yürüyüş süreleri
    - Timeline görünümü
-   - ⚠️ Prototip aşamasında, tam test edilmedi
+   - ❌ **Durum:** Frontend'de "Zaman Planla" tuşu aktif gözükmüyor (disabled)
+   - ⚠️ Backend mantığı hiç test edilmedi
    - Commit: 0fc237c
 
 5. 🏛️ **POI Arama** - Müze, kafe vb. mekanları bulur
@@ -150,7 +150,7 @@ openroute/
 - **Overpass API:** OSM veritabanında arama motoru (internetten canlı veri çeker)
 - **Embedding:** Kelimelerin 768 boyutlu matematiksel temsilci vektörleri
 
-## 📅 Son Güncelleme: 03.03.2026 - ~17:50
+## 📅 Son Güncelleme: 03.03.2026 - Gün Sonu (~23:59)
 
 ---
 
@@ -186,13 +186,33 @@ openroute/
 
 ---
 
+## 🚀 03.03.2026 Gün Sonu Oturumu - Çalışmalar (23 değişen dosya)
+
+### 🎯 Yapılan Çalışmalar
+
+| Alan | Yapılan | Sonuç |
+|------|---------|-------|
+| **Alternatif Rota Algoritması** | Yen's K-Shortest Paths dahil birkaç farklı yaklaşımla düzeltme denendi | ❌ BAŞARISIZ - Birkaç denemeden sonra hala 3 seçenek aynı rotayı gösteriyor. Algoritma fiziksel olarak farklı güzergah üretemiyor. |
+| **Zamanlayıcı (Time Planner)** | Frontend'de "Zaman Planla" tuşu incelendi | ❌ Tuş aktif olarak gözükmüyor, tıklanamıyor (disabled durumda) |
+| **OSM Mekan Endpoint'leri** | OSM üzerinde mekan (POI) endpoint'lerinin nasıl çalıştığı araştırıldı, frontend tarafında gerçek eşleşme olup olmayacağı incelendi | ⏳ Araştırma aşamasında - nasıl eklenir, frontend'de eşleşir mi soruları üzerinde çalışıldı |
+| **Rota Kaydetme** | Rota kaydetme/yükleme işlemleri üzerinde çalışıldı | ⚠️ Temel çalışıyor, iyileştirmeler devam ediyor |
+
+### 📊 Durum Özeti
+- **Çözülen sorun:** Yok (bugün ağırlıklı olarak araştırma ve deneme günüydü)
+- **Denenen ama çözülemeyen:** Alternatif rota algoritması (birden fazla deneme)
+- **Araştırılan:** OSM mekan endpoint'leri + frontend entegrasyonu
+- **Tespit edilen yeni sorun:** Zamanlayıcı tuşu frontend'de disabled
+
+---
+
 ## 🐛 Bilinen Sorunlar ve Kötü Çalışan Yerler
 
-### 1. Alternatif Rotalar - ⚠️ Geometrik Fark Üretilemiyor
+### 1. Alternatif Rotalar - ❌ ÇÖZÜLEMEDI (Birden Fazla Deneme Yapıldı)
 | Sorun | Detay | Önem | Durum |
 |-------|-------|------|-------|
-| 3 seçenek aynı çizgiyi gösteriyor | Shortest/Fastest/Balanced olarak 3 seçenek sunuluyor ama haritada hepsi aynı polyline'ı çiziyor | 🔴 Yüksek | ❌ Düzeltilecek |
-| Gerçek alternatif üretilmiyor | Algoritma fiziksel olarak farklı güzergahlar yerine aynı yolu farklı etiketle döndürüyor | 🔴 Yüksek | ❌ Düzeltilecek |
+| 3 seçenek aynı çizgiyi gösteriyor | Shortest/Fastest/Balanced olarak 3 seçenek sunuluyor ama haritada hepsi aynı polyline'ı çiziyor | 🔴 Yüksek | ❌ Çözülemedi |
+| Gerçek alternatif üretilmiyor | Yen's K-Shortest Paths dahil birkaç farklı yaklaşım denendi, hala aynı yolu döndürüyor | 🔴 Yüksek | ❌ Çözülemedi |
+| Birden fazla deneme yapıldı | 03.03.2026'da birkaç kez düzeltme denendi ama başarısız oldu, algoritma köklü bir yeniden yazım gerektirebilir | 🔴 Yüksek | ❌ Bekliyor |
 | **Kural:** Düz çizgi hariç her yerde fiziksel olarak farklı güzergah bulunabilir. "Aynı yol" cevabı kabul edilemez. | | | |
 
 ### 2. Rota Kaydetme/Yükleme - ✅ Temelde Çalışıyor
@@ -209,12 +229,19 @@ openroute/
 | Bazen hata veriyor | Çoğu zaman çalışıyor ama ara sıra hata fırlatıyor, kök neden araştırılmadı | 🔴 Yüksek |
 | Uzun sürüyor | OSMnx graph ilk indirmede bottleneck | 🟡 Orta |
 
-### 4. Zaman Bazlı Planlama - ❌ Hiç Test Edilmedi
+### 4. Zaman Bazlı Planlama - ❌ Frontend Tuşu Çalışmıyor
 | Sorun | Detay | Önem |
 |-------|-------|------|
-| Sıfır test | 03.03.2026 itibarıyla hiç denenmedi | 🔴 Yüksek |
+| Tuş aktif gözükmüyor | "Zaman Planla" butonu frontend'de disabled/inaktif durumda, tıklanamıyor | 🔴 Yüksek |
+| Sıfır test | Backend mantığı hiç test edilmedi | 🔴 Yüksek |
 
-### 5. BERT NLP Motoru - ⏳ Yarın Yapılacak
+### 5. OSM Mekan Endpoint'leri - ⏳ Araştırma Aşamasında
+| Sorun | Detay | Önem |
+|-------|-------|------|
+| Frontend eşleşmesi belirsiz | OSM endpoint'leri backend'de var ama frontend'te gerçekten doğru eşleşip eşleşmediği test edilmedi | 🟡 Orta |
+| Entegrasyon planı gerekli | Mekan verilerinin frontend'e nasıl aktarılacağı ve gösterileceği planlanmalı | 🟡 Orta |
+
+### 6. BERT NLP Motoru - ⏳ Yapılacak
 | Sorun | Detay | Önem |
 |-------|-------|------|
 | API endpoint yok | `/api/nlp/parse` app.py'ye eklenmedi | 🔴 Yüksek |
@@ -223,18 +250,19 @@ openroute/
 
 ---
 
-## 🧪 Test Durumu (03.03.2026 Akşam)
+## 🧪 Test Durumu (03.03.2026 Gün Sonu)
 
 | Özellik | Test Edildi mi? | Sonuç |
 |---------|-----------------|-------|
 | Rota Hesaplama | ✅ Evet | Genellikle çalışıyor, bazen hata |
-| Alternatif Rotalar | ⚠️ Kısmen | Hesaplama var ama hepsi aynı yolu gösteriyor |
-| Rota Kaydetme/Yükleme/Silme | ✅ Evet | Çalışıyor |
-| Zaman Planlama | ❌ Hayır | Hiç test edilmedi |
-| POI Arama | ✅ Evet | Maltepe dahil çalışıyor ✅ |
+| Alternatif Rotalar | ❌ Birkaç deneme | Birden fazla düzeltme denendi, hala aynı rotayı gösteriyor |
+| Rota Kaydetme/Yükleme/Silme | ✅ Evet | Temel çalışıyor |
+| Zaman Planlama | ❌ Hayır | Frontend tuşu disabled, backend test edilmedi |
+| POI Arama | ✅ Evet | Maltepe dahil çalışıyor |
+| OSM Mekan Endpoint'leri | ⏳ Araştırıldı | Nasıl çalıştığı incelendi, frontend eşleşmesi bekliyor |
 | Geocoding | ✅ Evet | Çalışıyor |
 | BERT Typo Tolerance | ✅ Evet | Kadikoy→Kadıköy %95 |
-| NLP→Frontend Entegrasyon | ❌ Hayır | Yarın yapılacak |
+| NLP→Frontend Entegrasyon | ❌ Hayır | Henüz yapılmadı |
 
 ---
 
@@ -245,93 +273,20 @@ openroute/
 - [x] Frontend tıklanabilirlik sorunu giderme
 - [x] POI arama bağlantı hatası giderme (Maltepe)
 - [x] `simplify_coords()` ile rota kaydetme hızlandırma
-- [ ] **Alternatif rotaların gerçek geometrik farklılık üretmesi** ← EN ÖNEMLİ
+- [ ] **Alternatif rotaların gerçek geometrik farklılık üretmesi** ← EN ÖNEMLİ (birden fazla deneme yapıldı, çözülemedi)
+- [ ] **Zamanlayıcı tuşunun frontend'de aktif hale getirilmesi** ← YENİ
 - [ ] Rota hesaplama aralıklı hata sebebinin araştırılması
-- [ ] Zaman Bazlı Planlama modülünün ilk kez test edilmesi
+- [ ] OSM mekan endpoint'lerinin frontend'e entegrasyonu
 
-### 🟡 Önemli (Yarın)
+### 🟡 Önemli
 - [ ] BERT NLP motorunun frontend'e bağlanması
 - [ ] `/api/nlp/parse` endpoint'inin app.py'ye eklenmesi
 - [ ] False positive azaltma (threshold iyileştirme)
+- [ ] Rota kaydetme edge case'lerinin tam doğrulanması
 
 ### 🟢 Gelecek
-- [ ] Rota kaydetme edge case'lerinin tam doğrulanması
 - [ ] OSM API fallback mekanizmasının test edilmesi
-
----
-
-
----
-
-## 🐛 Bilinen Sorunlar ve Kötü Çalışan Yerler
-
-### 1. Alternatif Rotalar (Commit: 27af924)
-| Sorun | Detay | Önem |
-|-------|-------|------|
-| Önceki rota kalıyor | Bir alternatif rota seçildiğinde önceki rota haritadan silinmiyor, yeni rota üzerine ekleniyor | 🔴 Yüksek |
-| Alternatifler güncellenmiyor | Yeni bir rota seçtiğinde alternatif rotaların yeniden hesaplanması gerekiyor ama eskiler gösteriliyor | 🔴 Yüksek |
-| Kayıtlı rota gösterimi | Daha önce kaydettiğin rotayı yüklediğinde alternatifler eski rotayı gösteriyor | 🟡 Orta |
-
-### 2. Rota Kaydetme/Yükleme (Commit: bb19215)
-| Sorun | Detay | Önem |
-|-------|-------|------|
-| Çok yavaş | İki noktaya rota ekleyip kaydedebiliyorsun ama kaydetme işlemi çok uzun sürüyor | 🔴 Yüksek |
-| Hatalı uyarı | Rota zaten hesaplanmış olmasına rağmen "Önce rotayı hesaplayın" diyor | 🔴 Yüksek |
-| Hesaplama kontrolü | Rota hesaplanıp hesaplanmadığını doğru kontrol edemiyor | 🟡 Orta |
-
-### 3. Zaman Bazlı Planlama (Commit: 0fc237c)
-| Sorun | Detay | Önem |
-|-------|-------|------|
-| Test edilmedi | Prototip olarak eklendi, hiç test edilmedi | 🔴 Yüksek |
-| Doğruluk bilinmiyor | Zaman hesaplamalarının doğruluğu bilinmiyor | 🟡 Orta |
-
-### 4. BERT NLP Motoru (Commit: 951d0db)
-| Sorun | Detay | Önem |
-|-------|-------|------|
-| API endpoint yok | /api/nlp/parse endpoint'i app.py'ye eklenmedi, motor çalışıyor ama dışarıdan erişilemiyor | 🔴 Yüksek |
-| Frontend bağlantısı yok | BERT motorunu kullanan hiçbir frontend arayüzü yok | 🔴 Yüksek |
-| False positive | Bazı kelimeleri yanlışlıkla yer ismi olarak algılıyor, eşik (threshold) iyileştirmesi gerekli | 🟡 Orta |
-| OSM fallback test edilmedi | Bilinmeyen yerlerde OSM API'ye düşme mantığı yazıldı ama gerçek ortamda test edilmedi | 🟡 Orta |
-
----
-
-## 🧪 Test Durumu
-
-| Özellik | Test Edildi mi? | Sonuç |
-|---------|-----------------|-------|
-| Rota Hesaplama (temel) | ✅ Evet | Çalışıyor |
-| Alternatif Rotalar | ⚠️ Kısmen | Backend çalışıyor, frontend sorunlu |
-| Rota Kaydetme | ⚠️ Kısmen | Kaydediyor ama yavaş + hatalı uyarılar |
-| Zaman Planlama | ❌ Hayır | Hiç test edilmedi |
-| BERT Typo Tolerance | ✅ Evet | Çalışıyor (Kadikoy→Kadıköy %95) |
-| BERT Sorgu Sınıflandırma | ✅ Evet | route/poi/multi/single çalışıyor |
-| BERT Yer Çıkarma | ⚠️ Kısmen | Temel çalışıyor, false positive var |
-| OSM POI Sözlüğü | ✅ Evet | 167 kelime eşleştirmesi çalışıyor |
-| OSM Overpass API | ✅ Evet | Kadıköy tekelleri test edildi, çalışıyor |
-| NLP→Frontend Entegrasyon | ❌ Hayır | Henüz yapılmadı |
-
----
-
-## 📋 Yapılacaklar (TODO)
-
-### 🔴 Acil (Mevcut özelliklerin düzeltilmesi)
-- [ ] Alternatif rota seçildiğinde önceki rotanın haritadan silinmesi
-- [ ] Rota seçimi sonrası alternatiflerin güncellenmesi
-- [ ] Rota kaydetme hız sorununun çözülmesi
-- [ ] "Önce rotayı hesaplayın" hatalı uyarısının düzeltilmesi
-- [ ] Zaman Bazlı Planlama modülünün test edilmesi
-
-### 🟡 Önemli (Yeni entegrasyonlar)
-- [ ] /api/nlp/parse endpoint'inin app.py'ye eklenmesi
-- [ ] BERT NLP motorunun frontend'e bağlanması
-- [ ] POI arama için OSM sözlüğünün BERT ile entegrasyonu
-- [ ] False positive azaltma (threshold iyileştirme)
-- [ ] OSM API fallback mekanizmasının gerçek ortamda test edilmesi
-
-### 🟢 Gelecek (Geliştirme)
 - [ ] Veritabanına mahalle, cadde, özel mekan isimleri eklenmesi
-- [ ] Harita üzerinde gerçek rota çizimi ve koordinat işlemleri
-- [ ] Enlem/boylam (lat/lon) çekme sisteminin tamamlanması
 - [ ] POI aramasında kategori bazlı harita gösterimi
 
 ---
