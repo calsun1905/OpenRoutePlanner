@@ -1,0 +1,139 @@
+╔════════════════════════════════════════════════════════╗
+║        OTURUM BAŞLANGICI                              ║
+║        Tarih: 03.03.2026 - Başlangıç: 10:02          ║
+╚════════════════════════════════════════════════════════╝
+
+### Sistem Durumu:
+- Git Branch: main
+- Uncommitted Changes: YOK
+- Son Commit: f50f580
+
+### Bu Oturumun Hedefleri:
+- Doğal Dil Sorgu Faz 2.5: BERT modelinin (dbmdz/bert-base-turkish-uncased) Hugging Face CLI kullanılarak projeye entegre edilmesi.
+
+### Devam Eden İşler:
+- nlp_engine.py modülünün BERT tabanlı hibrit sisteme dönüştürülmesi çalışmasına başlanacak.
+
+### Notlar:
+- Kullanıcı önceliği BERT modeline verdi. Modelin huggingface-cli üzerinden indirilmesi kararlaştırıldı.
+
+---
+
+## ✅ FAZ 2.5 TAMAMLANDI: BERT Model Entegrasyonu (10:25)
+
+### Yapılanlar:
+1. ✅ requirements.txt güncellendi (transformers, torch, sentence-transformers)
+2. ✅ bert_engine.py oluşturuldu (440 MB, CUDA destekli)
+3. ✅ Model indirildi ve cache'lendi
+4. ✅ Test başarılı: Typo tolerance çalışıyor!
+
+### Test Sonuçları:
+| Test | Benzerlik |
+|------|-----------|
+| Kadıköy vs Kadıköy | 1.0000 (aynı) |
+| Kadıköy vs Kadiköy | 0.9511 (typo tolerance!) |
+| Kadıköy vs Kadikoy | 0.9511 (typo tolerance!) |
+| Taksim Meydanı vs Taksim | 0.9268 |
+
+### Teknik Detaylar:
+- Model: dbmdz/bert-base-turkish-uncased
+- Device: CUDA (GPU aktif)
+- Embedding boyutu: 768
+- Singleton pattern ile global cache
+
+---
+
+## ✅ FAZ 3.0: BERT NLP Engine ve Türkiye Veritabanı (10:25 - 11:30)
+
+### Yapılanlar:
+1. ✅ bert_nlp_engine.py oluşturuldu - Ana NLP motoru
+   - Sorgu tipi sınıflandırma (route / poi / multi / single / unknown)
+   - Yer ismi çıkarma (BERT embedding + cosine similarity)
+   - Yön algılama (nereden → nereye)
+   - Typo düzeltme (yazım hatası toleransı)
+
+2. ✅ turkey_places.py oluşturuldu - Türkiye Veritabanı
+   - 81 il + ilçeleri = 1775 yer ismi
+   - Bu liste BERT embedding hesaplamaları için temel veri kaynağı
+   - Hızlı arama (0.05 sn) ve typo düzeltme için ZORUNLU
+   - OSM API tek başına typo düzeltme yapamaz, bu yüzden lokal liste şart
+
+3. ✅ districts_db.py + cache/districts_turkey.db oluşturuldu
+   - İlçe veritabanı SQLite cache yönetimi
+
+4. ✅ .gitignore güncellendi
+   - Model dosyaları (440 MB) git dışında tutuldu
+   - .gitkeep ile klasör yapısı korundu
+
+### Neden Lokal Veritabanı + API Birlikte Gerekli?
+- Lokal veritabanı (turkey_places.py): Hızlı arama + typo düzeltme (0.05 sn)
+- OSM API: Özel mekanlar (müzeler, kafeler) için canlı arama (1-2 sn)
+- OSM tek başına typo düzeltme YAPAMAZ → lokal liste ZORUNLU
+- Lokal liste olmadan her sorgu internete gitmek zorunda → yavaş + ban riski
+- İnternet olmadan çalışma da lokal listeyle mümkün
+
+### Commit: 951d0db
+
+---
+
+## ✅ FAZ 3.1: OSM POI Sözlüğü ve Test Araçları (11:30 - 12:15)
+
+### Yapılanlar:
+1. ✅ osm_poi_dictionary.py oluşturuldu - Türkçe→OSM Etiket Sözlüğü
+   - 167 Türkçe kelime → OSM etiket eşleştirmesi
+   - Kategoriler: yeme-içme, alışveriş, sağlık, turizm, ulaşım, eğitim, tarih, doğa
+   - Örnek: "tekel" → {'shop': 'alcohol'}, "müze" → {'tourism': 'museum'}
+   - BERT "poi" niyeti algıladığında bu sözlük devreye girer
+
+2. ✅ test_osm_poi.py oluşturuldu - OSM Overpass API Test Aracı
+   - Terminalde şehir+kategori değiştirerek mekan listesi çekme
+   - Örnek: Kadıköy'deki tekeller, Beşiktaş'taki kafeler
+   - Veriler canlı olarak OSM sunucularından çekilir (Almanya)
+
+3. ✅ check_osm_counts.py oluşturuldu - Kategori Bazlı Mekan Sayısı
+   - Türkiye genelinde OSM'deki mekan sayılarını sorgulama
+   - 50.000+ kafe, 100.000+ market/tekel, 25.000+ eczane vb.
+
+4. ✅ test_bert_extraction.py, test_endpoints.py oluşturuldu
+   - BERT yer çıkarma ve Flask API endpoint testleri
+
+### OSM Overpass API Çalışma Mantığı:
+- İnternet üzerinden OSM veritabanına (Almanya sunucuları) bağlanır
+- Overpass API = OSM'nin arama motoru (sorgu gönder, JSON sonuç al)
+- Rate limit: saniyede 1 istek, fazlası ban riski
+- Milyonlarca POI olduğu için lokal indirmek imkansız, canlı sorgulanır
+
+### Commit: 5dcbc85
+
+---
+
+## ✅ GIT KOMİTLERİ DÜZENLENDİ (12:25 - 12:40)
+
+### Bugün Atılan Commitler (sırasıyla):
+
+| # | Commit | Mesaj |
+|---|--------|-------|
+| 1 | 27af924 | feat: Alternatif Rotalar motoru eklendi (En Kısa / En Hızlı / Dengeli) |
+| 2 | bb19215 | feat: Rota Kaydetme ve Yükleme sistemi eklendi |
+| 3 | 0fc237c | feat: Zaman Bazlı Planlama modülü eklendi (prototip) |
+| 4 | 951d0db | feat: BERT NLP motoru ve Türkiye yer veritabanı eklendi |
+| 5 | 5dcbc85 | feat: OSM POI sözlüğü ve test araçları eklendi |
+
+### Bilinen Sorunlar (Commit Mesajlarında Belirtildi):
+1. **Alternatif Rotalar:** Seçildiğinde önceki rota haritada kalıyor. Yeni rota seçilince alternatiflerin güncellenmesi gerekiyor.
+2. **Rota Kaydetme:** Kaydetme işlemi çok uzun sürüyor. "Önce rotayı hesaplayın" uyarısı hatalı (rota zaten hesaplanmış).
+3. **Zaman Planlama:** Prototip aşamasında, test edilmedi.
+4. **BERT NLP:** /api/nlp/parse endpoint'i yok. Frontend entegrasyonu yapılmadı. False positive iyileştirme gerekli.
+
+---
+
+## ⏳ HENÜZ YAPILMADI (Sonraki Adımlar):
+
+1. ❌ /api/nlp/parse endpoint'inin app.py'ye eklenmesi
+2. ❌ BERT NLP'nin frontend'e entegrasyonu
+3. ❌ Alternatif rota frontend buglarının düzeltilmesi
+4. ❌ Rota kaydetme yavaşlık sorununun çözülmesi
+5. ❌ POI arama (tekel, müze vb.) için OSM entegrasyonunun tamamlanması
+6. ❌ Harita üzerinde rota çizimi ve koordinat işlemleri
+
+---

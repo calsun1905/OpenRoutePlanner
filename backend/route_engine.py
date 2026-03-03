@@ -197,3 +197,184 @@ def generate_google_maps_link(ordered_points: list) -> str:
     base = "https://www.google.com/maps/dir/"
     parts = [f"{lat},{lon}" for lat, lon in ordered_points]
     return base + "/".join(parts)
+
+
+def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int = 3) -> list:
+    """
+    İki nokta arası alternatif rotalar bulur.
+    
+    Stratejiler:
+    1. En Kısa Rota - Minimum mesafe (length weight)
+    2. En Hızlı Rota - Büyük yolları tercih eder (highway priority)
+    3. Dengeli Rota - Mesafe ve yol tipi dengesi
+    
+    Args:
+        G: NetworkX grafiği
+        origin_node: Başlangıç düğümü
+        dest_node: Hedef düğüm
+        num_routes: Kaç alternatif rota isteniyor (varsayılan 3)
+    
+    Returns:
+        list[dict]: Alternatif rotalar
+        [
+            {
+                "type": "shortest",
+                "name": "En Kısa Rota",
+                "nodes": [...],
+                "distance_km": 4.5,
+                "duration_minutes": 55,
+                "description": "En az mesafe"
+            },
+            ...
+        ]
+    """
+    alternatives = []
+    
+    # 1. EN KISA ROTA (Minimum mesafe)
+    try:
+        shortest_nodes = nx.shortest_path(G, origin_node, dest_node, weight="length")
+        shortest_stats = calculate_route_stats(G, shortest_nodes)
+        
+        alternatives.append({
+            "type": "shortest",
+            "name": "En Kısa Rota",
+            "icon": "📏",
+            "nodes": shortest_nodes,
+            "distance_km": shortest_stats["total_distance_km"],
+            "duration_minutes": shortest_stats["estimated_walk_minutes"],
+            "description": "Minimum mesafe, en az yürüme"
+        })
+    except nx.NetworkXNoPath:
+        pass
+    
+    # 2. EN HIZLI ROTA (Büyük yolları tercih eder)
+    try:
+        # Yol tipine göre ağırlık hesapla
+        def speed_weight(u, v, d):
+            length = d.get("length", 1)
+            highway = d.get("highway", "residential")
+            
+            # Büyük yollar daha hızlı
+            speed_multipliers = {
+                "motorway": 0.5,      # Çok hızlı
+                "trunk": 0.6,
+                "primary": 0.7,
+                "secondary": 0.8,
+                "tertiary": 0.9,
+                "residential": 1.0,
+                "service": 1.1,
+                "footway": 1.2,       # Yavaş
+                "path": 1.3
+            }
+            
+            # Highway string veya liste olabilir
+            if isinstance(highway, list):
+                highway = highway[0]
+            
+            multiplier = speed_multipliers.get(highway, 1.0)
+            return length * multiplier
+        
+        fastest_nodes = nx.shortest_path(G, origin_node, dest_node, weight=speed_weight)
+        fastest_stats = calculate_route_stats(G, fastest_nodes)
+        
+        # En kısa rotadan farklıysa ekle
+        if fastest_nodes != shortest_nodes:
+            alternatives.append({
+                "type": "fastest",
+                "name": "En Hızlı Rota",
+                "icon": "⚡",
+                "nodes": fastest_nodes,
+                "distance_km": fastest_stats["total_distance_km"],
+                "duration_minutes": fastest_stats["estimated_walk_minutes"],
+                "description": "Büyük yolları tercih eder, daha hızlı"
+            })
+    except (nx.NetworkXNoPath, Exception):
+        pass
+    
+    # 3. DENGELI ROTA (Mesafe ve yol tipi dengesi)
+    try:
+        def balanced_weight(u, v, d):
+            length = d.get("length", 1)
+            highway = d.get("highway", "residential")
+            
+            # Orta seviye tercihler
+            balance_multipliers = {
+                "motorway": 0.8,
+                "trunk": 0.85,
+                "primary": 0.9,
+                "secondary": 0.95,
+                "tertiary": 1.0,
+                "residential": 1.0,
+                "service": 1.05,
+                "footway": 1.1,
+                "path": 1.15
+            }
+            
+            if isinstance(highway, list):
+                highway = highway[0]
+            
+            multiplier = balance_multipliers.get(highway, 1.0)
+            return length * multiplier
+        
+        balanced_nodes = nx.shortest_path(G, origin_node, dest_node, weight=balanced_weight)
+        balanced_stats = calculate_route_stats(G, balanced_nodes)
+        
+        # Diğer rotalardan farklıysa ekle
+        if balanced_nodes not in [alt["nodes"] for alt in alternatives]:
+            alternatives.append({
+                "type": "balanced",
+                "name": "Dengeli Rota",
+                "icon": "⚖️",
+                "nodes": balanced_nodes,
+                "distance_km": balanced_stats["total_distance_km"],
+                "duration_minutes": balanced_stats["estimated_walk_minutes"],
+                "description": "Mesafe ve konfor dengesi"
+            })
+    except (nx.NetworkXNoPath, Exception):
+        pass
+    
+    # En fazla num_routes kadar döndür
+    return alternatives[:num_routes]
+
+
+def build_alternative_routes(G, ordered_points: list, route_type: str = "shortest") -> list:
+    """
+    Çoklu nokta için alternatif rota stratejisi ile tam rota oluşturur.
+    
+    Args:
+        G: NetworkX grafiği
+        ordered_points: Sıralı [(lat, lon), ...] listesi
+        route_type: "shortest", "fastest", veya "balanced"
+    
+    Returns:
+        list[int]: Düğüm listesi
+    """
+    full_route_nodes = []
+    
+    for i in range(len(ordered_points) - 1):
+        origin = find_nearest_node(G, ordered_points[i][0], ordered_points[i][1])
+        dest = find_nearest_node(G, ordered_points[i + 1][0], ordered_points[i + 1][1])
+        
+        # Alternatif rotaları bul
+        alternatives = find_alternative_routes(G, origin, dest, num_routes=3)
+        
+        # İstenen tip rotayı seç
+        segment = None
+        for alt in alternatives:
+            if alt["type"] == route_type:
+                segment = alt["nodes"]
+                break
+        
+        # Bulunamazsa en kısa rotayı kullan
+        if not segment and alternatives:
+            segment = alternatives[0]["nodes"]
+        elif not segment:
+            segment = shortest_path(G, origin, dest)
+        
+        if segment:
+            if i == 0:
+                full_route_nodes.extend(segment)
+            else:
+                full_route_nodes.extend(segment[1:])
+    
+    return full_route_nodes

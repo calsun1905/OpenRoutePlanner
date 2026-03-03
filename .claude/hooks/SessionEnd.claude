@@ -1,0 +1,174 @@
+# 🌙 Oturum Sonu
+
+**ÖNEMLİ: Bu adımları otomatik olarak gerçekleştir, kullanıcıdan onay bekleme (sadece commit/push için sor).**
+
+> ⚡ **HIZLI KAPANIŞ (LITE MOD)**
+> Eğer kullanıcı oturumu kapatırken "Hızlı kapat", "Lite mod" veya benzeri bir komut verirse, ADIM 2, ADIM 4, ADIM 5 ve ADIM 6 gibi uzun analizleri/dökümleri atla. Doğrudan `progress.md`'yi güncelle (ADIM 7), günün dosyasına kısa bir özet geç (ADIM 9) ve Git PR/Commit isteyip istemediğini sorup oturumu bitir. 
+
+---
+
+## 1. OTURUM SÜRE ve DEĞİŞİKLİKLER
+
+### 1.1 Zaman Bilgilerini Topla
+- Oturum bitiş zamanını kaydet
+- BUGÜNÜN dosyasını (`günlük-rapor/[BUGÜN_TARİH].txt`) oku, son eklenen oturum başlangıç saatini bul.
+- Toplam oturum süresini hesapla (saat, dakika cinsinden).
+
+### 1.2 Temel Bilgileri Hazırla
+- Bugünün tarihini al
+- Hangi branch'te çalışıldı?
+- `git diff --stat` ile kaç dosya değiştirildiğine satır bazında bak (detaylı diff okuma, sadece istatistik göster).
+
+---
+
+## 2. OTURUM BOYUNCA YAPILAN DEĞİŞİKLİKLERİ DETAYLI ANALİZ ET
+
+**Bu Oturumda Yapılanları Hatırla:**
+- Sohbet geçmişine bakarak oturum başından beri hangi görevler üzerinde çalışıldığını özetle.
+- Kullanıcı hangi dosyaları değiştirdi/oluşturdu?
+- Yapılanları şu kategorilere ayır: Feature, Bug fix, Refactor, Docs, UI/UX.
+
+---
+
+## 3. TAMAMLANANLAR LİSTESİNİ DETAYLI OLUŞTUR
+
+### 3.1 Ana Görevler - Completed Features
+Bu oturumda TAMAMLANAN her şeyi listele:
+- Görev Adı
+- İlgili Dosyalar
+- Zorluk Derecesi
+
+### 3.2 Mini Görevler - Small Wins
+Küçük ama önemli yapılanlar (Bug fix, code cleanup vs.)
+
+---
+
+## 4. DEVAM EDEN VE TAMAMLANAMAYAN İŞLER
+
+### 4.1 Devam Eden İşler - In Progress
+Şu an yarım kalan işler neler? İlk yapılması gereken sonraki adım ne?
+
+### 4.2 Engelleyiciler - Blockers (Varsa)
+İşi engelleyen veya çözülemeyen teknik bir sıkıntı var mı?
+
+---
+
+## 5. KARŞILAŞILAN SORUNLAR VE HATALARI DETAYLI KAYDET
+
+Oturum boyunca karşılaşılan hatalar (çözülen veya çözülemeyen) nelerdi? Kısa bir özet çıkar. Gelecek için "Technical Debt" (teknik borç) oluşturan bir yer varsa belirt.
+
+---
+
+## 6. YENİ FİKİRLER VE ÖĞRENİLENLER
+
+Aklına veya sohbete gelen yeni fikirler var mı? Öğrenilen/Keşfedilen yeni bir best-practice var mı? 
+
+---
+
+## 7. PROGRESS DOSYASINI DETAYLI GÜNCELLE
+
+- `progress.md` dosyasını `view_file` ile oku.
+- **Tamamlananları** "TODO" listesinden silip, günün tarihiyle "DONE" listesine taşı.
+- **Devam edenleri** TODO listesinde bırak veya önceliğini güncelle.
+- Varsa **yeni çıkan BUGS & ERRORS** kayıtlarını ekle.
+- Progress dosyasının genel yapısını bozmadan, sadece gerekli satırları `replace_file_content` veya benzer araçlarla nazikçe düzenle. (Tüm dosyayı baştan yazma).
+
+---
+
+## 8. ÖNERİLER DOSYASINI GÜNCELLE
+
+Eğer bu oturumda ADIM 6'da çıkan yeni bir fikir/öneri varsa `öneriler.md` dosyasına git ve bu öneriyi formatına uygun şekilde (Tarih, Kategori, Başlık, Sebep, Uygulama) ekle.
+
+---
+
+## 9. GÜNLÜK NOT DOSYASINI GÜNCELLE (APPEND)
+
+**Dosya:** `günlük-rapor/[TARİH].txt`
+
+Bu dosyanın en altına gidip, o an kapanan oturumun (Session) özetini EKLE (Append). **Kesinlikle yeni bir dosya oluşturma (rapor-1.txt vs yok!), var olan günün dosyasının en altına bu şablonu ekle:**
+
+```text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          🌙 OTURUM SONU ÖZETİ
+          Bitiş: [SAAT] | Süre: [SÜRE]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+## ✅ TAMAMLANAN GÖREVLER
+[Kısa Liste]
+
+## 🔄 DEVAM EDEN / YARINA KALAN İŞLER
+[Kısa Liste]
+
+## 📝 EKSTRA NOTLAR
+[Yeni fikirler, kararlar veya bug'lar]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
+## 10. GIT COMMIT ÖNERİSİ OLUŞTUR
+
+### 10.1 Çalışma Durumunu Değerlendir
+- Kullanıcı şu anki işini commit'lemeye hazır mı? (Çalışan kod mu?)
+- Konvansiyonel Commit (Conventional Commits) standartlarına uygun bir **Commit Mesajı** öner.
+  - Örnek: `feat(route-engine): a* pathfinding algoritması eklendi`
+  - Örnek: `fix(frontend): harita render sorunu çözüldü`
+
+---
+
+## 11. KULLANICIYA İNTERAKTİF SORULAR VE ONAYLAR
+
+Son olarak kullanıcıya terminale/ekrana aşağıdaki gibi bir özet bas ve sorularını sor.
+
+```text
+╔═══════════════════════════════════════════════════════╗
+║          🌙 OTURUM SONU RAPORU                       ║
+║          [TARİH] - Süre: [X saat Y dakika]          ║
+╚═══════════════════════════════════════════════════════╝
+
+📊 ÖZET:
+✅ Tamamlanan İşler: X adet
+🔄 Yarım Kalanlar: Y adet
+💾 Progress.md & Günlük Rapor güncellendi.
+
+🚀 GIT DURUMU:
+[Değişen dosya sayısı ve stat analizi özetlenir]
+
+Önerilen Commit Mesajı:
+-------------------------
+[ÖNERİLEN_COMMIT_MESAJI]
+-------------------------
+
+SORULAR:
+1. Bu değişiklikleri sizin için Commit edip (ve istenirse push'layıp) repoyu temizleyeyim mi? ([E]vet / [H]ayır)
+2. Yarın için özel bir hatırlatıcı not düşmemi ister misiniz?
+```
+
+---
+
+## 12. KULLANICININ CEVAPLARINA GÖRE AKSİYONLAR
+
+- Eğer "Evet" derse: `git add .`, ardından `git commit -m "..."` yap ve `git push` isteyip istemediğini netleştir.
+- Özel bir not eklerse: O notu alıp `günlük-rapor/[TARİH].txt` dosyasının en altına (Yarının Öncelikleri) kısmına ekle.
+
+---
+
+## 13. OTURUM KAPATMA PROSEDÜRÜ
+
+Kullanıcı ile işler bittikten sonra:
+```text
+✅ Oturum sonu işlemleri tamamlandı!
+📝 Tüm notlar günlük dosyaya eklendi.
+🎯 Yarın için hazırsınız!
+
+İyi dinlenmeler! 💤
+```
+
+---
+
+**ÖNEMLI NOTLAR:**
+- Bu hook'taki TÜM adımları otomatik gerçekleştir (commit/push onayı hariç).
+- **Rapor isimlendirme:** Her gün için SADECE TEK DOSYA (`[TARİH].txt`) kullanılacak. `rapor-1.txt`, `rapor-2.txt` sistemini terk ettik. Dosya varsa sadece en altına Append (ekleme) yap.
+- `progress/2026-02.md` yerine doğrudan `progress.md` kullan.
+- AI Ajana Not: Token limitlerini şişirmemek adına, `git diff HEAD` (saf diff çıktısı) kullanmak yerine sadece listeleri, istatistikleri ve sohbet belleğini (context) kullan. Gerekli değilse devasa okumalar yapma.

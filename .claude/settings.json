@@ -1,0 +1,9 @@
+{
+  "autoApprove": true,
+  "permissions": {
+    "mode": "auto"
+  },
+  "hooks": {
+    "disabled": ["SessionEnd", "SessionStart"]
+  }
+}

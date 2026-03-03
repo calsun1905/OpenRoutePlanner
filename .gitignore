@@ -3,5 +3,13 @@ __pycache__/
 *.pyc
 *.pyo
 backend/data/*.graphml
+backend/data/saved_routes.json
 .env
 *.log
+
+# İndirilen yapay zeka modelleri
+backend/models/*
+!backend/models/.gitkeep
+!backend/models/bert-base-turkish-uncased/
+backend/models/bert-base-turkish-uncased/*
+!backend/models/bert-base-turkish-uncased/.gitkeep

@@ -1,0 +1,45 @@
+# Günlük Notlar - 27.02.2026
+
+**Tarih:** 27 Şubat 2026 Perşembe
+**Başlangıç:** ~16:00
+**Bitiş:** ~17:15
+
+---
+
+## 📝 Notlar
+
+### Çalışma Başlangıcı
+- Proje yapısı oluşturuldu
+- GSD ve SuperClaude kurulumu yapıldı
+- Çalışma yöntemi belirlendi
+
+### Öğrenilenler:
+- Cache mekanizması: `_graph_cache` ve `_poi_cache`
+- Proje ana özellikleri: Rota hesaplama ve POI arama
+
+### Yapılanlar (Bu Oturum):
+1. ✅ Tavily MCP API entegrasyonu yapıldı
+2. ✅ Get Shit Done (GSD) v1.21.0 kuruldu
+3. ✅ Çalışma yöntemi belirlendi:
+   - Aylık progress dosyaları
+   - Günlük not sistemi
+   - Oturum başı/sonu hook'ları
+4. ✅ Dosya yapısı oluşturuldu:
+   - `progress/` klasörü (aylık takip)
+   - `günlük-rapor/` klasörü (günlük notlar)
+   - `öneriler.md` (öneriler ve notlar)
+   - `komutlar.md` (GSD + SuperClaude komutları)
+5. ✅ Hook'lar oluşturuldu:
+   - `.claude/hooks/SessionStart.claude` (oturum başı)
+   - `.claude/hooks/SessionEnd.claude` (oturum sonu - sadece manuel)
+
+### Öğrenilen Komutlar:
+- GSD: `/gsd:resume-work`, `/gsd:pause-work`, `/gsd:progress`
+- SuperClaude: `/sc:explain`, `/sc:analyze`, `/sc:implement`
+
+---
+
+## 🌙 Oturum Sonu
+
+**Tamamlanan görevler:** Tüm yapılandırma tamamlandı
+**Sonraki adım:** `app.py` dosyasını detaylı inceleme

@@ -1,0 +1,1 @@
+Bu dosya, backend/models/bert-base-turkish-uncased klasörünün Git üzerinde takip edilmesini sağlar, ancak indirilmiş asıl yapay zeka model dosyaları .gitignore kuralları ile takip edilmez.

@@ -1,0 +1,271 @@
+# 🌅 Oturum Başlangıcı
+
+**ÖNEMLİ: Bu adımları otomatik olarak gerçekleştir, kullanıcıdan onay bekleme.**
+
+> ⚡ **HIZLI BAŞLANGIÇ (LITE MOD)**
+> Eğer kullanıcı oturumu başlatırken "Hızlı başla", "Lite mod" veya benzeri bir komut verirse, sadece `progress.md` dosyasına bak (ADIM 2), son commit'i gör ve doğrudan ADIM 9'daki sorulara geç. Diğer tüm uzun analiz adımlarını atla.
+
+---
+
+## 1. SİSTEM DURUMU
+
+Hızlıca kontrol et:
+- Bugünün tarihi (DD.MM.YYYY format)
+- Git branch ve uncommitted changes (`git status --short`)
+- Son commit (`git log --oneline -1`)
+
+## 2. PROGRESS ANALİZİ
+
+`progress.md` dosyasını oku ve özet çıkar:
+- TODO sayısı ve ilk 5 madde
+- Son tamamlananlar (DONE'dan son 3)
+- Açık kritik bug varsa listele
+
+Kısa özet tablo göster:
+```text
+📊 TODO: X | ✅ Done (bu hafta): Y | 🐛 Bug: Z
+```
+
+## 3. SON 2 GÜNÜN GÜNLÜK RAPORLARI
+
+**Sadece son 2 günün tüm raporlarını oku:**
+
+1. **Bugün:** `günlük-rapor/[bugünün_tarihi].txt` (veya Markdown .md) var mı diye kontrol et.
+   - Varsa dünden kalan işleri ve son notları özetle.
+2. **Dün:** `günlük-rapor/[dünün_tarihi].txt` dosyasını oku.
+   - Varsa önemli notları ve "Bugün yapılacaklar" listesini özetle.
+
+**Not:** Artık her gün için "tek bir dosya" tutulmaktadır. (Örn: `28.02.2026.txt`). İsimlendirmeler "rapor-1", "rapor-2" şeklinde ayrılmamaktadır.
+
+---
+
+## 4. GIT GEÇMİŞİNİ İNCELE
+
+### 4.1 Son Commit'leri Detaylı Göster
+- `git log --oneline -10` komutunu çalıştır (son 10 commit)
+- Her commit'in kısa özetini göster
+- Commit tarihlerini de ekle: `git log --pretty=format:"%h - %an, %ar : %s" -10`
+
+### 4.2 Son Değişiklikleri Analiz Et
+- `git diff --stat` ile değişen dosyaların isimlerini ve istatistiklerini göster.
+- **DİKKAT:** Devasa çıktıları önlemek için çok gerekli olmadıkça `git diff HEAD` kullanma. Sadece değişen dosya adlarını listele.
+
+### 4.3 Stash Kontrolü
+- `git stash list` ile stash'leri kontrol et
+- Varsa ne zaman oluşturulduklarını göster
+
+---
+
+## 5. ÖNERİLER DOSYASINI DETAYLI İNCELE
+
+### 5.1 Öneriler Dosyasını Tamamen Oku
+- `öneriler.md` dosyasının **TAMAMINI** oku (satır sınırı yok)
+- Dosya yoksa kullanıcıya bildir
+
+### 5.2 Önerileri Kategorize Et
+Dosyayı okuyup şu kategorilere ayır:
+
+1. **Teknik Öneriler** - Kod iyileştirmeleri, optimizasyonlar
+2. **Özellik Önerileri** - Yeni özellik fikirleri
+3. **Bug Fix Önerileri** - Hata çözüm önerileri
+4. **Dokumentasyon Önerileri** - Dökümantasyon iyileştirmeleri
+5. **Genel Notlar** - Diğer öneriler
+
+### 5.3 En Son Eklenen 5 Öneriyi Vurgula
+Hangilerinin yeni eklendiğini belirt.
+
+---
+
+## 6. DİĞER PROJE DOSYALARINI HIZLI TARA
+
+### 6.1 README.md'yi Oku
+- README.md'nin tamamını oku
+- Proje açıklamasını hatırla
+- Eksik bilgi var mı kontrol et
+
+### 6.2 Komutlar ve İnceleme Dosyalarını Tara
+- `komutlar.md` dosyası varsa oku
+- `incelemem.md` dosyası varsa oku
+- Bu dosyalarda önemli notlar var mı?
+
+### 6.3 Backend Durumu
+- `backend/app.py` (veya ilgili ana dosya) son değişiklik tarihini kontrol et
+- `requirements.txt` dosyasını oku, hangi kütüphaneler kullanılıyor?
+
+### 6.4 Frontend Durumu
+- `frontend/index.html` son ne zaman güncellenmiş?
+- `frontend/js/app.js` ve `frontend/css/style.css` durumları?
+
+---
+
+## 7. HATA VE SORUN TESPİTİ
+
+### 7.1 Backend Hatalarını Kontrol Et
+- Backend'de log dosyası var mı kontrol et.
+- Log dosyalarındaki (varsa) son Python hatalarını veya uyarıları analiz et.
+
+### 7.2 Frontend Hatalarını Kontrol Et
+- Projede varsa frontend log dosyalarına veya yapılandırma dosyalarındaki uyarılara bak. (Tarayıcı konumu olmadığı için doğrudan console'a bakılamaz).
+
+### 7.3 Git Problemlerini Kontrol Et
+- Merge conflict var mı?
+- Detached HEAD durumu var mı?
+- Remote ile senkronizasyon sorunu var mı?
+
+---
+
+## 8. KULLANICIYA DETAYLI RAPOR SUNUMU
+
+Yukarıdaki tüm adımları tamamladıktan sonra kullanıcıya şu formatta bir rapor sun:
+
+```text
+╔════════════════════════════════════════════════════════╗
+║        🌅 OTURUM BAŞLANGICI RAPORU                    ║
+║        Tarih: [TARİH] - Saat: [SAAT]                 ║
+╚════════════════════════════════════════════════════════╝
+
+📊 PROJE DURUMU:
+----------------
+✅ Tamamlanan İşler: X
+📝 Bekleyen İşler: Y
+🐛 Açık Bug'lar: Z
+💡 Yeni Fikirler: N
+
+📂 DİZİN DURUMU:
+----------------
+✓ Tüm klasörler mevcut
+✓ Günlük dosyalar oluşturuldu (veya güncellendi)
+[veya eksikler varsa belirt]
+
+🔧 GIT DURUMU:
+----------------
+Branch: [BRANCH_ADI]
+Son Commit: [SON_COMMIT]
+Değişiklikler: [DEĞİŞİKLİK_SAYISI]
+
+📋 BUGÜNÜN TODO LİSTESİ:
+----------------
+1. [İş 1]
+2. [İş 2]
+3. [İş 3]
+...
+
+🐛 KRİTİK BUG'LAR:
+----------------
+[Varsa listele, yoksa "Kritik bug yok"]
+
+💡 YENİ FİKİRLER:
+----------------
+[Son eklenen fikirleri listele]
+
+⚠️ DİKKAT EDİLMESİ GEREKENLER:
+----------------
+[Önemli notlar, uyarılar]
+```
+
+---
+
+## 9. KULLANICIYA İNTERAKTİF SORULAR SOR
+
+Raporu sunduktan sonra kullanıcıya şu soruları sor:
+
+### 🎯 Öncelik Sorusu:
+"Progress dosyasında X adet TODO var. Bugün HANGİ işlerle ilgilenmek istersiniz? (Birden fazla seçebilirsiniz)"
+
+### 🔄 Kalan İş Sorusu:
+"Dünden kalan tamamlanmamış bir iş var mı? Varsa ona devam mı etmek istersiniz?"
+
+### 💡 Yeni Fikir Sorusu:
+"Aklınıza gelen yeni bir fikir, öneri veya TODO var mı? Şimdi eklemek ister misiniz?"
+
+### 🐛 Bug Raporu Sorusu:
+"Herhangi bir bug veya sorunla karşılaştınız mı? Raporlamak istediğiniz bir şey var mı?"
+
+### 🚀 Hızlı Başlangıç Sorusu:
+"Hızlı bir şekilde başlamak isterseniz, en acil işi söyleyeyim mi?"
+
+### ⚙️ Ortam Hazırlığı Sorusu:
+"Backend sunucuyu başlatmamı ister misiniz? (python backend/app.py vb.)"
+
+---
+
+## 10. KULLANICININ CEVABINA GÖRE AKSIYONLAR AL
+
+Kullanıcının cevaplarına göre:
+
+1. **Eğer belirli bir TODO seçildiyse:**
+   - O TODO'yu `progress.md` içinde "in-progress" olarak işaretle
+   - İlgili dosyaları kullanıcıya hatırlat
+   - İlk adımı öner
+
+2. **Eğer yeni fikir eklendiyse:**
+   - Hemen `progress.md` veya `öneriler.md` dosyasına ekle
+   - Hangi kategoriye girdiğini belirle
+   - Öncelik seviyesini sor
+
+3. **Eğer bug rapor edildiyse:**
+   - `progress.md` dosyasının buglar bölümüne ekle
+   - Öncelik seviyesini belirle
+   - Hemen çözülmesi gerekiyor mu sor
+
+4. **Eğer backend başlatılacaksa:**
+   - İlgili dizine geçip uygun komutu bul ve çalıştır (veya kullanıcıya komutu öner)
+
+---
+
+## 11. OTURUM BAŞLANGICI NOTUNU GÜNCELLE / KAYDET
+
+Bugünün notları için `günlük-rapor/[TARİH].txt` dosyasını kullan. **Artık her oturum için rapor-1, rapor-2 diye yeni dosya açma. Onun yerine aynı günün tek dosyası içine (dosyanın altına) yeni oturumun (Session) verilerini Ekle (Append Yap).**
+
+**Kontrol ve Ekleme İşlemi:**
+1. `günlük-rapor/[TARİH].txt` var mı kontrol et. Yoksa YENİ bir dosya olarak oluştur ve ilk Oturum (Session 1) verisini gir.
+2. Varsa, dosyanın en altına gidip yeni bir zaman damgasıyla yeni Oturum (Session X) verisini Ekle.
+
+Dosyaya Eklenecek İçerik Formatı:
+```text
+╔════════════════════════════════════════════════════════╗
+║        OTURUM BAŞLANGICI                              ║
+║        Tarih: [TARİH] - Başlangıç: [SAAT]            ║
+╚════════════════════════════════════════════════════════╝
+
+### Sistem Durumu:
+- Git Branch: [BRANCH]
+- Uncommitted Changes: [VAR/YOK]
+- Son Commit: [COMMIT_MSG]
+
+### Bu Oturumun Hedefleri:
+[Kullanıcının seçtiği TODO'lar]
+
+### Devam Eden İşler:
+[Varsa dünden/bir önceki oturumdan kalan işler]
+
+### Notlar:
+[Kullanıcının belirttiği özel notlar]
+
+---
+```
+
+---
+
+## ✅ OTURUM BAŞLANGICI TAMAMLANDI
+
+Kullanıcıya şöyle bir mesaj göster:
+
+```text
+✅ Oturum başlangıç işlemleri tamamlandı!
+🎯 Bugünün hedefi: [SEÇİLEN_TODO]
+⏰ Başlangıç saati: [SAAT]
+📝 Notlar güncellendi: günlük-rapor/[TARİH].txt
+
+Haydi başlayalım! İyi çalışmalar! 🚀
+```
+
+---
+
+**ÖNEMLI NOTLAR:**
+- Bu hook'taki TÜM adımları otomatik gerçekleştir (kullanıcı Hızlı Başlangıç istemediyse).
+- Günlük raporları okurken: SADECE SON 2 GÜNÜ oku (bugün + dün). `[TARİH].txt` tek dosyalarına odaklan.
+- `progress.md` ve `öneriler.md` dosyalarını tamamen oku (sınır yok).
+- Kullanıcıyla etkileşim önemli, sorular sor ve cevaplar al.
+- Tüm bilgiler detaylı ve eksiksiz sunulmalı.
+- **Rapor isimlendirme:** Her gün için tek dosya kullan (`[TARİH].txt`). Her oturumda dosyaya yepyeni bir kayıt gibi **append** et (altına ekle).
