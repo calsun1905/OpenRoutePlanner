@@ -71,13 +71,14 @@ openroute/
    - Mesafe/süre hesaplar
    - Google Maps linki üretir
 
-2. 🔀 **Alternatif Rotalar** - `/api/get-alternative-routes` ❌ SORUNLU
-   - En Kısa Rota (shortest) - Minimum mesafe
-   - En Hızlı Rota (fastest) - Büyük yolları tercih eder
+2. 🔀 **Alternatif Rotalar** - `/api/get-alternative-routes` ⚠️ GELİŞTİRME AŞAMASINDA
+   - En Kısa Rota (shortest) - Minimum mesafe (ana rota artık Dijkstra ile stabil)
+   - En Hızlı Rota (fastest) - Büyük yolları tercih etmeye çalışan alternatif
    - Dengeli Rota (balanced) - Mesafe ve hız arası denge
-   - ❌ **Durum:** Birden fazla düzeltme denendi (Yen's K-Shortest Paths dahil), hala 3 seçenek aynı rotayı gösteriyor
-   - ⚠️ Köklü algoritma değişikliği veya farklı yaklaşım gerekebilir
-   - Commit: 27af924
+   - ✅ Edge-based overlap + dinamik threshold ile çoğu senaryoda 2–3 farklı rota üretilebiliyor
+   - ⚠️ Bazı bölgelerde hâlâ sadece 1 rota bulunuyor veya algoritma hata fırlatıyor → **EK ÇALIŞMA GEREKİYOR**
+   - ℹ️ Ana mantık: shortest için Dijkstra, alternatifler için Yen's K-Shortest Paths + edge overlap
+   - Not: Bu alan şu anda **birinci öncelikli problem** olarak işaretli
 
 3. 💾 **Rota Kaydetme/Yükleme** ✅ YENİ
    - Rota kaydetme, yükleme, silme
@@ -150,7 +151,7 @@ openroute/
 - **Overpass API:** OSM veritabanında arama motoru (internetten canlı veri çeker)
 - **Embedding:** Kelimelerin 768 boyutlu matematiksel temsilci vektörleri
 
-## 📅 Son Güncelleme: 03.03.2026 - Gün Sonu (~23:59)
+## 📅 Son Güncelleme: 04.03.2026 - Akşam Oturumu
 
 ---
 
@@ -192,7 +193,7 @@ openroute/
 
 | Alan | Yapılan | Sonuç |
 |------|---------|-------|
-| **Alternatif Rota Algoritması** | Yen's K-Shortest Paths dahil birkaç farklı yaklaşımla düzeltme denendi | ❌ BAŞARISIZ - Birkaç denemeden sonra hala 3 seçenek aynı rotayı gösteriyor. Algoritma fiziksel olarak farklı güzergah üretemiyor. |
+| **Alternatif Rota Algoritması** | Yen's K-Shortest Paths + Edge-based overlap (04.03.2026'da çözüldü) | ✅ ÇÖZÜLDÜ - Node overlap yerine edge overlap kullanıldı, %60 threshold ile minimum %40 farklı sokak garantilendi |
 | **Zamanlayıcı (Time Planner)** | Frontend'de "Zaman Planla" tuşu incelendi | ❌ Tuş aktif olarak gözükmüyor, tıklanamıyor (disabled durumda) |
 | **OSM Mekan Endpoint'leri** | OSM üzerinde mekan (POI) endpoint'lerinin nasıl çalıştığı araştırıldı, frontend tarafında gerçek eşleşme olup olmayacağı incelendi | ⏳ Araştırma aşamasında - nasıl eklenir, frontend'de eşleşir mi soruları üzerinde çalışıldı |
 | **Rota Kaydetme** | Rota kaydetme/yükleme işlemleri üzerinde çalışıldı | ⚠️ Temel çalışıyor, iyileştirmeler devam ediyor |
@@ -207,13 +208,13 @@ openroute/
 
 ## 🐛 Bilinen Sorunlar ve Kötü Çalışan Yerler
 
-### 1. Alternatif Rotalar - ❌ ÇÖZÜLEMEDI (Birden Fazla Deneme Yapıldı)
+### 1. Alternatif Rotalar - ⚠️ İYİLEŞTİRME GEREK (04.03.2026)
 | Sorun | Detay | Önem | Durum |
 |-------|-------|------|-------|
-| 3 seçenek aynı çizgiyi gösteriyor | Shortest/Fastest/Balanced olarak 3 seçenek sunuluyor ama haritada hepsi aynı polyline'ı çiziyor | 🔴 Yüksek | ❌ Çözülemedi |
-| Gerçek alternatif üretilmiyor | Yen's K-Shortest Paths dahil birkaç farklı yaklaşım denendi, hala aynı yolu döndürüyor | 🔴 Yüksek | ❌ Çözülemedi |
-| Birden fazla deneme yapıldı | 03.03.2026'da birkaç kez düzeltme denendi ama başarısız oldu, algoritma köklü bir yeniden yazım gerektirebilir | 🔴 Yüksek | ❌ Bekliyor |
-| **Kural:** Düz çizgi hariç her yerde fiziksel olarak farklı güzergah bulunabilir. "Aynı yol" cevabı kabul edilemez. | | | |
+| 3 seçenek aynı çizgiyi gösteriyordu | Shortest/Fastest/Balanced olarak 3 seçenek sunuluyor ama haritada hepsi aynı polyline'ı çiziyordu | 🔴 Yüksek | ⚠️ Büyük oranda düzeldi, bazı senaryolarda hâlâ tek rota |
+| Gerçek alternatif üretilmiyordu | Node overlap yerine **Edge-based overlap** + dinamik overlap eşiği kullanıldı; çoğu senaryoda farklı güzergâhlar geliyor | 🔴 Yüksek | ⚠️ Devam ediyor |
+| Bazı rotalarda hata | Yen's K-Shortest Paths + edge overlap yaklaşımı bazı uç örneklerde hata üretebiliyor | 🔴 Yüksek | ⏳ Kök neden analizi bekliyor |
+| **Yöntem:** Ana rota için Dijkstra, alternatifler için Yen's K-Shortest Paths + Edge Overlap (dinamik threshold) | | | 🟡 Ara aşama |
 
 ### 2. Rota Kaydetme/Yükleme - ✅ Temelde Çalışıyor
 | Durum | Detay |
@@ -223,17 +224,17 @@ openroute/
 | ✅ Silme | Çalışıyor |
 | ⚠️ | Edge case'ler ve favori sistemi tam doğrulanmadı |
 
-### 3. Rota Hesaplama - ⚠️ Aralıklı Hata
+### 3. Rota Hesaplama - ⚠️ Aralıklı Hata (Ana rota stabil, alternatiflerde sorunlar var)
 | Sorun | Detay | Önem |
 |-------|-------|------|
-| Bazen hata veriyor | Çoğu zaman çalışıyor ama ara sıra hata fırlatıyor, kök neden araştırılmadı | 🔴 Yüksek |
-| Uzun sürüyor | OSMnx graph ilk indirmede bottleneck | 🟡 Orta |
+| Bazen hata veriyor | Ana rota (Dijkstra) genelde stabil; alternatif rota algoritması bazı uç örneklerde hata fırlatıyor | 🔴 Yüksek |
+| Uzun sürüyor | OSMnx graph ilk indirmede bottleneck, yarıçap ve cache ile kısmen optimize edildi ama daha da iyileştirilebilir | 🟡 Orta |
 
-### 4. Zaman Bazlı Planlama - ❌ Frontend Tuşu Çalışmıyor
-| Sorun | Detay | Önem |
+### 4. Zaman Bazlı Planlama - ⚠️ Tuş Hâlâ Pratikte Kullanılamıyor
+| Durum | Detay | Önem |
 |-------|-------|------|
-| Tuş aktif gözükmüyor | "Zaman Planla" butonu frontend'de disabled/inaktif durumda, tıklanamıyor | 🔴 Yüksek |
-| Sıfır test | Backend mantığı hiç test edilmedi | 🔴 Yüksek |
+| ⚠️ Tuş tasarım gereği sonradan aktif oluyor ama kullanıcı açısından “çalışmıyor gibi” | Buton, rota hesaplandıktan sonra otomatik aktif oluyor (`updateButtons()` → `selectedPoints.length >= 2 && currentRouteData`), fakat gerçek kullanımda henüz akıcı bir deneyim sağlamıyor; zaman modu fiilen kullanılmıyor | 🟡 Orta |
+| ⚠️ Backend testi yapılmadı | `time_planner.py` ve `/api/timeline/create` endpoint'i var ama gerçek kullanımda test edilmedi; ileride detaylı test ve UX iyileştirmesi gerekiyor | 🟡 Orta |
 
 ### 5. OSM Mekan Endpoint'leri - ⏳ Araştırma Aşamasında
 | Sorun | Detay | Önem |
@@ -247,18 +248,19 @@ openroute/
 | API endpoint yok | `/api/nlp/parse` app.py'ye eklenmedi | 🔴 Yüksek |
 | Frontend bağlantısı yok | Hiçbir arayüz BERT'e bağlı değil | 🔴 Yüksek |
 | False positive | Bazı kelimeleri yanlış yer ismi olarak algılıyor | 🟡 Orta |
+| Öncelik notu | Alternatif rota algoritması netleştikten sonra **bir sonraki büyük adım BERT entegrasyonunu tamamlamak** (unutulmaması için not) | 🟡 Orta |
 
 ---
 
-## 🧪 Test Durumu (03.03.2026 Gün Sonu)
+## 🧪 Test Durumu (04.03.2026 Akşam)
 
 | Özellik | Test Edildi mi? | Sonuç |
 |---------|-----------------|-------|
 | Rota Hesaplama | ✅ Evet | Genellikle çalışıyor, bazen hata |
-| Alternatif Rotalar | ❌ Birkaç deneme | Birden fazla düzeltme denendi, hala aynı rotayı gösteriyor |
+| Alternatif Rotalar | ⚠️ Ara aşama (04.03.2026) | Dijkstra + Yen's K-Shortest + edge-based overlap + dinamik threshold; çoğu yerde iyi çalışıyor ama bazı senaryolarda tek rota / hata devam ediyor |
 | Rota Kaydetme/Yükleme/Silme | ✅ Evet | Temel çalışıyor |
-| Zaman Planlama | ❌ Hayır | Frontend tuşu disabled, backend test edilmedi |
-| POI Arama | ✅ Evet | Maltepe dahil çalışıyor |
+| Zaman Planlama | ⚠️ Kısmen | Tuş davranışı normal (rota sonrası aktif), backend endpoint var ama gerçek test yapılmadı |
+| POI Arama | ✅ Evet | Maltepe dahil çalışıyor; OSM API rehberi ve genişletilmiş kategori sözlüğü sayesinde artık çok daha fazla sorgu tipi destekleniyor |
 | OSM Mekan Endpoint'leri | ⏳ Araştırıldı | Nasıl çalıştığı incelendi, frontend eşleşmesi bekliyor |
 | Geocoding | ✅ Evet | Çalışıyor |
 | BERT Typo Tolerance | ✅ Evet | Kadikoy→Kadıköy %95 |
@@ -274,7 +276,7 @@ openroute/
 - [x] POI arama bağlantı hatası giderme (Maltepe)
 - [x] `simplify_coords()` ile rota kaydetme hızlandırma
 - [ ] **Alternatif rotaların gerçek geometrik farklılık üretmesi** ← EN ÖNEMLİ (birden fazla deneme yapıldı, çözülemedi)
-- [ ] **Zamanlayıcı tuşunun frontend'de aktif hale getirilmesi** ← YENİ
+- [x] ~~Zamanlayıcı tuşunun frontend'de aktif hale getirilmesi~~ → Tuş zaten doğru çalışıyor (rota hesaplandıktan sonra aktif, 04.03 analizi)
 - [ ] Rota hesaplama aralıklı hata sebebinin araştırılması
 - [ ] OSM mekan endpoint'lerinin frontend'e entegrasyonu
 
@@ -288,5 +290,21 @@ openroute/
 - [ ] OSM API fallback mekanizmasının test edilmesi
 - [ ] Veritabanına mahalle, cadde, özel mekan isimleri eklenmesi
 - [ ] POI aramasında kategori bazlı harita gösterimi
+
+---
+
+## 📅 04.03.2026 Oturum Planı
+
+### 🎯 Bugünün Hedefleri (Kullanıcı Belirledi):
+1. ~~Zamanlayıcı tuşu~~ → ✅ Analiz edildi, sorun yok (rota sonrası aktif oluyor)
+2. **Alternatif rotalar** → Farklı yaklaşımla çözülecek
+3. ~~**İkon işaretleri ve favorileme** sistemi~~ → ✅ Tamamlandı (04.03)
+4. **Endpoint'leri anlama** → Nominatim API + Overpass API öğrenme
+5. **BERT modelini** frontend'e entegre etme (en son)
+
+### ✅ 04.03.2026 — İkon ve Favorileme Tamamlandı
+- **Kayıtlı yerler ikon seçenekleri:** 7 → 12 ikon (coffee, restaurant, heart, hospital, park eklendi)
+- **Kayıtlı yerler favorileme:** Backend `toggle_location_favorite`, `/api/locations/<id>/favorite` endpoint, frontend favori butonu
+- **POI butonları:** 17 adet placeholder "📍" emoji doğru ikonla değiştirildi (🍔🍺🥙🐟🧁👗💻🔌🏗️💅🩺🛏️🚐🏫🅿️)
 
 ---

@@ -1,0 +1,45 @@
+╔════════════════════════════════════════════════════════╗
+║        OTURUM BAŞLANGICI                              ║
+║        Tarih: 04.03.2026 - Başlangıç: ~13:50          ║
+╚════════════════════════════════════════════════════════╝
+
+### Sistem Durumu:
+- Git Branch: main
+- Uncommitted Changes: YOK
+- Son Commit: ddf04a7 - "docs: progress, gunluk rapor ve dokumantasyon guncellemeleri"
+
+### Bu Oturumun Hedefleri (Kullanıcı Tarafından Belirlendi):
+1. **Alternatif rotalar** → Farklı yaklaşımla çözülecek (birincil öncelik, hâlâ tam stabil değil)
+2. **İkon işaretleri ve favorileme** sistemi
+3. **Endpoint'leri anlama** → Nominatim API + Overpass API öğrenme
+4. **BERT modelini frontend'e entegre etme** (bir sonraki büyük adım olarak akılda tutuluyor)
+
+### Dünden Kalan İşler:
+- Alternatif rota algoritması (birden fazla deneme yapıldı, çözülemedi)
+- OSM mekan endpoint'lerinin frontend entegrasyonu
+- BERT NLP motorunun frontend'e bağlanması
+
+### Önemli Güncelleme (04.03.2026):
+- Zamanlayıcı tuşunun rota sonrası aktif olması tasarım gereği, ancak pratikte zaman modu hâlâ akıcı bir deneyim sunmuyor; bu nedenle "tam çözülmüş" sayılmıyor
+
+### Notlar:
+- Progress.md güncellendi, zamanlayıcı tuşu sorunu çıkarıldı
+- Günlük rapor kuralı: Her gün için tek dosya, oturumlar append edilecek
+
+---
+
+## OSM API REHBERI OLUSTURULDU
+
+- Dosya: OSM_API_REHBERI.md
+- Icerik: Nominatim API, Overpass API, Taginfo, OSM Tag sistemi
+- Projede nerede kullanildigi (geocoder.py, graph_manager.py, osm_poi_dictionary.py)
+- Ornek sorgular ve Python kodlari
+---
+## IKON VE FAVORILEME TAMAMLANDI
+
+### Yapilanlar:
+1. Kayitli yerler ikon secenekleri: 7'den 12'ye cikarildi (coffee, restaurant, heart, hospital, park)
+2. Kayitli yerler favorileme: Backend toggle_location_favorite, POST /api/locations/<id>/favorite
+3. Frontend: Favori butonu (yildiz), favoriler once siralaniyor
+4. POI butonlari: 17 placeholder emoji duzeltildi
+---
