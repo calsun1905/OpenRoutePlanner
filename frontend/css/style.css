@@ -257,6 +257,53 @@ body {
     gap: 8px;
 }
 
+/* --- Drag & Drop Styles --- */
+.point-item {
+    cursor: grab;
+    gap: 8px;
+}
+
+.point-item:active {
+    cursor: grabbing;
+}
+
+.drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: var(--text-muted);
+    cursor: grab;
+    flex-shrink: 0;
+    opacity: 0.5;
+    transition: opacity var(--transition-fast);
+}
+
+.point-item:hover .drag-handle {
+    opacity: 1;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.point-item.dragging {
+    opacity: 0.5;
+    background: var(--bg-card-hover);
+    border: 1px dashed var(--accent-primary);
+}
+
+.point-item.drag-over {
+    border-top: 2px solid var(--accent-primary);
+    margin-top: 4px;
+}
+
+/* Point label updated for drag handle */
+.point-item .point-label {
+    flex: 1;
+}
+
 /* --- Buttons --- */
 .btn {
     display: inline-flex;
@@ -491,8 +538,19 @@ body {
 /* --- POI Grid --- */
 .poi-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 6px;
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.poi-grid::-webkit-scrollbar {
+    width: 4px;
+}
+.poi-grid::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: 4px;
 }
 
 @media (max-width: 768px) {
@@ -1491,8 +1549,9 @@ body {
 
 .saved-location-actions {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 4px;
+    align-items: center;
 }
 
 .ic-btn {
@@ -1507,6 +1566,14 @@ body {
 
 .ic-btn:hover {
     opacity: 1;
+}
+
+.ic-btn-favorite {
+    color: var(--accent-warning);
+}
+
+.ic-btn-favorite:hover {
+    color: #ffd93d;
 }
 
 .ic-btn-route {
@@ -1531,7 +1598,7 @@ body {
     border-radius: var(--radius-sm);
     background: var(--bg-secondary);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    font-size: 1.4rem;
+    font-size: 1.5rem;
     cursor: pointer;
     transition: all var(--transition-fast);
     display: flex;

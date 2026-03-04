@@ -167,6 +167,71 @@ function clearAllPoints() {
 }
 
 // ========== UI UPDATES ==========
+// ========== DRAG & DROP VARIABLES ==========
+let draggedIndex = null;
+
+// ========== DRAG & DROP HANDLERS ==========
+function handleDragStart(e, index) {
+    draggedIndex = index;
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => e.target.style.opacity = '0.5', 0);
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+    e.target.style.opacity = '1';
+    document.querySelectorAll('.point-item').forEach(item => {
+        item.classList.remove('drag-over');
+    });
+    draggedIndex = null;
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const targetItem = e.target.closest('.point-item');
+    if (targetItem) {
+        targetItem.classList.add('drag-over');
+    }
+}
+
+function handleDragLeave(e) {
+    const targetItem = e.target.closest('.point-item');
+    if (targetItem) {
+        targetItem.classList.remove('drag-over');
+    }
+}
+
+function handleDrop(e, targetIndex) {
+    e.preventDefault();
+    const targetItem = e.target.closest('.point-item');
+    if (targetItem) {
+        targetItem.classList.remove('drag-over');
+    }
+
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+        return;
+    }
+
+    // Array'de yer değiştir
+    const draggedPoint = selectedPoints.splice(draggedIndex, 1)[0];
+    selectedPoints.splice(targetIndex, 0, draggedPoint);
+
+    // Marker'ları da güncelle
+    const draggedMarker = markers.splice(draggedIndex, 1)[0];
+    markers.splice(targetIndex, 0, draggedMarker);
+
+    // UI güncelle
+    updatePointsList();
+
+    // Eğer rota varsa, rota sırasını güncelle
+    if (currentRouteData) {
+        clearRoute();
+        showToast('Nokta sırası değiştirildi. Rota için tekrar hesaplayın.', 'info');
+    }
+}
+
 function updatePointsList() {
     elPointCount.textContent = selectedPoints.length;
 
@@ -178,7 +243,22 @@ function updatePointsList() {
     let html = "";
     selectedPoints.forEach((p, i) => {
         html += `
-            <div class="point-item">
+            <div class="point-item" draggable="true"
+                 ondragstart="handleDragStart(event, ${i})"
+                 ondragend="handleDragEnd(event)"
+                 ondragover="handleDragOver(event)"
+                 ondragleave="handleDragLeave(event)"
+                 ondrop="handleDrop(event, ${i})">
+                <div class="drag-handle" title="Sıralamak için sürükle">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="9" cy="6" r="1.5"/>
+                        <circle cx="15" cy="6" r="1.5"/>
+                        <circle cx="9" cy="12" r="1.5"/>
+                        <circle cx="15" cy="12" r="1.5"/>
+                        <circle cx="9" cy="18" r="1.5"/>
+                        <circle cx="15" cy="18" r="1.5"/>
+                    </svg>
+                </div>
                 <div class="point-label">
                     <span class="point-number">${i + 1}</span>
                     <span class="point-coords">${p[0].toFixed(4)}, ${p[1].toFixed(4)}</span>
@@ -1162,15 +1242,29 @@ function displayTimeline(timeline) {
 
 // ========== SAVED LOCATIONS (KAYITLI YERLER) ==========
 
-// İkon haritası
+// İkon haritası — Kayıtlı yerler için emoji eşlemesi
 const locationEmojiMap = {
+    marker: "📍",
     home: "🏠",
     work: "💼",
     school: "🎓",
     gym: "🏋️",
     market: "🛒",
     star: "⭐",
-    marker: "📍"
+    coffee: "☕",
+    restaurant: "🍽️",
+    heart: "❤️",
+    hospital: "🏥",
+    park: "🌳",
+    museum: "🏛️",
+    plane: "✈️",
+    car: "🚗",
+    bike: "🚲",
+    beach: "🏖️",
+    mountain: "⛰️",
+    bank: "🏦",
+    gas: "⛽",
+    pharmacy: "💊"
 };
 
 /**
@@ -1184,7 +1278,8 @@ window.openSaveLocationModal = function (lat, lon, defaultName = "") {
 
     // Default marker'ı sıfırla
     locationIconBtns.forEach(b => b.classList.remove("active"));
-    document.querySelector('#locationIconSelector [data-icon="marker"]').classList.add("active");
+    const defaultBtn = document.querySelector('#locationIconSelector [data-icon="marker"]');
+    if (defaultBtn) defaultBtn.classList.add("active");
 
     elSaveLocationModal.style.display = "flex";
     elLocationName.focus();
@@ -1255,7 +1350,7 @@ async function confirmSaveLocation() {
  */
 async function loadSavedLocations() {
     try {
-        const response = await fetch(`${API_BASE}/locations?limit=20`);
+        const response = await fetch(`${API_BASE}/locations?limit=20&sort_by=favorite`);
         const data = await response.json();
 
         if (!response.ok) {
@@ -1283,15 +1378,19 @@ function displaySavedLocationsSidebar(locations) {
     let html = "";
     locations.forEach(loc => {
         const emoji = locationEmojiMap[loc.icon_type] || "📍";
+        const favoriteIcon = loc.favorite ? "⭐" : "☆";
 
         html += `
             <div class="saved-location-card" onclick="zoomToLocation(${loc.lat}, ${loc.lon}, '${escapeHtml(loc.name)}')">
                 <div class="saved-location-icon">${emoji}</div>
                 <div class="saved-location-info">
                     <h3 class="saved-location-name">${escapeHtml(loc.name)}</h3>
-                    <p class="saved-location-address">Kullanım: ${loc.usage_count}</p>
+                    <p class="saved-location-address">Kullanım: ${loc.times_used || 0}</p>
                 </div>
                 <div class="saved-location-actions" onclick="event.stopPropagation()">
+                    <button class="ic-btn ic-btn-favorite" onclick="toggleLocationFavorite('${loc.id}')" title="Favori">
+                        ${favoriteIcon}
+                    </button>
                     <button class="ic-btn ic-btn-route" onclick="addPoint(${loc.lat}, ${loc.lon})" title="Rotaya Ekle">
                         ＋
                     </button>
@@ -1308,8 +1407,31 @@ function displaySavedLocationsSidebar(locations) {
 
 window.zoomToLocation = function (lat, lon, name) {
     map.setView([lat, lon], 16);
-    // showToast(`${name} konumuna gidildi`, "info");
 };
+
+/**
+ * Kayıtlı konumun favori durumunu değiştirir
+ */
+async function toggleLocationFavorite(locationId) {
+    try {
+        const response = await fetch(`${API_BASE}/locations/${locationId}/favorite`, {
+            method: "POST"
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Favori işlemi başarısız");
+        }
+
+        loadSavedLocations();
+        showToast(data.is_favorite ? "Favorilere eklendi ⭐" : "Favorilerden çıkarıldı", "success");
+
+    } catch (error) {
+        console.error("Favori işlemi hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    }
+}
 
 async function deleteSavedLocation(locationId) {
     if (!confirm("Bu konumu silmek istediğinizden emin misiniz?")) {
