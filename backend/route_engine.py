@@ -199,6 +199,55 @@ def generate_google_maps_link(ordered_points: list) -> str:
     return base + "/".join(parts)
 
 
+def path_to_edges(G, path_nodes):
+    """
+    Node listesini edge listesine çevirir.
+    MultiDiGraph için edge'ler (u, v, key) tuple olarak temsil edilir.
+    """
+    edges = []
+    for i in range(len(path_nodes) - 1):
+        edge_data = G.get_edge_data(path_nodes[i], path_nodes[i + 1])
+        if edge_data:
+            # MultiDiGraph'te ilk key'i al
+            first_key = list(edge_data.keys())[0]
+            edges.append((path_nodes[i], path_nodes[i + 1], first_key))
+    return edges
+
+
+def count_edge_overlap(edges1, edges2):
+    """
+    İki rota arasındaki EDGE (kenar) overlap oranını hesaplar.
+    Node overlap yerine edge overlap kullan çünkü aynı node'lar
+    farklı kenarlarla bağlanabilir (örn: çift yönlü yollar).
+    """
+    set1 = set(edges1)
+    set2 = set(edges2)
+    if not set1 or not set2:
+        return 1.0
+    intersection = len(set1 & set2)
+    union = len(set1 | set2)
+    return intersection / union if union > 0 else 1.0
+
+
+def dynamic_overlap_threshold(distance_km: float) -> float:
+    """
+    Rota uzunluğuna göre maksimum izin verilen overlap oranını belirler.
+    Kısa rotalarda biraz daha yüksek, uzun rotalarda daha düşük tutulur.
+    Böylece:
+      - Kısa mesafede alternatif bulmak kolaylaşır,
+      - Uzun rotalarda daha farklı güzergahlar tercih edilir.
+    """
+    if distance_km < 1.0:
+        # Çok kısa rotalarda neredeyse tüm yollar benzer olacağı için esnek ol
+        return 0.90
+    if distance_km < 3.0:
+        return 0.80
+    if distance_km < 7.0:
+        return 0.75
+    # Çok uzun rotalarda gerçekten daha farklı yol iste
+    return 0.70
+
+
 def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int = 3) -> list:
     """
     İki nokta arası GERÇEK alternatif rotalar bulur.
@@ -222,18 +271,8 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
         {"type": "balanced", "name": "Dengeli Rota", "icon": "⚖️", "description": "Hız ve mesafe dengesi"}
     ]
 
-    def count_overlap(nodes1, nodes2):
-        """İki rota arasındaki node overlap oranını hesaplar"""
-        set1 = set(nodes1)
-        set2 = set(nodes2)
-        if not set1 or not set2:
-            return 1.0
-        intersection = len(set1 & set2)
-        union = len(set1 | set2)
-        return intersection / union if union > 0 else 1.0
-
     try:
-        print(f"[RouteEngine] === GERÇEK ALTERNATİF ROTALAR AÇILIYOR === {origin_node} -> {dest_node}")
+        print(f"[RouteEngine] === EDGE BAZLI ALTERNATİF ROTALAR === {origin_node} -> {dest_node}")
 
         # Yen's K-Shortest Paths algorithm (nx.shortest_simple_paths) doesn't support MultiDiGraphs.
         # We temporarily convert the graph to a simple DiGraph to find the node sequences.
@@ -242,22 +281,26 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
         # K-shortest paths generator'ı oluştur (tek seferde!)
         k_paths_generator = nx.shortest_simple_paths(G_simple, origin_node, dest_node, weight="length")
 
-        # İlk 10-15 yolu al ve aralarından en farklı 3'ünü seç
+        # Performans: 3 rota için biraz daha fazla aday deneyelim
         candidate_paths = []
-        max_candidates = 15  # Maksimum aday yol
+        max_candidates = 30
 
         for i, path_nodes in enumerate(k_paths_generator):
             if i >= max_candidates:
                 break
 
             path_stats = calculate_route_stats(G, path_nodes)
+            path_edges = path_to_edges(G, path_nodes)
+
             candidate_paths.append({
                 "nodes": path_nodes,
+                "edges": path_edges,
                 "distance_km": path_stats["total_distance_km"],
                 "duration_minutes": path_stats["estimated_walk_minutes"],
                 "length": len(path_nodes)
             })
-            print(f"[RouteEngine] Aday {i+1}: {path_stats['total_distance_km']} km, {len(path_nodes)} nodes")
+            if i < 5:  # Sadece ilk 5 adayı logla (performans)
+                print(f"[RouteEngine] Aday {i+1}: {path_stats['total_distance_km']} km, {len(path_edges)} edges")
 
         print(f"[RouteEngine] Toplam {len(candidate_paths)} aday yol bulundu")
 
@@ -267,6 +310,12 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
 
         # 1. En kısa yol mutlaka ilk alternatif olsun
         shortest = candidate_paths[0]
+        shortest_edges = shortest["edges"]
+
+        # Rota uzunluğuna göre dinamik overlap eşiği belirle
+        MAX_OVERLAP = dynamic_overlap_threshold(shortest["distance_km"])
+        print(f"[RouteEngine] Dinamik MAX_OVERLAP = {MAX_OVERLAP:.2f} (mesafe={shortest['distance_km']:.2f} km)")
+
         alternatives.append({
             "type": "shortest",
             "name": route_types[0]["name"],
@@ -276,68 +325,54 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
             "duration_minutes": shortest["duration_minutes"],
             "description": route_types[0]["description"]
         })
-        print(f"[RouteEngine] = SHORTEST secildi: {shortest['distance_km']} km")
+        print(f"[RouteEngine] = SHORTEST secildi: {shortest['distance_km']} km, {len(shortest_edges)} edges")
 
-        # 2. En farklı ikinci yolu bul (minimum overlap)
-        if len(candidate_paths) > 1:
-            best_second_idx = 1
-            min_overlap = 1.0
+        # 2. ve 3. rota: Hem shortest'tan hem de BİRBİRİNDEN farklı olmalı
+        # Her yeni aday, TÜM seçilmiş rotalarla düşük overlap göstermeli
+        selected_indices = [0]
+        selected_edges_list = [shortest_edges]  # Seçilen her rotanın edge seti
 
-            for idx in range(1, len(candidate_paths)):
-                overlap = count_overlap(shortest["nodes"], candidate_paths[idx]["nodes"])
-                print(f"[RouteEngine] Aday {idx+1} overlap: {overlap:.2%}")
-                if overlap < min_overlap:
-                    min_overlap = overlap
-                    best_second_idx = idx
+        for idx in range(1, len(candidate_paths)):
+            if len(selected_indices) >= 3:
+                break
 
-            second_path = candidate_paths[best_second_idx]
+            candidate_edges = candidate_paths[idx]["edges"]
+
+            # Tüm seçilmiş rotalarla overlap kontrolü
+            overlaps_all_ok = True
+            for sel_edges in selected_edges_list:
+                edge_overlap = count_edge_overlap(sel_edges, candidate_edges)
+
+                # %60'tan fazla örtüşüyorsa = aynı/benzer rota, KABUL ETME
+                if edge_overlap >= MAX_OVERLAP:
+                    overlaps_all_ok = False
+                    break
+
+            if overlaps_all_ok:
+                selected_indices.append(idx)
+                selected_edges_list.append(candidate_edges)
+
+        # Seçilen yolları alternatifs'e ekle (shortest zaten var)
+        for idx in selected_indices[1:]:
+            candidate = candidate_paths[idx]
+            route_type = route_types[len(alternatives)]
+
             alternatives.append({
-                "type": "fastest",
-                "name": route_types[1]["name"],
-                "icon": route_types[1]["icon"],
-                "nodes": second_path["nodes"],
-                "distance_km": second_path["distance_km"],
-                "duration_minutes": second_path["duration_minutes"],
-                "description": route_types[1]["description"]
+                "type": route_type["type"],
+                "name": route_type["name"],
+                "icon": route_type["icon"],
+                "nodes": candidate["nodes"],
+                "distance_km": candidate["distance_km"],
+                "duration_minutes": candidate["duration_minutes"],
+                "description": route_type["description"]
             })
-            print(f"[RouteEngine] = FASTEST secildi (idx {best_second_idx+1}): {second_path['distance_km']} km (overlap: {min_overlap:.2%})")
-
-        # 3. En farklı üçüncü yolu bul (hem birinciyle hem ikinciyle minimum overlap)
-        if len(candidate_paths) > 2:
-            best_third_idx = 2
-            min_combined_overlap = 1.0
-
-            for idx in range(1, len(candidate_paths)):
-                if idx == best_second_idx:
-                    continue  # İkinci olarak seçileni atla
-
-                overlap1 = count_overlap(shortest["nodes"], candidate_paths[idx]["nodes"])
-                overlap2 = count_overlap(candidate_paths[best_second_idx]["nodes"], candidate_paths[idx]["nodes"])
-                avg_overlap = (overlap1 + overlap2) / 2
-
-                print(f"[RouteEngine] Aday {idx+1} combined overlap: {avg_overlap:.2%}")
-
-                if avg_overlap < min_combined_overlap:
-                    min_combined_overlap = avg_overlap
-                    best_third_idx = idx
-
-            third_path = candidate_paths[best_third_idx]
-            alternatives.append({
-                "type": "balanced",
-                "name": route_types[2]["name"],
-                "icon": route_types[2]["icon"],
-                "nodes": third_path["nodes"],
-                "distance_km": third_path["distance_km"],
-                "duration_minutes": third_path["duration_minutes"],
-                "description": route_types[2]["description"]
-            })
-            print(f"[RouteEngine] = BALANCED secildi (idx {best_third_idx+1}): {third_path['distance_km']} km (overlap: {min_combined_overlap:.2%})")
 
         print(f"[RouteEngine] === TOPLAM {len(alternatives)} FARKLI ALTERNATİF ROTA BULUNDU ===")
 
-        # Her alternatif için node sayısını logla
+        # Her alternatif için edge sayısını logla
         for i, alt in enumerate(alternatives):
-            print(f"[RouteEngine] Alternatif {i+1} ({alt['type']}): {len(alt['nodes'])} nodes, {alt['distance_km']} km")
+            edge_count = len(path_to_edges(G, alt["nodes"]))
+            print(f"[RouteEngine] Alternatif {i+1} ({alt['type']}): {len(alt['nodes'])} nodes, {edge_count} edges, {alt['distance_km']} km")
 
     except Exception as e:
         print(f"[RouteEngine] KRİTİK HATA: {e}")
@@ -376,31 +411,110 @@ def build_alternative_routes(G, ordered_points: list, route_type: str = "shortes
         list[int]: Düğüm listesi
     """
     full_route_nodes = []
-    
+
+    # PERFORMANS: "shortest" için Yen algoritmasına gerek yok, direkt Dijkstra yeterli
+    if route_type == "shortest":
+        for i in range(len(ordered_points) - 1):
+            origin = find_nearest_node(G, ordered_points[i][0], ordered_points[i][1])
+            dest = find_nearest_node(G, ordered_points[i + 1][0], ordered_points[i + 1][1])
+            segment = shortest_path(G, origin, dest)
+            if segment:
+                if i == 0:
+                    full_route_nodes.extend(segment)
+                else:
+                    full_route_nodes.extend(segment[1:])
+        return full_route_nodes
+
     for i in range(len(ordered_points) - 1):
         origin = find_nearest_node(G, ordered_points[i][0], ordered_points[i][1])
         dest = find_nearest_node(G, ordered_points[i + 1][0], ordered_points[i + 1][1])
-        
-        # Alternatif rotaları bul
+
         alternatives = find_alternative_routes(G, origin, dest, num_routes=3)
-        
-        # İstenen tip rotayı seç
+
         segment = None
         for alt in alternatives:
             if alt["type"] == route_type:
                 segment = alt["nodes"]
                 break
-        
-        # Bulunamazsa en kısa rotayı kullan
+
         if not segment and alternatives:
             segment = alternatives[0]["nodes"]
         elif not segment:
             segment = shortest_path(G, origin, dest)
-        
+
         if segment:
             if i == 0:
                 full_route_nodes.extend(segment)
             else:
                 full_route_nodes.extend(segment[1:])
-    
+
     return full_route_nodes
+
+
+def build_all_alternative_routes_batch(G, ordered_points: list) -> list:
+    """
+    Tüm segment alternatiflerini TEK SEFERDE hesaplar, 3 tam rota döner.
+    Her segment için find_alternative_routes sadece 1 kez çağrılır (3 yerine).
+    
+    Returns:
+        list[dict]: [{"type": "shortest", "nodes": [...], ...}, {"type": "fastest", ...}, {"type": "balanced", ...}]
+    """
+    route_types = [
+        {"type": "shortest", "name": "En Kısa Rota", "icon": "📏", "description": "Minimum mesafe"},
+        {"type": "fastest", "name": "En Hızlı Rota", "icon": "⚡", "description": "Büyük yolları tercih eder"},
+        {"type": "balanced", "name": "Dengeli Rota", "icon": "⚖️", "description": "Hız ve mesafe dengesi"}
+    ]
+
+    # Her segment için alternatifleri BİR KEZ hesapla
+    segment_alternatives = []
+    for i in range(len(ordered_points) - 1):
+        origin = find_nearest_node(G, ordered_points[i][0], ordered_points[i][1])
+        dest = find_nearest_node(G, ordered_points[i + 1][0], ordered_points[i + 1][1])
+        print(f"[RouteEngine] [BATCH] Segment {i+1}: {ordered_points[i]} -> {ordered_points[i+1]}")
+        alts = find_alternative_routes(G, origin, dest, num_routes=3)
+        print(f"[RouteEngine] [BATCH] Segment {i+1} icin {len(alts)} alternatif bulundu")
+        segment_alternatives.append(alts)
+
+    # 3 tam rota oluştur (her biri için segment seç)
+    results = []
+    for rt in route_types:
+        full_nodes = []
+        print(f"[RouteEngine] [BATCH] === {rt['type']} tam rota olusturuluyor ===")
+        for seg_idx, alts in enumerate(segment_alternatives):
+            segment = None
+            chosen_type = None
+            for alt in alts:
+                if alt["type"] == rt["type"]:
+                    segment = alt["nodes"]
+                    chosen_type = alt["type"]
+                    break
+            if not segment and alts:
+                segment = alts[0]["nodes"]
+                chosen_type = alts[0]["type"]
+            elif not segment:
+                origin = find_nearest_node(G, ordered_points[seg_idx][0], ordered_points[seg_idx][1])
+                dest = find_nearest_node(G, ordered_points[seg_idx + 1][0], ordered_points[seg_idx + 1][1])
+                segment = shortest_path(G, origin, dest)
+                chosen_type = "shortest_fallback"
+
+            if segment:
+                if seg_idx == 0:
+                    full_nodes.extend(segment)
+                else:
+                    full_nodes.extend(segment[1:])
+                print(f"[RouteEngine] [BATCH] Segment {seg_idx+1} icin secilen tip: {chosen_type}, uzunluk={len(segment)}")
+
+        if full_nodes:
+            stats = calculate_route_stats(G, full_nodes)
+            print(f"[RouteEngine] [BATCH] {rt['type']} rota: {stats['total_distance_km']} km, {stats['estimated_walk_minutes']} dk")
+            results.append({
+                "type": rt["type"],
+                "name": rt["name"],
+                "icon": rt["icon"],
+                "nodes": full_nodes,
+                "distance_km": stats["total_distance_km"],
+                "duration_minutes": stats["estimated_walk_minutes"],
+                "description": rt["description"]
+            })
+
+    return results

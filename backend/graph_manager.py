@@ -72,8 +72,8 @@ def get_graph_for_points(points: list):
         if dist > max_dist:
             max_dist = dist
     
-    # Minimum 500m, padding olarak +300m ekle
-    radius = max(500, max_dist + 300)
+    # Minimum 500m, padding +300m. Maksimum 3500m (performans: çok geniş alan 10+ dk sürebilir)
+    radius = min(3500, max(500, max_dist + 300))
     
     # Cache key: merkez + yarıçap
     cache_key = f"point_{center_lat:.4f}_{center_lon:.4f}_{int(radius)}"
@@ -135,87 +135,15 @@ def search_pois(place_name: str, category: str) -> list:
     Returns:
         list of dict: [{"name": "...", "lat": ..., "lon": ...}, ...]
     """
-    # OSM etiketleri - Tüm kategoriler
-    tag_map = {
-        # Mevcut kategoriler
-        "museum":       {"tourism": "museum"},
-        "cafe":         {"amenity": "cafe"},
-        "park":         {"leisure": "park"},
-        "restaurant":   {"amenity": "restaurant"},
-        "library":      {"amenity": "library"},
-        "mosque":       {"amenity": "place_of_worship", "religion": "muslim"},
-        "hotel":        {"tourism": "hotel"},
-        
-        # Yeni kategoriler - Frontend'de eklenenler
-        "hospital":     {"amenity": "hospital"},
-        "supermarket":  {"shop": "supermarket"},
-        "cinema":       {"amenity": "cinema"},
-        "bank":         {"amenity": "bank"},
-        "fuel":         {"amenity": "fuel"},
-        
-        # Ekstra popüler kategoriler
-        "stadium":      {"leisure": "stadium"},
-        "school":       {"amenity": "school"},
-        "pharmacy":     {"amenity": "pharmacy"},
-        "bakery":       {"shop": "bakery"},
-        "atm":          {"amenity": "atm"},
-        "police":       {"amenity": "police"},
-        "post_office":  {"amenity": "post_office"},
-        "bus_station":  {"amenity": "bus_station"},
-        "parking":      {"amenity": "parking"},
-        "playground":   {"leisure": "playground"},
-        "gym":          {"leisure": "fitness_centre"},
-        "swimming_pool": {"leisure": "swimming_pool"},
-        "bar":          {"amenity": "bar"},
-        "pub":          {"amenity": "pub"},
-        "fast_food":    {"amenity": "fast_food"},
-        "dentist":      {"amenity": "dentist"},
-        "veterinary":   {"amenity": "veterinary"},
-        "bookshop":     {"shop": "books"},
-        "clothes":      {"shop": "clothes"},
-        "shoes":        {"shop": "shoes"},
-        "electronics":  {"shop": "electronics"},
-        "furniture":    {"shop": "furniture"},
-        "florist":      {"shop": "florist"},
-        "jewelry":      {"shop": "jewelry"},
-        "optician":     {"shop": "optician"},
-        "hairdresser":  {"shop": "hairdresser"},
-        "beauty":       {"shop": "beauty"},
-        "car_repair":   {"shop": "car_repair"},
-        "bicycle":      {"shop": "bicycle"},
-        "pet":          {"shop": "pet"},
-        "toys":         {"shop": "toys"},
-        "sports":       {"shop": "sports"},
-        "mall":         {"shop": "mall"},
-        "marketplace":  {"amenity": "marketplace"},
-        "theatre":      {"amenity": "theatre"},
-        "nightclub":    {"amenity": "nightclub"},
-        "casino":       {"amenity": "casino"},
-        "arts_centre":  {"amenity": "arts_centre"},
-        "gallery":      {"tourism": "gallery"},
-        "viewpoint":    {"tourism": "viewpoint"},
-        "attraction":   {"tourism": "attraction"},
-        "zoo":          {"tourism": "zoo"},
-        "aquarium":     {"tourism": "aquarium"},
-        "theme_park":   {"tourism": "theme_park"},
-        "university":   {"amenity": "university"},
-        "college":      {"amenity": "college"},
-        "kindergarten": {"amenity": "kindergarten"},
-        "fire_station": {"amenity": "fire_station"},
-        "townhall":     {"amenity": "townhall"},
-        "courthouse":   {"amenity": "courthouse"},
-        "embassy":      {"amenity": "embassy"},
-        "church":       {"amenity": "place_of_worship", "religion": "christian"},
-        "synagogue":    {"amenity": "place_of_worship", "religion": "jewish"},
-        "temple":       {"amenity": "place_of_worship", "religion": "buddhist"},
-        "fountain":     {"amenity": "fountain"},
-        "monument":     {"historic": "monument"},
-        "castle":       {"historic": "castle"},
-        "ruins":        {"historic": "ruins"},
-        "memorial":     {"historic": "memorial"},
-    }
-
-    tags = tag_map.get(category, {"tourism": category})
+    from osm_poi_dictionary import POI_MAPPING
+    
+    category = category.lower().strip()
+    
+    # Eğer category sözlükte varsa onun tag'ini kullan, yoksa tourism veya amenity varsay
+    if category in POI_MAPPING:
+        tags = POI_MAPPING[category]
+    else:
+        tags = {"tourism": category} # Fallback
 
     try:
         gdf = ox.features_from_place(place_name, tags=tags)
