@@ -14,6 +14,7 @@ from route_engine import (
     solve_tsp,
     build_full_route,
     build_alternative_routes,
+    build_all_alternative_routes_batch,
     nodes_to_coords,
     calculate_route_stats,
     generate_google_maps_link,
@@ -39,6 +40,7 @@ from location_storage import (
     get_all_locations,
     update_location,
     delete_location,
+    toggle_location_favorite,
 )
 
 # Frontend klasörünün yolu
@@ -217,57 +219,45 @@ def api_get_alternative_routes():
 
         ordered_points = [point_tuples[i] for i in optimized_order]
 
-        # Her rota tipi için rota oluştur
+        # PERFORMANS: Segment alternatifleri tek seferde hesaplanır (3x yerine 1x)
+        try:
+            batch_results = build_all_alternative_routes_batch(G, ordered_points)
+        except Exception as e:
+            print(f"[API] Alternatif rota batch hatası: {e}")
+            batch_results = []
+
         alternatives = []
-        
-        for route_type in ["shortest", "fastest", "balanced"]:
-            try:
-                route_nodes = build_alternative_routes(G, ordered_points, route_type)
-                
-                if route_nodes:
-                    route_coords = nodes_to_coords(G, route_nodes)
-                    stats = calculate_route_stats(G, route_nodes)
-                    
-                    # Rota tipi bilgileri
-                    route_info = {
-                        "shortest": {
-                            "name": "En Kısa Rota",
-                            "icon": "📏",
-                            "description": "Minimum mesafe, en az yürüme"
-                        },
-                        "fastest": {
-                            "name": "En Hızlı Rota",
-                            "icon": "⚡",
-                            "description": "Büyük yolları tercih eder, daha hızlı"
-                        },
-                        "balanced": {
-                            "name": "Dengeli Rota",
-                            "icon": "⚖️",
-                            "description": "Mesafe ve konfor dengesi"
-                        }
-                    }
-                    
-                    info = route_info[route_type]
-                    
-                    alternatives.append({
-                        "type": route_type,
-                        "name": info["name"],
-                        "icon": info["icon"],
-                        "route_coords": route_coords,
-                        "distance_km": stats["total_distance_km"],
-                        "duration_minutes": stats["estimated_walk_minutes"],
-                        "description": info["description"],
-                        "google_maps_link": generate_google_maps_link(ordered_points)
-                    })
-            except Exception as e:
-                print(f"[API] {route_type} rota hatası: {e}")
-                continue
+        for alt in batch_results:
+            route_coords = nodes_to_coords(G, alt["nodes"])
+            alternatives.append({
+                "type": alt["type"],
+                "name": alt["name"],
+                "icon": alt["icon"],
+                "route_coords": route_coords,
+                "distance_km": alt["distance_km"],
+                "duration_minutes": alt["duration_minutes"],
+                "description": alt["description"],
+                "google_maps_link": generate_google_maps_link(ordered_points)
+            })
 
         if not alternatives:
             return jsonify({"error": "Hiçbir alternatif rota hesaplanamadı."}), 400
 
-        # print(f"[API] {len(alternatives)} alternatif rota hesaplandı"))
-        return jsonify({"alternatives": alternatives})
+        # Aynı rotaları filtrele: Birebir aynı koordinat listesi = tek rota
+        def _coords_equal(a, b):
+            if len(a) != len(b):
+                return False
+            for i in range(len(a)):
+                if abs(a[i][0] - b[i][0]) > 1e-6 or abs(a[i][1] - b[i][1]) > 1e-6:
+                    return False
+            return True
+
+        unique = []
+        for alt in alternatives:
+            if not any(_coords_equal(alt["route_coords"], u["route_coords"]) for u in unique):
+                unique.append(alt)
+
+        return jsonify({"alternatives": unique})
 
     except Exception as e:
         print(f"[API] Hata: {e}")
@@ -302,11 +292,12 @@ def api_search_pois():
         place = data.get("place", "Kadikoy, Istanbul, Turkey")
         category = data["category"]
 
-        valid_categories = ["museum", "cafe", "park", "restaurant", "library", "mosque", "hotel"]
-        if category not in valid_categories:
-            return jsonify({
-                "error": f"Geçersiz kategori. Geçerli: {', '.join(valid_categories)}"
-            }), 400
+        from osm_poi_dictionary import POI_MAPPING
+        
+        # Validasyon: Eğer kelime sözlükte yoksa ve önceden tanımlanmış bir ingilizce anahtar değilse hata verilebilir.
+        # Ancak esneklik için sadece sözlük kontrolü yapalım. Eğer backend'de yoksa, fallback tag ile çalışır.
+        if category.lower() not in POI_MAPPING and not category.isascii():
+            pass # We will allow any category phrase that could be matched, to avoid failing valid English OSM categories too.
 
         cache_key = f"{place}::{category}"
         if cache_key in _poi_cache:
@@ -958,6 +949,27 @@ def api_update_location(location_id):
             "status": "success",
             "location": location,
             "message": "Lokasyon güncellendi"
+        })
+    except Exception as e:
+        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+
+
+@app.route("/api/locations/<location_id>/favorite", methods=["POST"])
+def api_toggle_location_favorite(location_id):
+    """
+    Lokasyonun favori durumunu değiştirir.
+    """
+    try:
+        location = toggle_location_favorite(location_id)
+        
+        if not location:
+            return jsonify({"error": "Lokasyon bulunamadı"}), 404
+            
+        return jsonify({
+            "status": "success",
+            "location": location,
+            "is_favorite": location.get("favorite", False),
+            "message": "Favorilere eklendi ⭐" if location.get("favorite") else "Favorilerden çıkarıldı"
         })
     except Exception as e:
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500

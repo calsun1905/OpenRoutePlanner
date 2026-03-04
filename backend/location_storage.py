@@ -83,6 +83,7 @@ def save_location(
         "lon": lon,
         "icon_type": icon_type,
         "address": address,
+        "favorite": False,
         "created_at": datetime.now().isoformat(),
         "updated_at": datetime.now().isoformat(),
         "times_used": 0
@@ -93,6 +94,30 @@ def save_location(
     
     print(f"[LocationStorage] Lokasyon kaydedildi: {location_id} - {name} ({icon_type})")
     return location
+
+
+def toggle_location_favorite(location_id: str) -> Optional[Dict]:
+    """
+    Lokasyonun favori durumunu değiştirir.
+    
+    Args:
+        location_id: Lokasyon ID'si
+    
+    Returns:
+        dict: Güncellenmiş lokasyon veya None
+    """
+    locations = _load_locations()
+    
+    for i, loc in enumerate(locations):
+        if loc["id"] == location_id:
+            loc["favorite"] = not loc.get("favorite", False)
+            loc["updated_at"] = datetime.now().isoformat()
+            locations[i] = loc
+            _save_locations(locations)
+            print(f"[LocationStorage] Favori güncellendi: {location_id} -> {loc['favorite']}")
+            return loc
+    
+    return None
 
 
 def get_all_locations(sort_by: str = "created_at", limit: int = None) -> List[Dict]:
@@ -108,6 +133,11 @@ def get_all_locations(sort_by: str = "created_at", limit: int = None) -> List[Di
     """
     locations = _load_locations()
     
+    # Eski kayıtlara favorite alanı ekle
+    for loc in locations:
+        if "favorite" not in loc:
+            loc["favorite"] = False
+    
     # Sıralama
     if sort_by == "created_at":
         locations.sort(key=lambda x: x.get("created_at", ""), reverse=True)
@@ -115,6 +145,8 @@ def get_all_locations(sort_by: str = "created_at", limit: int = None) -> List[Di
         locations.sort(key=lambda x: x.get("name", "").lower())
     elif sort_by == "times_used":
         locations.sort(key=lambda x: x.get("times_used", 0), reverse=True)
+    elif sort_by == "favorite":
+        locations.sort(key=lambda x: (not x.get("favorite", False), x.get("created_at", "")), reverse=False)
     
     # Limit uygula
     if limit:
