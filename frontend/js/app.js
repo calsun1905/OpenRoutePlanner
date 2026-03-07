@@ -583,7 +583,23 @@ loadSavedLocations();
 
 // ========== PLACE SEARCH (GEOCODING) ==========
 
-// Enter tuşu ile arama
+// Debounce: yazmayı bitirdikten sonra öneri isteği at
+let suggestDebounceTimer = null;
+const SUGGEST_DELAY_MS = 400;
+
+elPlaceSearchInput.addEventListener("input", function () {
+    clearTimeout(suggestDebounceTimer);
+    const query = elPlaceSearchInput.value.trim();
+
+    if (query.length < 2) {
+        elSearchResults.style.display = "none";
+        return;
+    }
+
+    suggestDebounceTimer = setTimeout(() => fetchSuggestions(query), SUGGEST_DELAY_MS);
+});
+
+// Enter tuşu ile tam arama
 elPlaceSearchInput.addEventListener("keypress", function (e) {
     if (e.key === "Enter") {
         searchPlace();
@@ -592,6 +608,50 @@ elPlaceSearchInput.addEventListener("keypress", function (e) {
 
 // Arama butonu
 elBtnSearchPlace.addEventListener("click", searchPlace);
+
+// Dışarı tıklanınca önerileri kapat
+document.addEventListener("click", function (e) {
+    if (!elPlaceSearchInput.contains(e.target) && !elSearchResults.contains(e.target)) {
+        elSearchResults.style.display = "none";
+    }
+});
+
+/**
+ * Yazarken öneri listesi getirir (autocomplete)
+ */
+async function fetchSuggestions(query) {
+    try {
+        const response = await fetch(`${API_BASE}/geocode/suggest?q=${encodeURIComponent(query)}&limit=6`);
+        const data = await response.json();
+
+        if (data.status !== "success" || !data.suggestions || data.suggestions.length === 0) {
+            elSearchResults.style.display = "none";
+            return;
+        }
+
+        elSearchResults.style.display = "block";
+        elSearchResults.innerHTML = data.suggestions.map((s) => `
+            <div class="search-result-item search-suggestion-item" data-lat="${s.lat}" data-lon="${s.lon}">
+                <div class="search-result-name">📍 ${escapeHtml(s.display_name)}</div>
+                <div class="search-result-coords">${s.lat.toFixed(5)}, ${s.lon.toFixed(5)}</div>
+            </div>
+        `).join("");
+
+        // Öneri tıklama
+        elSearchResults.querySelectorAll(".search-suggestion-item").forEach((el) => {
+            el.addEventListener("click", () => {
+                const lat = parseFloat(el.dataset.lat);
+                const lon = parseFloat(el.dataset.lon);
+                const nameEl = el.querySelector(".search-result-name");
+                const name = nameEl ? nameEl.textContent.replace(/^📍\s*/, "").trim() : "";
+                selectSearchResult(lat, lon, name);
+            });
+        });
+    } catch (err) {
+        console.error("Öneri hatası:", err);
+        elSearchResults.style.display = "none";
+    }
+}
 
 /**
  * Yer ismi ile arama yapar (Geocoding API)

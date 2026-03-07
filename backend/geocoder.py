@@ -238,6 +238,8 @@ def geocode(place_name: str) -> dict:
         - Success: {"status": "success", "lat": 40.99, "lon": 29.03, "display_name": "..."}
         - Error: {"status": "error", "error_type": "...", "message": "...", "suggestions": []}
     """
+    print(f"[GEOCODER] Arama baslatildi: {place_name}")
+
     if not place_name or not isinstance(place_name, str):
         return {
             "status": "error",
@@ -257,7 +259,7 @@ def geocode(place_name: str) -> dict:
     # 1) Memory cache kontrol
     cache_key = place_name.lower()
     if cache_key in _geocode_cache:
-        # print(f"[Geocoder] Memory cache hit: {place_name}")
+        print(f"[GEOCODER] Memory CACHE HIT: {place_name}")
         return {
             "status": "success",
             **_geocode_cache[cache_key],
@@ -268,7 +270,7 @@ def geocode(place_name: str) -> dict:
     qhash = _query_hash(place_name)
     cached_data = _get_from_cache(qhash, "geocodes")
     if cached_data:
-        # print(f"[Geocoder] SQLite cache hit: {place_name}")
+        print(f"[GEOCODER] SQLite CACHE HIT: {place_name}")
         _geocode_cache[cache_key] = cached_data
         return {
             "status": "success",
@@ -336,7 +338,7 @@ def geocode(place_name: str) -> dict:
         _geocode_cache[cache_key] = geo_data
         _save_to_cache(qhash, geo_data, "geocodes")
 
-        print(f"[Geocoder] Bulundu: {display_name} → ({lat:.6f}, {lon:.6f})")
+        print(f"[GEOCODER] Bulundu: {display_name} -> ({lat:.6f}, {lon:.6f})")
 
         return {
             "status": "success",
@@ -362,6 +364,63 @@ def geocode(place_name: str) -> dict:
             "error_type": "unknown",
             "message": f"Beklenmeyen hata: {str(e)}"
         }
+
+
+def geocode_suggest(place_name: str, limit: int = 6) -> dict:
+    """
+    Yazarken öneri için: Yer ismine göre çoklu sonuç döner (autocomplete).
+
+    Args:
+        place_name: Kısmi veya tam yer ismi (örn: "Kadıköy", "Taksim M")
+        limit: Maksimum öneri sayısı (varsayılan 6)
+
+    Returns:
+        dict: {"status": "success", "suggestions": [{"lat": 40.99, "lon": 29.03, "display_name": "..."}, ...]}
+        veya {"status": "error", "message": "..."}
+    """
+    if not place_name or not isinstance(place_name, str):
+        return {"status": "success", "suggestions": []}
+
+    place_name = place_name.strip()
+    if len(place_name) < 2:
+        return {"status": "success", "suggestions": []}
+
+    _rate_limit()
+
+    headers = {
+        "User-Agent": "OpenRoutePlanner/1.0 (https://github.com/openrouteplanner)",
+        "Accept": "application/json"
+    }
+    params = {
+        "q": place_name,
+        "format": "json",
+        "limit": min(limit, 10),
+        "addressdetails": 0,
+    }
+
+    try:
+        response = requests.get(
+            NOMINATIM_SEARCH_URL,
+            params=params,
+            headers=headers,
+            timeout=5
+        )
+        if response.status_code == 429:
+            return {"status": "error", "message": "API limit. Bekleyin.", "suggestions": []}
+        response.raise_for_status()
+        data = response.json()
+
+        suggestions = []
+        for item in data:
+            suggestions.append({
+                "lat": float(item.get("lat", 0)),
+                "lon": float(item.get("lon", 0)),
+                "display_name": item.get("display_name", ""),
+            })
+        return {"status": "success", "suggestions": suggestions}
+    except Exception as e:
+        print(f"[Geocoder] Suggest hatası: {e}")
+        return {"status": "success", "suggestions": []}
 
 
 def reverse_geocode(lat: float, lon: float) -> dict:

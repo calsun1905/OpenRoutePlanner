@@ -127,18 +127,20 @@ def find_nearest_node(G, lat: float, lon: float) -> int:
 def search_pois(place_name: str, category: str) -> list:
     """
     Belirtilen bölgede POI (Points of Interest) arar.
-    
+
     Args:
         place_name: Bölge adı
         category: Kategori ('museum', 'cafe', 'park', 'restaurant')
-    
+
     Returns:
         list of dict: [{"name": "...", "lat": ..., "lon": ...}, ...]
     """
+    print(f"[POI] Arama baslatildi: {place_name}, kategori={category}")
+
     from osm_poi_dictionary import POI_MAPPING
-    
+
     category = category.lower().strip()
-    
+
     # Eğer category sözlükte varsa onun tag'ini kullan, yoksa tourism veya amenity varsay
     if category in POI_MAPPING:
         tags = POI_MAPPING[category]
@@ -188,5 +190,5 @@ def search_pois(place_name: str, category: str) -> list:
         except Exception:
             continue
 
-    print(f"[GraphManager] {place_name} bölgesinde {len(pois)} adet '{category}' bulundu.")
+    print(f"[POI] {len(pois)} POI bulundu: {place_name} ({category})")
     return pois

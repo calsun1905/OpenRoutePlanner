@@ -63,17 +63,19 @@ def solve_tsp(G, points: list) -> list:
     """
     Çoklu nokta için TSP (Gezgin Satıcı Problemi) optimizasyonu.
     En verimli ziyaret sırasını belirler.
-    
+
     Args:
         G: NetworkX grafiği
         points: [(lat, lon), ...] koordinat listesi
-    
+
     Returns:
         list[int]: Optimize edilmiş sıra indeksleri [0, 2, 1, 3, ...]
     """
     n = len(points)
-    
+    print(f"[ROUTE] TSP baslatildi: {n} nokta")
+
     if n <= 2:
+        print(f"[ROUTE] TSP tamamlandi: {list(range(n))} (2 nokta, optimizasyon gerekmez)")
         return list(range(n))
     
     # Noktaları graf düğümlerine çevir
@@ -122,7 +124,8 @@ def solve_tsp(G, points: list) -> list:
     for i in range(n):
         if i not in ordered_indices:
             ordered_indices.append(i)
-    
+
+    print(f"[ROUTE] TSP tamamlandi: {ordered_indices}")
     return ordered_indices
 
 
@@ -842,6 +845,7 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
         return []
 
     try:
+        print(f"[ROUTE] Alternatif rota: origin={origin_node}, dest={dest_node}, n={num_routes}")
         print(f"[RouteEngine] ════════════════════════════════════")
         print(f"[RouteEngine] ALTERNATIF ROTALAR v3.0 (Via-Node)")
         print(f"[RouteEngine] Origin: {origin_node} → Dest: {dest_node}")
@@ -1037,6 +1041,7 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
             base["is_duplicate"] = True
             alternatives.append(base)
 
+    print(f"[ROUTE] {len(alternatives)} alternatif rota bulundu")
     return alternatives
 
 

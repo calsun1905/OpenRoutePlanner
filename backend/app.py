@@ -9,7 +9,7 @@ import os
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from graph_manager import get_graph, get_graph_for_points, search_pois
-from geocoder import geocode, reverse_geocode, geocode_batch
+from geocoder import geocode, reverse_geocode, geocode_batch, geocode_suggest
 from route_engine import (
     solve_tsp,
     build_full_route,
@@ -92,6 +92,8 @@ def api_get_route():
         optimize = data.get("optimize", False)  # Varsayılan: sıralı bağla
         route_type = data.get("route_type", "route_1")  # route_1, route_2, route_3
 
+        print(f"[API] Get-route: {len(points)} nokta, optimize={optimize}, route_type={route_type}")
+
         # Eski tip compatibility
         if route_type == "shortest": route_type = "route_1"
         elif route_type == "fastest": route_type = "route_2"
@@ -127,8 +129,9 @@ def api_get_route():
         ordered_points = [point_tuples[i] for i in optimized_order]
 
         # 4) Tam rotayı oluştur (alternatif rota tipi ile)
-        # print(f"[API] Tam rota oluşturuluyor... (Tip: {route_type})"))
-        route_nodes = build_alternative_routes(G, ordered_points, route_type)
+        # route_type "route_1"|"route_2"|"route_3" string → route_index 0|1|2 int (build_alternative_routes int bekliyor)
+        route_index = {"route_1": 0, "route_2": 1, "route_3": 2}.get(route_type, 0)
+        route_nodes = build_alternative_routes(G, ordered_points, route_index)
 
         if not route_nodes:
             return jsonify({"error": "Rota hesaplanamadı. Noktalar harita alanı dışında olabilir."}), 400
@@ -151,8 +154,7 @@ def api_get_route():
             "route_type": route_type,
         }
 
-        # print(f"[API] Rota hesaplandı: {stats['total_distance_km']} km, "
-        #       f"~{stats['estimated_walk_minutes']} dk yürüme")
+        print(f"[API] Rota tamamlandi: {stats['total_distance_km']}km, {stats['estimated_walk_minutes']}dk")
         return jsonify(response)
 
     except Exception as e:
@@ -212,13 +214,14 @@ def api_get_alternative_routes():
         points = data["points"]
         optimize = data.get("optimize", False)
 
+        print(f"[API] Get-alternative-routes: {len(points)} nokta, optimize={optimize}")
+
         # Validasyon
         if not isinstance(points, list) or len(points) < 2:
             return jsonify({"error": "En az 2 nokta gereklidir."}), 400
 
         point_tuples = [(p[0], p[1]) for p in points]
-        # print(f"[API] Alternatif rotalar hesaplanıyor: {len(points)} nokta"))
-        
+
         G = get_graph_for_points(point_tuples)
 
         # TSP optimizasyonu
@@ -267,6 +270,7 @@ def api_get_alternative_routes():
             if not any(_coords_equal(alt["route_coords"], u["route_coords"]) for u in unique):
                 unique.append(alt)
 
+        print(f"[API] {len(unique)} alternatif rota")
         return jsonify({"alternatives": unique})
 
     except Exception as e:
@@ -302,6 +306,8 @@ def api_search_pois():
         place = data.get("place", "Kadikoy, Istanbul, Turkey")
         category = data["category"]
 
+        print(f"[API] Search-pois: {place}, kategori={category}")
+
         from osm_poi_dictionary import POI_MAPPING
         
         # Validasyon: Eğer kelime sözlükte yoksa ve önceden tanımlanmış bir ingilizce anahtar değilse hata verilebilir.
@@ -316,6 +322,8 @@ def api_search_pois():
         else:
             pois = search_pois(place, category)
             _poi_cache[cache_key] = pois
+
+        print(f"[API] {len(pois)} POI bulundu")
         return jsonify({"pois": pois})
 
     except Exception as e:
@@ -327,6 +335,23 @@ def api_search_pois():
 def health_check():
     """Sunucu sağlık kontrolü."""
     return jsonify({"status": "ok", "message": "OpenTrip API çalışıyor!"})
+
+
+@app.route("/api/geocode/suggest", methods=["GET"])
+def api_geocode_suggest():
+    """
+    Yazarken öneri için: Kısmi yer ismi → çoklu sonuç döner (autocomplete).
+
+    Query: ?q=Kadıköy&limit=6
+    """
+    try:
+        q = request.args.get("q", "").strip()
+        limit = min(int(request.args.get("limit", 6)), 10)
+        result = geocode_suggest(q, limit=limit)
+        return jsonify(result)
+    except Exception as e:
+        print(f"[API] Geocode suggest hatası: {e}")
+        return jsonify({"status": "success", "suggestions": []})
 
 
 @app.route("/api/geocode", methods=["POST"])
@@ -355,11 +380,16 @@ def api_geocode():
             return jsonify({"error": "'place' alanı gerekli."}), 400
 
         place_name = data["place"]
+
+        print(f"[API] Geocode: {place_name}")
+
         result = geocode(place_name)
 
         if result["status"] == "error":
+            print(f"[API] Geocode HATA: {result['message']}")
             return jsonify(result), 404
 
+        print(f"[API] Geocode Sonuc: ({result['lat']:.6f}, {result['lon']:.6f})")
         return jsonify(result)
 
     except Exception as e:
