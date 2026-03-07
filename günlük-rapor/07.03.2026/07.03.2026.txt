@@ -178,3 +178,177 @@ Işleri başlat! 🚀
 
 ---
 
+## ✅ İKİNCİ OTURUM: ALTERNATİF ROTA MOTORU v3.0 YENİDEN YAZIMI
+
+Bu bölüm, 07.03.2026 tarihindeki asıl büyük teknik ilerlemeyi özetler.
+İlk oturumda bulunan frontend cache hatasının ardından, alternatif rota mantığı kökten ele alındı ve rota motoru v3.0 yaklaşımına geçirildi.
+
+### 🎯 Bu Oturumda Tamamlanan Ana İşler
+
+1. **Jaccard overlap formülü bırakıldı**
+2. **Asimetrik overlap hesabına geçildi**
+3. **Via-Node yaklaşımı eklendi**
+4. **Gövde-only penalty sistemi yazıldı**
+5. **`find_alternative_routes()` akışı yeniden tasarlandı**
+6. **`route_config.py` oluşturuldu**
+7. **Frontend cache bug fix tamamlandı ve progress dosyasına işlendi**
+
+---
+
+### 🔧 route_engine.py Tarafında Yapılan Temel Değişiklikler
+
+#### 1. Overlap Mantığı Düzeltildi
+
+**Eski durum:**
+- Jaccard formülü kullanılıyordu: `kesişim / birleşim`
+- Bu yaklaşım, kısa bir rotanın uzun bir rotanın alt kümesi olduğu durumları doğru yorumlamıyordu
+- Sonuç olarak bazı neredeyse aynı rotalar "farklı" sanılıyordu
+
+**Yeni durum:**
+- Asimetrik overlap mantığına geçildi
+- Temel soru şu oldu:
+  - "Yeni rotanın yüzde kaçı eski rota ile aynı?"
+- Bu değişiklik, özellikle alt küme yanılgısını düzeltti
+
+İlgili fonksiyon:
+- `count_edge_overlap()`
+
+---
+
+#### 2. Via-Node Sistemi Eklendi
+
+Eski alternatif rota mantığında, disjoint path yaklaşımı OSM verisinde sık sık yetersiz kalıyordu.
+Özellikle çıkmaz sokaklar ve zayıf bağlantılı yol ağlarında gerçek alternatif üretmek zorlaşıyordu.
+
+Bu yüzden yeni yaklaşım olarak **Via-Node** sistemi eklendi:
+
+- Ana rotanın bounding box alanı çıkarılıyor
+- Bu bölgedeki yüksek degree'li kavşaklar bulunuyor
+- Ana rotadan uzak ama bağlanabilir kavşaklar seçiliyor
+- Rota, `A -> C -> B` mantığında bu ara düğümlerden geçiriliyor
+
+Sonuç:
+- Alternatif rota üretimi daha gerçekçi hale geldi
+- Google Maps / OSRM tarzına daha yakın bir davranış oluştu
+
+İlgili fonksiyon:
+- `find_via_node_routes()`
+
+---
+
+#### 3. Gövde-Only Penalty Yazıldı
+
+Eski penalty mantığında tüm kullanılan kenarlara ceza veriliyordu.
+Bu da özellikle rotanın giriş ve çıkış bölgelerinde gereksiz zikzaklara neden oluyordu.
+
+Yeni yaklaşım:
+
+- Rotanın baş yüzde 10'luk kısmı korunuyor
+- Rotanın son yüzde 10'luk kısmı korunuyor
+- Sadece orta gövde kısmına ceza uygulanıyor
+- Penalty grafı her iterasyonda yeniden oluşturuluyor
+
+Sonuç:
+- Zikzak problemi önemli ölçüde azaltıldı
+- Alternatif rota daha doğal görünmeye başladı
+
+İlgili fonksiyonlar:
+- `get_body_edges()`
+- `find_routes_with_penalty()`
+
+---
+
+#### 4. find_alternative_routes() v3.0 Akışı Yeniden Kuruldu
+
+**Eski strateji:**
+- Topoloji analizi
+- Disjoint paths
+- Penalty
+
+**Yeni strateji:**
+- Dijkstra ile ana rota
+- Via-Node ile alternatif rota adayları
+- Yetmezse body-only penalty ile yedek üretim
+
+Bu yeni akış daha sade, daha anlaşılır ve daha uygulanabilir hale geldi.
+
+---
+
+### 🧩 route_config.py Dosyası Eklendi
+
+Yeni bir konfigürasyon dosyası oluşturuldu:
+
+- `backend/route_config.py`
+
+Amaç:
+- Hardcoded sabitleri merkezileştirmek
+- İleride route engine parametrelerini daha kolay ayarlamak
+- Via-node ve overlap mantığını daha okunabilir hale getirmek
+
+Durum:
+- Dosya oluşturuldu
+- Şimdilik referans amaçlı
+- Route engine tamamen buradan okumuyor, ama temel yapı hazırlandı
+
+---
+
+### 🖥️ Frontend Tarafında Tamamlanan Fix
+
+İlk oturumda bulunan bug tamamen kapatıldı:
+
+**Sorun:**
+- `alternativeRoutesCache` tanımlı değildi
+- Alternatif rota seçilince seçili rota bilgileri güncellenemiyordu
+
+**Çözüm:**
+- State'e cache eklendi
+- `displayAlternativeRoutes()` içinde cache doldurma yazıldı
+
+Sonuç:
+- Alternatif rota seçildiğinde harita ve rota bilgileri doğru güncellenir hale geldi
+
+---
+
+### 📝 O Gün Güncellenen/Yazılan Dosyalar
+
+- `backend/route_engine.py`
+- `backend/route_config.py`
+- `frontend/js/app.js`
+- `progress.md`
+- günlük rapor dosyaları
+
+---
+
+### ⏳ Açık Kalanlar / O Gün Bitmeyenler
+
+1. **Uçtan uca test tamamlanmadı**
+    - Backend tarafında `torch` bağımlılığı nedeniyle çalıştırma tarafında sıkıntı vardı
+
+2. **BERT endpoint hâlâ eklenmedi**
+    - `/api/nlp/parse` bekliyor
+
+3. **Frontend BERT entegrasyonu yapılmadı**
+    - Endpoint olmadan bağlama yapılmadı
+
+4. **route_config.py tam aktif hale gelmedi**
+    - Konfigürasyon dosyası hazırlandı ama motorun tamamı henüz oradan okumuyor
+
+---
+
+### 📌 07.03.2026 Gün Sonu Özeti
+
+Bu tarih için en önemli teknik kazanım, alternatif rota sisteminin "ufak düzeltmelerle toparlanan bir modül" olmaktan çıkıp daha sistematik bir v3.0 mimariye taşınmış olmasıdır.
+
+O günün özeti:
+
+- ✅ Frontend alternatif rota cache hatası bulundu ve düzeltildi
+- ✅ Alternatif rota overlap mantığı düzeltildi
+- ✅ Via-node sistemi eklendi
+- ✅ Gövde-only penalty yazıldı
+- ✅ route_config.py ile yapılandırma temeli atıldı
+- ✅ progress ve günlük kayıtlar güncellendi
+- ⏳ Gerçek test ve BERT entegrasyonu sonraya kaldı
+
+Bu oturum, proje içinde özellikle rota motoru açısından en kritik yeniden yazım günlerinden biri olarak değerlendirilebilir.
+
+
