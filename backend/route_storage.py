@@ -72,7 +72,7 @@ def save_route(
     route_coords: List[List[float]],
     distance_km: float,
     duration_minutes: int,
-    route_type: str = "shortest",
+    route_type: str = "route_1",  # route_1, route_2, route_3
     description: str = "",
     tags: List[str] = None
 ) -> Dict:
@@ -85,7 +85,7 @@ def save_route(
         route_coords: Tam rota koordinatları
         distance_km: Toplam mesafe
         duration_minutes: Tahmini süre
-        route_type: Rota tipi (shortest, fastest, balanced)
+        route_type: Rota tipi (route_1, route_2, route_3)
         description: Rota açıklaması
         tags: Etiketler (örn: ["romantik", "tarihi"])
     

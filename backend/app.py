@@ -70,7 +70,7 @@ def api_get_route():
         {
             "points": [[lat, lon], [lat, lon], ...],
             "place": "Kadikoy, Istanbul, Turkey"  (opsiyonel, varsayılan Kadıköy),
-            "route_type": "shortest" | "fastest" | "balanced"  (opsiyonel)
+            "route_type": "route_1" | "route_2" | "route_3"  (opsiyonel, varsayılan route_1)
         }
     
     Response:
@@ -90,7 +90,12 @@ def api_get_route():
 
         points = data["points"]
         optimize = data.get("optimize", False)  # Varsayılan: sıralı bağla
-        route_type = data.get("route_type", "shortest")  # shortest, fastest, balanced
+        route_type = data.get("route_type", "route_1")  # route_1, route_2, route_3
+
+        # Eski tip compatibility
+        if route_type == "shortest": route_type = "route_1"
+        elif route_type == "fastest": route_type = "route_2"
+        elif route_type == "balanced": route_type = "route_3"
 
         # Validasyon
         if not isinstance(points, list) or len(points) < 2:
@@ -159,35 +164,40 @@ def api_get_route():
 def api_get_alternative_routes():
     """
     Aynı noktalar için 3 farklı alternatif rota döner.
-    
+
+    Basit sistem:
+    - 3 rota: "Rota 1", "Rota 2", "Rota 3"
+    - Hepsi kısa rotaya yakın mesafede
+    - Geometrik olarak farklı sokaklardan geçer
+
     Request Body:
         {
             "points": [[lat, lon], [lat, lon], ...],
             "optimize": true/false
         }
-    
+
     Response:
         {
             "alternatives": [
                 {
-                    "type": "shortest",
-                    "name": "En Kısa Rota",
-                    "icon": "📏",
+                    "type": "route_1",
+                    "name": "Rota 1",
+                    "icon": "📍",
                     "route_coords": [[lat, lon], ...],
                     "distance_km": 4.5,
                     "duration_minutes": 55,
-                    "description": "Minimum mesafe"
+                    "description": "4.5 km"
                 },
                 {
-                    "type": "fastest",
-                    "name": "En Hızlı Rota",
-                    "icon": "⚡",
+                    "type": "route_2",
+                    "name": "Rota 2",
+                    "icon": "📍",
                     ...
                 },
                 {
-                    "type": "balanced",
-                    "name": "Dengeli Rota",
-                    "icon": "⚖️",
+                    "type": "route_3",
+                    "name": "Rota 3",
+                    "icon": "📍",
                     ...
                 }
             ]

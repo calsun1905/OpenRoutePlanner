@@ -14,6 +14,7 @@ let routePolyline = null;
 let routeGlowPolylines = [];  // Glow efektleri için ayrı takip
 let poiMarkers = [];
 let currentRouteData = null;
+let alternativeRoutesCache = {};  // Alternatif rota verileri cache'i (BUG FIX 07.03.2026)
 
 // ========== MAP INIT ==========
 const map = L.map("map", {
@@ -727,6 +728,16 @@ async function showAlternativeRoutes() {
  */
 function displayAlternativeRoutes(alternatives) {
     elAlternativesPanel.style.display = "block";
+    
+    // Cache'i doldur (BUG FIX: 07.03.2026 - alternativeRoutesCache init)
+    alternativeRoutesCache = {};
+    alternatives.forEach(alt => {
+        alternativeRoutesCache[alt.type] = {
+            distance_km: alt.distance_km,
+            duration_minutes: alt.duration_minutes,
+            route_coords: alt.route_coords
+        };
+    });
 
     let html = "";
 
@@ -771,12 +782,17 @@ function displayAlternativeRoutes(alternatives) {
 function selectAlternativeRoute(routeType, routeCoords) {
     clearRoute();
 
-    // Rota renklerini belirle
+    // Rota renklerini belirle - basit sistem
     const routeColors = {
-        shortest: "#6c5ce7",    // Mor
-        fastest: "#00cec9",     // Turkuaz
-        balanced: "#feca57"     // Sarı
+        route_1: "#6c5ce7",     // Mor
+        route_2: "#00cec9",     // Turkuaz
+        route_3: "#feca57"      // Sarı
     };
+
+    // Eski tip compatibility (shortest/fastest/balanced)
+    if (routeType === "shortest") routeType = "route_1";
+    else if (routeType === "fastest") routeType = "route_2";
+    else if (routeType === "balanced") routeType = "route_3";
 
     const color = routeColors[routeType] || "#6c5ce7";
 
@@ -821,9 +837,9 @@ function selectAlternativeRoute(routeType, routeCoords) {
     updateButtons();
 
     const routeNames = {
-        shortest: "En Kısa Rota",
-        fastest: "En Hızlı Rota",
-        balanced: "Dengeli Rota"
+        route_1: "Rota 1",
+        route_2: "Rota 2",
+        route_3: "Rota 3"
     };
 
     showToast(`${routeNames[routeType]} seçildi! 🎯`, "success");
@@ -890,7 +906,7 @@ async function confirmSaveRoute() {
                 route_coords: currentRouteData.route_coords,
                 distance_km: currentRouteData.total_distance_km,
                 duration_minutes: currentRouteData.estimated_walk_minutes,
-                route_type: currentRouteData.route_type || "shortest",
+                route_type: currentRouteData.route_type || "route_1",
                 tags: tags
             }),
         });

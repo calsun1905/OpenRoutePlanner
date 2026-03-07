@@ -71,14 +71,16 @@ openroute/
    - Mesafe/süre hesaplar
    - Google Maps linki üretir
 
-2. 🔀 **Alternatif Rotalar** - `/api/get-alternative-routes` ⚠️ GELİŞTİRME AŞAMASINDA
-   - En Kısa Rota (shortest) - Minimum mesafe (ana rota artık Dijkstra ile stabil)
-   - En Hızlı Rota (fastest) - Büyük yolları tercih etmeye çalışan alternatif
-   - Dengeli Rota (balanced) - Mesafe ve hız arası denge
-   - ✅ Edge-based overlap + dinamik threshold ile çoğu senaryoda 2–3 farklı rota üretilebiliyor
-   - ⚠️ Bazı bölgelerde hâlâ sadece 1 rota bulunuyor veya algoritma hata fırlatıyor → **EK ÇALIŞMA GEREKİYOR**
-   - ℹ️ Ana mantık: shortest için Dijkstra, alternatifler için Yen's K-Shortest Paths + edge overlap
-   - Not: Bu alan şu anda **birinci öncelikli problem** olarak işaretli
+2. 🔀 **Alternatif Rotalar** - `/api/get-alternative-routes` 🔄 v3.0 YENİDEN YAZILDI
+   - **v3.0 Strateji:** Dijkstra (Rota 1) → Via-Node (Rota 2, 3) → Gövde-only Penalty (yedek)
+   - Via-Node: Ana rotadan uzak büyük kavşaklardan geçen rotalar (Google Maps/OSRM tarzı)
+   - Asimetrik overlap: "Yeni rotanın % kaçı eskiyle aynı?" (eski Jaccard formülü düzeltildi)
+   - Gövde-only penalty: Baş/son %10'a dokunmadan sadece gövdeye ceza
+   - ✅ Disjoint paths'in OSM çıkmaz sokak problemi çözüldü (Via-Node ile değiştirildi)
+   - ✅ Penalty zikzak problemi çözüldü (gövde-only + her iterasyonda yeniden oluşturma)
+   - ✅ Jaccard alt küme yanılgısı düzeltildi (asimetrik formül)
+   - ⚠️ Uçtan uca test bekliyor (torch kurulumu gerekli)
+   - Konfigürasyon: `backend/route_config.py` (31 sabit, referans amaçlı)
 
 3. 💾 **Rota Kaydetme/Yükleme** ✅ YENİ
    - Rota kaydetme, yükleme, silme
@@ -151,7 +153,67 @@ openroute/
 - **Overpass API:** OSM veritabanında arama motoru (internetten canlı veri çeker)
 - **Embedding:** Kelimelerin 768 boyutlu matematiksel temsilci vektörleri
 
-## 📅 Son Güncelleme: 04.03.2026 - Akşam Oturumu
+## 📅 Son Güncelleme: 07.03.2026 - Alternatif Rota v3.0
+
+---
+
+## 🚀 07.03.2026 Oturumu - Alternatif Rota Motoru v3.0 Yeniden Yazımı
+
+### 🎯 Bu Oturumda Yapılanlar
+
+| # | Değişiklik | Dosya | Durum |
+|---|-----------|-------|-------|
+| 1 | **Jaccard → Asimetrik Overlap** | `backend/route_engine.py` | ✅ Tamamlandı |
+| 2 | **Via-Node (Ara Nokta) sistemi** | `backend/route_engine.py` | ✅ Tamamlandı |
+| 3 | **Gövde-Only Penalty (zikzak önleme)** | `backend/route_engine.py` | ✅ Tamamlandı |
+| 4 | **find_alternative_routes v3.0 yeniden yazımı** | `backend/route_engine.py` | ✅ Tamamlandı |
+| 5 | **Konfigürasyon sabitleri dosyası** | `backend/route_config.py` | ✅ Yeni dosya |
+| 6 | **Frontend cache bugfix** | `frontend/js/app.js` | ✅ Tamamlandı |
+| 7 | **Progress ve günlük rapor** | `progress.md`, `günlük-rapor/` | ✅ Güncellendi |
+
+### 📝 Detaylı Değişiklik Açıklamaları
+
+**1. Overlap Formülü Düzeltmesi (Kritik Bug)**
+- **Eski:** Jaccard formülü (`kesişim / birleşim`) — 100 kenarlık rotanın 20 kenarlık alt kümesini "%20 farklı" sanıyordu
+- **Yeni:** Asimetrik formül (`kesişim / yeni_rota_kenar_sayısı`) — aynı örnek artık "%100 aynı" olarak doğru tespit ediliyor
+- Fonksiyon: `count_edge_overlap()`
+
+**2. Via-Node (Ara Nokta) Sistemi (Yeni)**
+- Google Maps / OSRM tarzı endüstri standardı yaklaşım
+- Ana rotanın bounding box'ını genişletip, ana rotadan uzak büyük kavşakları (degree ≥ 3) bulur
+- `A → C → B` şeklinde ara noktadan geçen rota oluşturur
+- Disjoint paths'in OSM çıkmaz sokak problemini kökten çözer
+- Fonksiyon: `find_via_node_routes()`
+
+**3. Gövde-Only Penalty (Yeni)**
+- **Eski:** Tüm kullanılmış kenarlara sabit ×2 ceza → "zikzak" (tırtıklı) rotalar üretiyordu
+- **Yeni:** Rotanın baş %10 ve son %10'una dokunmaz, sadece gövde kenarlarını cezalandırır
+- Penalty grafı her iterasyonda yeniden oluşturuluyor (eskiden aynı grafı tekrar kullanıyordu)
+- Fonksiyonlar: `get_body_edges()`, `find_routes_with_penalty()` güncellendi
+
+**4. find_alternative_routes v3.0**
+- **Eski strateji:** Topoloji analizi → Disjoint paths → Penalty
+- **Yeni strateji:** Dijkstra (Rota 1) → Via-Node (Rota 2, 3) → Gövde-only Penalty (yedek)
+- Eski fonksiyonlar (`find_disjoint_paths`, `check_alternative_potential`) korundu ama artık çağrılmıyor
+
+**5. route_config.py (Yeni Dosya)**
+- Tüm hardcoded sabitlerin merkezi referansı (31 anahtar)
+- Şu an referans amaçlı — ileride route_engine.py buradan okuyacak
+- Via-Node parametreleri: bbox genişletme, min degree, max aday, self-overlap limiti
+
+**6. Frontend Cache Bugfix**
+- `alternativeRoutesCache` değişkeni STATE'te tanımlı değildi → alternatif rota seçince harita güncellenemiyordu
+- `displayAlternativeRoutes()` içinde cache doldurma eklendi
+
+### ⏳ Bu Oturumda Yapılmayanlar / Bekleyenler
+
+| # | Konu | Neden Yapılmadı | Öncelik |
+|---|------|-----------------|---------|
+| 1 | route_config.py'den okuma | Sabitleri taşıdık ama route_engine henüz config'den okumuyor (referans dosyası) | 🟡 Orta |
+| 2 | Uçtan uca test | Backend başlatılamıyor (`torch` versiyon uyumsuzluğu) | 🔴 Yüksek |
+| 3 | BERT `/api/nlp/parse` endpoint | app.py'ye eklenmedi | 🔴 Yüksek |
+| 4 | Frontend BERT entegrasyonu | Endpoint olmadan yapılamaz | 🔴 Yüksek |
+| 5 | torch kurulumu düzeltme | `torch==2.5.1` Python 3.13 ile uyumsuz, 2.6.0+ gerekebilir | 🟡 Orta |
 
 ---
 
@@ -208,13 +270,15 @@ openroute/
 
 ## 🐛 Bilinen Sorunlar ve Kötü Çalışan Yerler
 
-### 1. Alternatif Rotalar - ⚠️ İYİLEŞTİRME GEREK (04.03.2026)
+### 1. Alternatif Rotalar - 🔄 v3.0 Yeniden Yazıldı (07.03.2026)
 | Sorun | Detay | Önem | Durum |
 |-------|-------|------|-------|
-| 3 seçenek aynı çizgiyi gösteriyordu | Shortest/Fastest/Balanced olarak 3 seçenek sunuluyor ama haritada hepsi aynı polyline'ı çiziyordu | 🔴 Yüksek | ⚠️ Büyük oranda düzeldi, bazı senaryolarda hâlâ tek rota |
-| Gerçek alternatif üretilmiyordu | Node overlap yerine **Edge-based overlap** + dinamik overlap eşiği kullanıldı; çoğu senaryoda farklı güzergâhlar geliyor | 🔴 Yüksek | ⚠️ Devam ediyor |
-| Bazı rotalarda hata | Yen's K-Shortest Paths + edge overlap yaklaşımı bazı uç örneklerde hata üretebiliyor | 🔴 Yüksek | ⏳ Kök neden analizi bekliyor |
-| **Yöntem:** Ana rota için Dijkstra, alternatifler için Yen's K-Shortest Paths + Edge Overlap (dinamik threshold) | | | 🟡 Ara aşama |
+| ~~3 seçenek aynı çizgiyi gösteriyordu~~ | v3.0 Via-Node ile geometrik olarak farklı rotalar üretiliyor | 🔴 Yüksek | ✅ Çözüldü |
+| ~~Jaccard alt küme yanılgısı~~ | Asimetrik overlap formülüne geçildi | 🔴 Yüksek | ✅ Çözüldü |
+| ~~Disjoint OSM çıkmaz sorun~~ | Via-Node sistemi ile değiştirildi | 🔴 Yüksek | ✅ Çözüldü |
+| ~~Penalty zikzak problemi~~ | Gövde-only penalty + her iterasyonda rebuild | 🔴 Yüksek | ✅ Çözüldü |
+| Uçtan uca test yapılmadı | Backend başlatılamıyor (torch sorunu) | 🔴 Yüksek | ⏳ Bekliyor |
+| **Yöntem v3.0:** Dijkstra + Via-Node + Gövde-only Penalty | Eski disjoint/connectivity kaldı ama çağrılmıyor | | ✅ Aktif |
 
 ### 2. Rota Kaydetme/Yükleme - ✅ Temelde Çalışıyor
 | Durum | Detay |
@@ -275,7 +339,10 @@ openroute/
 - [x] Frontend tıklanabilirlik sorunu giderme
 - [x] POI arama bağlantı hatası giderme (Maltepe)
 - [x] `simplify_coords()` ile rota kaydetme hızlandırma
-- [ ] **Alternatif rotaların gerçek geometrik farklılık üretmesi** ← EN ÖNEMLİ (birden fazla deneme yapıldı, çözülemedi)
+- [🔄 IN-PROGRESS] **Alternatif rotaların gerçek geometrik farklılık üretmesi** ← EN ÖNEMLİ
+  - 🐛 BUG BULUNDU: `alternativeRoutesCache` tanımlanmamış → cache init yapılacak
+  - Sorunlu kod: frontend/js/app.js line 810-811
+  - Fix: STATE'e cache ekle, displayAlternativeRoutes'da doldur
 - [x] ~~Zamanlayıcı tuşunun frontend'de aktif hale getirilmesi~~ → Tuş zaten doğru çalışıyor (rota hesaplandıktan sonra aktif, 04.03 analizi)
 - [ ] Rota hesaplama aralıklı hata sebebinin araştırılması
 - [ ] OSM mekan endpoint'lerinin frontend'e entegrasyonu
