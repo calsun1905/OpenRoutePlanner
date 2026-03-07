@@ -19,6 +19,8 @@ openroute/
 ├── progress/
 │   └── 2026-02.md                ← Şubat 2026 ilerlemesi
 │
+├── PROJECT_INDEX.md              ← Projenin tüm bileşenleri için indeks dosyası
+├── öneriler 7 mart.md            ← 07.03.2026 geliştirme önerileri ve yol haritası
 ├── öneriler.md                   ← Öneriler ve notlar
 ├── komutlar.md                   ← GSD + SuperClaude komutları
 │
@@ -96,16 +98,21 @@ openroute/
    - Varış/ayrılış saatleri hesaplama
    - Ziyaret ve yürüyüş süreleri
    - Timeline görünümü
-   - ❌ **Durum:** Frontend'de "Zaman Planla" tuşu aktif gözükmüyor (disabled)
+   - ⚠️ **Durum:** Buton rota hesaplandıktan sonra aktif oluyor ancak deneyim hâlâ akıcı değil ve özellik pratikte prototip seviyesinde
    - ⚠️ Backend mantığı hiç test edilmedi
    - Commit: 0fc237c
 
 5. 🏛️ **POI Arama** - Müze, kafe vb. mekanları bulur
+   - Genişletilmiş Türkçe kategori sözlüğü ile çalışır
+   - Frontend'de çok sayıda kategori butonu ile tetiklenir
+   - Overpass/OSM verisini haritada gösterir
 
-6. 🔎 **Yer İsmi ile Arama** - `/api/geocode`
+6. 🔎 **Yer İsmi ile Arama** - `/api/geocode` + `/api/geocode/suggest`
    - Yer ismini koordinata çevirir (Nominatim API)
    - Memory + SQLite cache ile hızlı
    - Rate limiting: 1 req/s
+   - Yazarken öneri (autocomplete) desteği eklendi
+   - Frontend tarafında debounce + öneri listesi ile daha akıcı arama deneyimi var
    - Commit: 215bd40
 
 7. 🧠 **BERT NLP Motoru** ✅ YENİ
@@ -153,7 +160,72 @@ openroute/
 - **Overpass API:** OSM veritabanında arama motoru (internetten canlı veri çeker)
 - **Embedding:** Kelimelerin 768 boyutlu matematiksel temsilci vektörleri
 
-## 📅 Son Güncelleme: 07.03.2026 - Alternatif Rota v3.0
+## 📅 Son Güncelleme: 08.03.2026 - Arama UX, Route Engine Düzeltmeleri ve Dokümantasyon
+
+---
+
+## 🚀 08.03.2026 Oturumu - Arama/Autocomplete, Route Engine Uyum Düzeltmeleri ve Dokümantasyon
+
+### 🎯 Bu Oturumda Yapılanlar
+
+| # | Değişiklik | Dosya | Durum |
+|---|-----------|-------|-------|
+| 1 | **Autocomplete endpoint'i eklendi** | `backend/app.py`, `backend/geocoder.py` | ✅ Tamamlandı |
+| 2 | **Yer ismi arama kutusuna yazarken öneri eklendi** | `frontend/js/app.js`, `frontend/css/style.css` | ✅ Tamamlandı |
+| 3 | **`route_type` → `route_index` uyum düzeltmesi** | `backend/app.py` | ✅ Tamamlandı |
+| 4 | **Rota/TSP/POI akışına daha net loglar eklendi** | `backend/app.py`, `backend/geocoder.py`, `backend/graph_manager.py`, `backend/route_engine.py` | ✅ Tamamlandı |
+| 5 | **Proje indeks dokümanı oluşturuldu** | `PROJECT_INDEX.md` | ✅ Yeni dosya |
+| 6 | **Geliştirme önerileri ve yol haritası yazıldı** | `öneriler 7 mart.md` | ✅ Yeni dosya |
+| 7 | **Progress güncellemesi** | `progress.md` | ✅ Güncellendi |
+
+### 📝 Değişen Dosyalar ve Açıklamaları
+
+**1. `backend/app.py`**
+- `geocode_suggest` import edildi
+- Yeni endpoint eklendi: `/api/geocode/suggest`
+- Yer arama (`/api/geocode`) için daha net log akışı eklendi
+- `/api/get-route` içinde `route_type` string değerinin `route_index` integer değerine çevrilmesi düzeltildi
+- `/api/get-alternative-routes` ve `/api/search-pois` için debug logları netleştirildi
+
+**2. `backend/geocoder.py`**
+- Yeni fonksiyon eklendi: `geocode_suggest()`
+- Kısmi arama için çoklu öneri döndüren autocomplete desteği yazıldı
+- Memory cache ve SQLite cache hit durumları loglanır hale getirildi
+- Geocoding akışı daha görünür hale geldi
+
+**3. `backend/graph_manager.py`**
+- POI arama başladığında ve bittiğinde daha sade/okunabilir loglar eklendi
+- Bu sayede hangi bölge ve kategori için arama yapıldığı daha rahat takip ediliyor
+
+**4. `backend/route_engine.py`**
+- `solve_tsp()` içine başlangıç ve sonuç logları eklendi
+- `find_alternative_routes()` içine alternatif rota üretim sayısını gösteren loglar eklendi
+- Route engine tarafında özellikle TSP ve alternatif rota akışını takip etmek kolaylaştı
+
+**5. `frontend/js/app.js`**
+- Arama kutusuna yazarken otomatik öneri getiren debounce mekanizması eklendi
+- `fetchSuggestions()` fonksiyonu ile backend autocomplete endpoint'ine bağlanıldı
+- Kullanıcı öneri listesinden seçtiği yeri doğrudan haritaya ekleyebiliyor
+- Dışarı tıklanınca öneri listesinin kapanması eklendi
+
+**6. `frontend/css/style.css`**
+- Yazarken çıkan öneri satırları için ek stil tanımları eklendi
+- Böylece arama sonuçları ve öneri sonuçları arayüzde daha okunur hale geldi
+
+**7. `PROJECT_INDEX.md`**
+- Projenin ana yapısı, endpoint'leri, backend/frontend dosyaları ve çekirdek modülleri tek bir dosyada özetlendi
+- Yeni oturumlarda hızlı bağlam kurmak için referans dosyası olarak kullanılabilir
+
+**8. `öneriler 7 mart.md`**
+- Uygulamanın gelişim yönü için ürün, teknik ve mimari öneriler yazıldı
+- Faz bazlı yol haritası oluşturuldu
+
+### ✅ Bu Oturumun Sonucu
+
+- Yer arama deneyimi artık sadece tam arama değil, yazarken öneri veren daha modern bir yapıya geçti
+- Route engine ile backend API arasındaki `route_type`/`route_index` uyumsuzluğu giderildi
+- Geliştirici tarafında loglar sayesinde hata ayıklama daha kolay hale geldi
+- Dokümantasyon tarafı güçlendirildi: indeks dosyası ve ayrı öneri dosyası eklendi
 
 ---
 
@@ -294,6 +366,13 @@ openroute/
 | Bazen hata veriyor | Ana rota (Dijkstra) genelde stabil; alternatif rota algoritması bazı uç örneklerde hata fırlatıyor | 🔴 Yüksek |
 | Uzun sürüyor | OSMnx graph ilk indirmede bottleneck, yarıçap ve cache ile kısmen optimize edildi ama daha da iyileştirilebilir | 🟡 Orta |
 
+### 3A. Yer İsmi ile Arama - ✅ Geliştirildi
+| Durum | Detay | Önem |
+|-------|-------|------|
+| ✅ Autocomplete eklendi | `/api/geocode/suggest` ile yazarken öneri listesi geliyor | 🟢 Faydalı |
+| ✅ Debounce eklendi | Her tuşta değil, kısa gecikme ile istek atılıyor | 🟢 Faydalı |
+| ⚠️ Nominatim bağımlılığı sürüyor | Dış servis limiti ve ağ yavaşlığı hâlâ etkileyebilir | 🟡 Orta |
+
 ### 4. Zaman Bazlı Planlama - ⚠️ Tuş Hâlâ Pratikte Kullanılamıyor
 | Durum | Detay | Önem |
 |-------|-------|------|
@@ -327,6 +406,7 @@ openroute/
 | POI Arama | ✅ Evet | Maltepe dahil çalışıyor; OSM API rehberi ve genişletilmiş kategori sözlüğü sayesinde artık çok daha fazla sorgu tipi destekleniyor |
 | OSM Mekan Endpoint'leri | ⏳ Araştırıldı | Nasıl çalıştığı incelendi, frontend eşleşmesi bekliyor |
 | Geocoding | ✅ Evet | Çalışıyor |
+| Geocode Autocomplete | ✅ Evet | Yazarken öneri geliyor, temel akış çalışıyor |
 | BERT Typo Tolerance | ✅ Evet | Kadikoy→Kadıköy %95 |
 | NLP→Frontend Entegrasyon | ❌ Hayır | Henüz yapılmadı |
 
@@ -339,10 +419,10 @@ openroute/
 - [x] Frontend tıklanabilirlik sorunu giderme
 - [x] POI arama bağlantı hatası giderme (Maltepe)
 - [x] `simplify_coords()` ile rota kaydetme hızlandırma
-- [🔄 IN-PROGRESS] **Alternatif rotaların gerçek geometrik farklılık üretmesi** ← EN ÖNEMLİ
-  - 🐛 BUG BULUNDU: `alternativeRoutesCache` tanımlanmamış → cache init yapılacak
-  - Sorunlu kod: frontend/js/app.js line 810-811
-  - Fix: STATE'e cache ekle, displayAlternativeRoutes'da doldur
+- [x] Alternatif rota cache bug fix (`alternativeRoutesCache` tanımlandı ve dolduruldu)
+- [x] Yer arama autocomplete endpoint'i eklendi (`/api/geocode/suggest`)
+- [x] Frontend arama kutusuna yazarken öneri listesi eklendi
+- [x] `route_type` → `route_index` uyum düzeltmesi yapıldı
 - [x] ~~Zamanlayıcı tuşunun frontend'de aktif hale getirilmesi~~ → Tuş zaten doğru çalışıyor (rota hesaplandıktan sonra aktif, 04.03 analizi)
 - [ ] Rota hesaplama aralıklı hata sebebinin araştırılması
 - [ ] OSM mekan endpoint'lerinin frontend'e entegrasyonu
@@ -351,6 +431,7 @@ openroute/
 - [ ] BERT NLP motorunun frontend'e bağlanması
 - [ ] `/api/nlp/parse` endpoint'inin app.py'ye eklenmesi
 - [ ] False positive azaltma (threshold iyileştirme)
+- [ ] Arama önerileri için lokal cache / fallback iyileştirmesi
 - [ ] Rota kaydetme edge case'lerinin tam doğrulanması
 
 ### 🟢 Gelecek
