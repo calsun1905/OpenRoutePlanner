@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Zaman Modu Test</title>
+</head>
+<body>
+    <h2>⏰ Zaman Modu Test Sayfası</h2>
+    
+    <div style="background: #f0f0f0; padding: 20px; border-radius: 8px;">
+        <h3>Test Talimatları:</h3>
+        <ol>
+            <li>Ana uygulamayı aç: <a href="index.html" target="_blank">index.html</a></li>
+            <li>Haritada 2-3 nokta seçin (örn: Kadıköy, Moda, Taksim)</li>
+            <li><strong>"Rotayı Hesapla"</strong> butonuna tıklayın</li>
+            <li><strong>"⏰ Zaman Planla"</strong> butonuna tıklayın</li>
+            <li>Başlangıç saati ve varsayılan süre ayarlayın</li>
+            <li><strong>"Zaman Çizelgesi Oluştur"</strong> butonuna tıklayın</li>
+        </ol>
+        
+        <h3>Backend Test Sonucu:</h3>
+        <pre style="background: #272822; color: #f8f8f2; padding: 10px; border-radius: 4px;">
+[SUCCESS] Timeline endpoint calisiyor
+Baslangic: 09:00
+Bitis: 11:46
+Toplam Sure: 166 dakika
+Schedule:
+  [0] Kadikoy Riptim
+      Varis: 09:00, Ayrilis: 09:30
+      Kalma: 30 dk
+      Sonraki: 10 dk yuruyus
+  [1] Moda Sahil
+      Varis: 09:40, Ayrilis: 10:10
+      Kalma: 30 dk
+      Sonraki: 66 dk yuruyus
+  [2] Taksim Meydan
+      Varis: 11:16, Ayrilis: 11:46
+      Kalma: 30 dk
+        </pre>
+        
+        <h3>Düzeltmeler:</h3>
+        <ul>
+            <li>✅ calculateSegmentDistances() - 0 segment kontrolü eklendi</li>
+            <li>✅ generateTimeline() - Hata mesajları iyileştirildi</li>
+            <li>✅ Nokta isimleri: "Başlangıç", "Varış", "Durak 3"...</li>
+            <li>✅ Cache buster: v1.0.4 → v1.0.5</li>
+        </ul>
+    </div>
+    
+    <script>
+        console.log('[TEST] Zaman modu test sayfası yüklendi');
+        console.log('[TEST] Backend endpoint çalışıyor: http://localhost:5000/api/timeline/create');
+    </script>
+</body>
+</html>

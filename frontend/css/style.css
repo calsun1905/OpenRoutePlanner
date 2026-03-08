@@ -1650,3 +1650,222 @@ body {
 .location-marker-hidden {
     display: none !important;
 }
+
+/* ============================================
+   AI Natural Language Search (BERT NLP) Styles
+   ============================================ */
+
+.nlp-search-box {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.nlp-input {
+    flex: 1;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(108, 92, 231, 0.3);
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    transition: all var(--transition-normal);
+}
+
+.nlp-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.2);
+    background: var(--bg-card);
+}
+
+.nlp-input::placeholder {
+    color: var(--text-muted);
+}
+
+.btn-nlp {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    background: var(--gradient-primary);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: white;
+    font-weight: 500;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    white-space: nowrap;
+}
+
+.btn-nlp:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(108, 92, 231, 0.4);
+}
+
+.btn-nlp:active {
+    transform: translateY(0);
+}
+
+.btn-nlp:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.nlp-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(108, 92, 231, 0.1);
+    border: 1px solid rgba(108, 92, 231, 0.2);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 10px;
+}
+
+.spinner-small {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(108, 92, 231, 0.3);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.nlp-results {
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.nlp-result-item {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--accent-primary);
+    font-size: 0.9rem;
+}
+
+.nlp-result-item:last-child {
+    margin-bottom: 0;
+}
+
+.nlp-result-type {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--gradient-primary);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.nlp-result-content {
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.nlp-result-confidence {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    background: rgba(0, 184, 148, 0.15);
+    border-radius: 4px;
+    color: var(--accent-success);
+    font-size: 0.75rem;
+    margin-top: 6px;
+}
+
+.nlp-result-places {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.nlp-place-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: rgba(108, 92, 231, 0.15);
+    border: 1px solid rgba(108, 92, 231, 0.3);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: var(--accent-primary-light);
+}
+
+.nlp-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.nlp-action-btn {
+    flex: 1;
+    padding: 10px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.nlp-action-btn:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-primary);
+}
+
+.nlp-action-btn.primary {
+    background: var(--gradient-primary);
+    border-color: transparent;
+}
+
+.nlp-action-btn.primary:hover {
+    box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+}
+
+.nlp-error {
+    padding: 12px;
+    background: rgba(255, 107, 107, 0.1);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    border-radius: var(--radius-sm);
+    color: var(--accent-danger);
+    font-size: 0.9rem;
+}
+
+.nlp-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}

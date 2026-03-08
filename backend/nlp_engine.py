@@ -84,35 +84,35 @@ PATTERN_MULTI_1 = re.compile(
     re.IGNORECASE
 )
 PATTERN_MULTI_1b = re.compile(
-    r"^(.+?)\s*,\s*(.+?)\s+ve\s+(.+?)(?:nu|nü)\s+gezdir\s*\??\s*$",
+    r"^(.+?)\s*,\s*(.+?)\s+ve\s+(.+?)(?:nu|nü)\s+gezdir\s*\?\s*$",
     re.IGNORECASE
 )
 
 # Pattern 4: "X'de/da/te/ta neler var/nereler var/ne yapabilirim/neleri öner"
 PATTERN_POI_QUERY = re.compile(
-    r"^(.+?)\s+(?:de|da|te|ta)\s+(?:neler|nereler)\s+var\??\s*$",
+    r"^(.+?)\s+(?:de|da|te|ta)\s+(?:neler|nereler)\s+var\?\s*$",
     re.IGNORECASE
 )
 PATTERN_POI_QUERY_2 = re.compile(
-    r"^(.+?)\s+(?:de|da|te|ta)\s+ne\s+yapabilirim\??\s*$",
+    r"^(.+?)\s+(?:de|da|te|ta)\s+ne\s+yapabilirim\?\s*$",
     re.IGNORECASE
 )
 PATTERN_POI_QUERY_3 = re.compile(
-    r"^(.+?)\s+(?:de|da|te|ta)\s+(?:neler|nereleri|neleri|neyi|bir şey)\s+(?:öner|önere|tavsiye|önerir|önerirsin|öneririm|tavsiye eder|tavsiye ederim)\s*\??\s*$",
+    r"^(.+?)\s+(?:de|da|te|ta)\s+(?:neler|nereleri|neleri|neyi|bir şey)\s+(?:öner|önere|tavsiye|önerir|önerirsin|öneririm|tavsiye eder|tavsiye ederim)\s*\?\s*$",
     re.IGNORECASE
 )
 
 # Pattern 5: "X'e git / X'e nasıl giderim / yol tarifi"
 PATTERN_SINGLE_DEST = re.compile(
-    r"^(.+?)(?:ye|a|e)\s+(?:git|nas[ıi]l\s+giderim|güzergah|rota|yol\s+tarifi)\s*\??\s*$",
+    r"^(.+?)(?:ye|a|e)\s+(?:git|nas[ıi]l\s+giderim|güzergah|rota|yol\s+tarifi)\s*\?\s*$",
     re.IGNORECASE
 )
 
 # Pattern 6: "X'den Y'ye nasıl giderim / yol tarifi"
 PATTERN_ROUTE_EXTENDED = re.compile(
-    r"^(.+?)(?:den|dan|ten|tan)\s+(.+?)(?:ye|a|e)\s+nas[ıi]l\s+giderim\??\s*$|"
-    r"^(.+?)(?:den|dan|ten|tan)\s+(.+?)(?:ye|a|e)\s+yol\s+tarifi\??\s*$|"
-    r"^(.+?)(?:den|dan|ten|tan)\s+(.+?)(?:ye|a|e)\s+rota\s*(?:çiz|hesapla|göster)\s*\??\s*$",
+    r"^(.+?)(?:den|dan|ten|tan)\s+(.+?)(?:ye|a|e)\s+nas[ıi]l\s+giderim\?\s*$|"
+    r"^(.+?)(?:den|dan|ten|tan)\s+(.+?)(?:ye|a|e)\s+yol\s+tarifi\?\s*$|"
+    r"^(.+?)(?:den|dan|ten|tan)\s+(.+?)(?:ye|a|e)\s+rota\s*(?:çiz|hesapla|göster)\s*\?\s*$",
     re.IGNORECASE
 )
 

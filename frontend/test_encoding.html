@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encoding Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-box {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        h1 { color: #6c5ce7; }
+        .success { color: #00b894; }
+        .fail { color: #ff6b6b; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Encoding Test</h1>
+    
+    <div class="test-box">
+        <h2>Türkçe Karakterler:</h2>
+        <p>✅ ı, ğ, ü, ş, ö, ç</p>
+        <p>✅ İ, Ğ, Ü, Ş, Ö, Ç</p>
+    </div>
+    
+    <div class="test-box">
+        <h2>Kelimeler:</h2>
+        <p>✅ Seçilen Noktalar</p>
+        <p>✅ Yer İsmi ile Ara</p>
+        <p>✅ Bölge</p>
+        <p>✅ Kayıtlı Yerlerim</p>
+        <p>✅ Kaydedilen Rotalar</p>
+        <p>✅ Mekan Ara (POI)</p>
+    </div>
+    
+    <div class="test-box">
+        <h2>Emoji'ler:</h2>
+        <p>📍 🗺️ 🔍 ⚽ 💊 🥖 🏫 🏋️ 🎠</p>
+        <p>🏛️ ☕ 🌳 🍽️ 🕌 📚</p>
+        <p>🏨 🏥 🏪 🎬 🏦 ⛽</p>
+    </div>
+    
+    <div class="test-box">
+        <h2>Cümleler:</h2>
+        <p>✅ Frontend ile Backend arasındaki köprü.</p>
+        <p>✅ Rota optimizasyonu ve POI arama endpoint'leri sağlar.</p>
+        <p>✅ Haritaya tıklayarak nokta ekleyin</p>
+    </div>
+    
+    <div class="test-box">
+        <h2>Tarayıcı Bilgisi:</h2>
+        <p id="charset"></p>
+        <p id="encoding"></p>
+    </div>
+    
+    <script>
+        document.getElementById('charset').textContent = 'Document Charset: ' + document.characterSet;
+        document.getElementById('encoding').textContent = 'Input Encoding: ' + document.inputEncoding;
+    </script>
+    
+    <hr>
+    <p><a href="index.html" style="color: #6c5ce7;">← Ana Sayfaya Dön</a></p>
+</body>
+</html>

@@ -643,12 +643,22 @@ class BertNLPEngine:
         detected_places = self.extract_places(query)
         place_names = [p["place"] for p in detected_places]
 
-        # 3. Yere göre sonuç oluştur
+        # 3. Numpy değerlerini Python native türlere çevir (JSON için)
+        detected_places_json = [
+            {
+                "place": p["place"],
+                "similarity": float(p["similarity"]),  # numpy.float32 -> float
+                "index": int(p["index"]) if "index" in p else None
+            }
+            for p in detected_places
+        ]
+
+        # 4. Yere göre sonuç oluştur
         result = {
             "type": query_type,
-            "confidence": type_confidence,
+            "confidence": float(type_confidence),  # numpy.float32 -> float
             "raw_query": query,
-            "detected_places": detected_places,
+            "detected_places": detected_places_json,
             "error": None
         }
 
