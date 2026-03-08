@@ -21,6 +21,11 @@ ROUTE_CONFIG = {
     # Varsayılan kaç alternatif rota isteneceği.
     "DEFAULT_NUM_ROUTES": 3,
 
+    # Graf indirme yarıçapı (metre)
+    "GRAPH_RADIUS_MIN_M": 500,
+    "GRAPH_RADIUS_PADDING_M": 300,
+    "GRAPH_RADIUS_MAX_M": 3500,
+
     # =========================================================================
     # OVERLAP (ÖRTÜŞMe) EŞİKLERİ — dynamic_overlap_threshold()
     # v3.0: Asimetrik formül kullanılıyor (Jaccard değil).

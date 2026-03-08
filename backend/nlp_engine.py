@@ -68,7 +68,8 @@ PLACE_KEYWORDS = {
 
 # Pattern 1: "X'den/ndan Y'ye/e rota/rotası"
 PATTERN_ROUTE_1 = re.compile(
-    r"(.+?)(?:den|dan|ten|tan)\s+(.+?)(?:ye|a|e)\s*(?:rota|rotası|yol|güzergah|nasıl giderim|nasıl gidilir)?\s*\.?$",
+    r"^(.+?)(?:'?\s*(?:den|dan|ten|tan))\s+(.+?)(?:'?\s*(?:ye|ya|a|e))\s*"
+    r"(?:rota|rotası|yol|güzergah|nasıl giderim|nasıl gidilir|rota\s*(?:çiz|hesapla|göster))?\s*\??$",
     re.IGNORECASE
 )
 
@@ -84,35 +85,36 @@ PATTERN_MULTI_1 = re.compile(
     re.IGNORECASE
 )
 PATTERN_MULTI_1b = re.compile(
-    r"^(.+?)\s*,\s*(.+?)\s+ve\s+(.+?)(?:nu|nü)\s+gezdir\s*\?\s*$",
+    r"^(.+?)\s*,\s*(.+?)\s+ve\s+(.+?)(?:nu|nü)\s+gezdir\s*\??\s*$",
     re.IGNORECASE
 )
 
 # Pattern 4: "X'de/da/te/ta neler var/nereler var/ne yapabilirim/neleri öner"
 PATTERN_POI_QUERY = re.compile(
-    r"^(.+?)\s+(?:de|da|te|ta)\s+(?:neler|nereler)\s+var\?\s*$",
+    r"^(.+?)(?:'?\s*(?:de|da|te|ta))\s+(?:neler|nereler)\s+var\??\s*$",
     re.IGNORECASE
 )
 PATTERN_POI_QUERY_2 = re.compile(
-    r"^(.+?)\s+(?:de|da|te|ta)\s+ne\s+yapabilirim\?\s*$",
+    r"^(.+?)(?:'?\s*(?:de|da|te|ta))\s+ne\s+yapabilirim\??\s*$",
     re.IGNORECASE
 )
 PATTERN_POI_QUERY_3 = re.compile(
-    r"^(.+?)\s+(?:de|da|te|ta)\s+(?:neler|nereleri|neleri|neyi|bir şey)\s+(?:öner|önere|tavsiye|önerir|önerirsin|öneririm|tavsiye eder|tavsiye ederim)\s*\?\s*$",
+    r"^(.+?)(?:'?\s*(?:de|da|te|ta))\s+(?:neler|nereleri|neleri|neyi|bir şey)\s+"
+    r"(?:öner|önere|tavsiye|önerir|önerirsin|öneririm|tavsiye eder|tavsiye ederim)\s*\??\s*$",
     re.IGNORECASE
 )
 
 # Pattern 5: "X'e git / X'e nasıl giderim / yol tarifi"
 PATTERN_SINGLE_DEST = re.compile(
-    r"^(.+?)(?:ye|a|e)\s+(?:git|nas[ıi]l\s+giderim|güzergah|rota|yol\s+tarifi)\s*\?\s*$",
+    r"^(.+?)(?:'?\s*(?:ye|ya|a|e))\s+(?:git|nas[ıi]l\s+giderim|güzergah|rota|yol\s+tarifi)\s*\??\s*$",
     re.IGNORECASE
 )
 
 # Pattern 6: "X'den Y'ye nasıl giderim / yol tarifi"
 PATTERN_ROUTE_EXTENDED = re.compile(
-    r"^(.+?)(?:den|dan|ten|tan)\s+(.+?)(?:ye|a|e)\s+nas[ıi]l\s+giderim\?\s*$|"
-    r"^(.+?)(?:den|dan|ten|tan)\s+(.+?)(?:ye|a|e)\s+yol\s+tarifi\?\s*$|"
-    r"^(.+?)(?:den|dan|ten|tan)\s+(.+?)(?:ye|a|e)\s+rota\s*(?:çiz|hesapla|göster)\s*\?\s*$",
+    r"^(.+?)(?:'?\s*(?:den|dan|ten|tan))\s+(.+?)(?:'?\s*(?:ye|ya|a|e))\s+nas[ıi]l\s+giderim\??\s*$|"
+    r"^(.+?)(?:'?\s*(?:den|dan|ten|tan))\s+(.+?)(?:'?\s*(?:ye|ya|a|e))\s+yol\s+tarifi\??\s*$|"
+    r"^(.+?)(?:'?\s*(?:den|dan|ten|tan))\s+(.+?)(?:'?\s*(?:ye|ya|a|e))\s+rota\s*(?:çiz|hesapla|göster)\s*\??\s*$",
     re.IGNORECASE
 )
 
@@ -131,15 +133,11 @@ def _clean_text(text: str) -> str:
     Returns:
         str: Temizlenmiş metin
     """
-    # Türkçe edatları birleştirilmiş halden ayır: "X'de" → "X de"
-    text = re.sub(r"('de|'da|'den|'dan|'ten|'tan|'ye|'a|'e|'i|'ı|'u|'ü|'te|'ta|'ne|'na)", r" \1", text)
-
-    # Fazla boşlukları tek boşluğa indir
-    text = re.sub(r'\s+', ' ', text)
-    # Baştaki ve sondaki boşlukları sil
+    text = text.replace("’", "'").replace("`", "'")
+    text = re.sub(r"\s+", " ", text)
     text = text.strip()
-    # Sadece Türkçe karakterler, boşluklar ve virgül bırak
-    text = re.sub(r'[^\w\s,ğüşıöçĞÜŞİÖÇ]', '', text)
+    # Soru işareti ve apostrof korunur; suffix tabanlı pattern'ler buna ihtiyaç duyuyor.
+    text = re.sub(r"[^\w\s,?'ğüşıöçĞÜŞİÖÇ]", "", text)
     return text
 
 

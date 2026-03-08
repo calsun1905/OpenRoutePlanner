@@ -5,7 +5,7 @@ Popüler semtler, il merkezleri ve landmark'lar.
 Nominatim API'ye gitmeden önce bu tabloya bakılır.
 """
 
-from typing import Optional
+from typing import List, Optional
 from storage_db import get_connection, ensure_db
 
 # Başlangıç verisi — popüler yerler (name, display_name, lat, lon, place_type, search_terms)
@@ -133,3 +133,70 @@ def lookup(place_name: str) -> Optional[dict]:
             "address": "",
         }
     return None
+
+
+def save_dynamic_place(
+    name: str,
+    display_name: str,
+    lat: float,
+    lon: float,
+    search_terms: str = ""
+) -> None:
+    """
+    OSM'den gelen dinamik yeri local_places tablosuna cache'ler.
+    Aynı ada sahip kayıt varsa tekrar eklemez.
+    """
+    ensure_db()
+
+    if not name or len(name.strip()) < 2:
+        return
+
+    normalized_name = name.strip()
+    normalized_display = (display_name or normalized_name).strip()
+    normalized_terms = (search_terms or normalized_display).strip().lower()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id FROM local_places WHERE LOWER(name) = ? LIMIT 1",
+        (normalized_name.lower(),),
+    )
+    exists = cursor.fetchone()
+
+    if exists:
+        conn.close()
+        return
+
+    cursor.execute(
+        """
+        INSERT INTO local_places (name, display_name, lat, lon, place_type, search_terms)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (normalized_name, normalized_display, lat, lon, "osm_dynamic", normalized_terms),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_dynamic_place_names(limit: int = 500) -> List[str]:
+    """
+    local_places içindeki dinamik OSM cache adlarını döner.
+    """
+    ensure_db()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT name
+        FROM local_places
+        WHERE place_type = 'osm_dynamic'
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        (int(limit),),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [row["name"] for row in rows if row["name"]]

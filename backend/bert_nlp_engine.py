@@ -752,140 +752,127 @@ class BertNLPEngine:
         Returns:
             Bulunan yer isimleri listesi
         """
-        found_places = []
-        seen_places = set()
+        best_matches = {}
+        candidate_spans = extract_candidate_spans(query, max_ngram=3)
 
         # OSM-first: Önce sorgudan canlı adaylar çekip aday havuzunu besle.
         self.places.prefetch_osm_candidates(query, bert_engine=self.bert, max_queries=6)
 
-        # 1. KELİME SEViYE: Tek kelimeler için yüksek threshold
-        words = re.findall(r'\b[\wğüşıöçĞÜŞİÖÇ]+\b', query)
+        for span in candidate_spans:
+            span_embedding = self.bert.encode(span["normalized"])
+            threshold = 0.75 if span["token_count"] == 1 else 0.65
+            match = self.places.find_best_match(
+                query=span["normalized"],
+                query_embedding=span_embedding,
+                threshold=threshold,
+                bert_engine=self.bert
+            )
 
-        for word in words:
-            if len(word) < 3:
+            if not match:
                 continue
 
-            word_embedding = self.bert.encode(word)
+            candidate = {
+                "place": match["place"],
+                "similarity": min(
+                    float(match["similarity"]) + (0.03 if span["token_count"] > 1 else 0.0),
+                    1.0,
+                ),
+                "index": int(match["index"]) if "index" in match else None,
+                "surface": span["surface"],
+                "normalized": span["normalized"],
+                "start": span["start"],
+                "end": span["end"],
+                "role_hint": span["role_hint"],
+                "token_count": span["token_count"],
+            }
 
-            # Yüksek threshold - sadece kesin eşleşmeler
-            match = self.places.find_best_match(
-                query=word,
-                query_embedding=word_embedding,
-                threshold=0.75,  # Yüksek threshold
-                bert_engine=self.bert
-            )
+            existing = best_matches.get(candidate["place"])
+            if not existing:
+                best_matches[candidate["place"]] = candidate
+                continue
 
-            if match and match["place"] not in seen_places:
-                found_places.append(match)
-                seen_places.add(match["place"])
+            if (
+                candidate["similarity"] > existing["similarity"]
+                or (
+                    candidate["similarity"] == existing["similarity"]
+                    and (
+                        candidate["token_count"] > existing["token_count"]
+                        or candidate["start"] < existing["start"]
+                    )
+                )
+            ):
+                best_matches[candidate["place"]] = candidate
 
-        # 2. N-GRAM SEViYE: 2-3 kelime grupları (daha spesifik)
-        # Örnek: "Kadıköy'den", "Taksim Meydanı"
-        ngrams = []
+        found_places = [
+            item for item in best_matches.values()
+            if item["similarity"] >= 0.65
+        ]
 
-        # 2-gramler (komşu kelime çiftleri)
-        for i in range(len(words) - 1):
-            ngram = f"{words[i]} {words[i+1]}"
-            if len(ngram) >= 5:  # En az 5 karakter
-                ngrams.append(ngram)
-
-        # 3-gramler
-        for i in range(len(words) - 2):
-            ngram = f"{words[i]} {words[i+1]} {words[i+2]}"
-            if len(ngram) >= 7:
-                ngrams.append(ngram)
-
-        # N-gramleri dene (daha düşük threshold ile)
-        for ngram in ngrams:
-            ngram_embedding = self.bert.encode(ngram)
-
-            match = self.places.find_best_match(
-                query=ngram,
-                query_embedding=ngram_embedding,
-                threshold=0.65,  # Orta threshold (n-gram daha spesifik)
-                bert_engine=self.bert
-            )
-
-            if match and match["place"] not in seen_places:
-                # N-gram bulduysa, skorunu biraz artır (daha güvenilir)
-                match["similarity"] = min(match["similarity"] * 1.05, 1.0)
-                found_places.append(match)
-                seen_places.add(match["place"])
-
-        # 3. FiLTERiNG: Çok fazla sonuç varsa, en iyilerini al
         if len(found_places) > 5:
-            # Skorlara göre sırala ve sadece en iyi 5'i al
-            found_places.sort(key=lambda x: x["similarity"], reverse=True)
+            found_places.sort(key=lambda item: (-item["similarity"], item["start"]))
+            found_places = found_places[:5]
 
-            # Ayrıca düşük skoru olanları at (0.70 altı)
-            found_places = [p for p in found_places if p["similarity"] >= 0.70][:5]
-
-        # Final sort
-        found_places.sort(key=lambda x: x["similarity"], reverse=True)
-
+        found_places.sort(key=lambda item: (item["start"], -item["token_count"], -item["similarity"]))
         return found_places
 
-    def detect_route_direction(self, query: str, places: List[str]) -> Dict[str, Optional[str]]:
+    def detect_route_direction(self, query: str, detected_places: List[Dict[str, Any]]) -> Dict[str, Optional[str]]:
         """
         "X'den Y'ye" tarzı sorgularda yönü tespit eder.
 
         Args:
             query: Kullanıcı sorgusu
-            places: Bulunan yer isimleri
+            detected_places: Bulunan yerlerin span bazlı listesi
 
         Returns:
             {"origin": str | None, "destination": str | None}
         """
-        if len(places) < 2:
+        if len(detected_places) < 2:
             return {"origin": None, "destination": None}
 
-        # "dan/den/ten/tan" edatlarını ara
-        from_patterns = [
-            r'(\w+)(?:den|dan|ten|tan)',
-            r'(\w+)\s+van\b',
-        ]
-
-        # "ye/e/a/ya" edatlarını ara
-        to_patterns = [
-            r'(?:ye|a|e|ya|na)\s*.*?(\w+)$',
-            r'(?:ye|a|e|ya|na)\s+(\w+)',
-        ]
+        ordered_places = sorted(
+            detected_places,
+            key=lambda item: (item.get("start", 0), -item.get("token_count", 1), -item.get("similarity", 0.0))
+        )
 
         origin = None
         destination = None
+        origin_item = None
+        destination_item = None
 
-        # Origin ara
-        for pattern in from_patterns:
-            match = re.search(pattern, query, re.IGNORECASE)
-            if match:
-                candidate = match.group(1)
-                # Yer ismi ile eşleştir
-                for place in places:
-                    if candidate.lower() in place.lower() or place.lower() in candidate.lower():
-                        origin = place
-                        break
-                if origin:
+        for item in ordered_places:
+            if item.get("role_hint") == "from":
+                origin_item = item
+                origin = item["place"]
+                break
+
+        for item in ordered_places:
+            if item.get("role_hint") == "to" and item["place"] != origin:
+                destination_item = item
+                destination = item["place"]
+                break
+
+        if origin_item and not destination:
+            for item in ordered_places:
+                if item["start"] > origin_item["start"] and item["place"] != origin:
+                    destination_item = item
+                    destination = item["place"]
                     break
 
-        # Destination ara
-        for pattern in to_patterns:
-            match = re.search(pattern, query, re.IGNORECASE)
-            if match:
-                candidate = match.group(1)
-                for place in places:
-                    if place != origin:  # Origin ile aynı olmasın
-                        if candidate.lower() in place.lower() or place.lower() in candidate.lower():
-                            destination = place
-                            break
-                if destination:
+        if destination_item and not origin:
+            for item in ordered_places:
+                if item["start"] < destination_item["start"] and item["place"] != destination:
+                    origin_item = item
+                    origin = item["place"]
                     break
 
-        # Bulunamazsa ilk ikisini origin/destination yap
-        if not origin and len(places) >= 2:
-            origin = places[0]
-            destination = places[1]
-        elif not destination and len(places) >= 2:
-            destination = places[1] if places[1] != origin else places[0]
+        if not origin:
+            origin = ordered_places[0]["place"]
+
+        if not destination:
+            for item in ordered_places[1:]:
+                if item["place"] != origin:
+                    destination = item["place"]
+                    break
 
         return {"origin": origin, "destination": destination}
 
@@ -925,16 +912,25 @@ class BertNLPEngine:
 
         # 2. Yer isimlerini çıkar
         detected_places = self.extract_places(query)
-        place_names = [p["place"] for p in detected_places]
+        ordered_places = sorted(
+            detected_places,
+            key=lambda item: (item.get("start", 0), -item.get("token_count", 1), -item.get("similarity", 0.0))
+        )
+        place_names = [p["place"] for p in ordered_places]
 
         # 3. Numpy değerlerini Python native türlere çevir (JSON için)
         detected_places_json = [
             {
                 "place": p["place"],
                 "similarity": float(p["similarity"]),  # numpy.float32 -> float
-                "index": int(p["index"]) if "index" in p else None
+                "index": int(p["index"]) if "index" in p else None,
+                "surface": p.get("surface"),
+                "normalized": p.get("normalized"),
+                "start": p.get("start"),
+                "end": p.get("end"),
+                "role_hint": p.get("role_hint"),
             }
-            for p in detected_places
+            for p in ordered_places
         ]
 
         # 4. Yere göre sonuç oluştur
@@ -948,7 +944,7 @@ class BertNLPEngine:
 
         if query_type == "route":
             # Origin ve destination tespit et
-            direction = self.detect_route_direction(query, place_names)
+            direction = self.detect_route_direction(query, ordered_places)
             result["origin"] = direction["origin"]
             result["destination"] = direction["destination"]
 
@@ -958,8 +954,9 @@ class BertNLPEngine:
                 result["destination"] = place_names[1]
 
         elif query_type == "poi":
-            # İlk yer ismi location olarak kullan
-            result["location"] = place_names[0] if place_names else None
+            # Önce location ipucu olan span'i kullan, yoksa metindeki ilk yeri al
+            location_match = next((p for p in ordered_places if p.get("role_hint") == "loc"), None)
+            result["location"] = location_match["place"] if location_match else (place_names[0] if place_names else None)
             result["query_type"] = "search"
 
         elif query_type == "multi":
@@ -967,8 +964,9 @@ class BertNLPEngine:
             result["locations"] = place_names if len(place_names) >= 2 else place_names
 
         elif query_type == "single":
-            # Tek hedef
-            result["destination"] = place_names[0] if place_names else None
+            # Tek hedefte önce "to" rol ipucunu, yoksa ilk yeri kullan
+            destination_match = next((p for p in ordered_places if p.get("role_hint") == "to"), None)
+            result["destination"] = destination_match["place"] if destination_match else (place_names[0] if place_names else None)
 
         elif query_type == "unknown":
             # Bilinmeyen tip - yer isimlerine göre karar ver
@@ -977,8 +975,9 @@ class BertNLPEngine:
                 result["locations"] = place_names
             elif len(place_names) == 2:
                 result["type"] = "route"
-                result["origin"] = place_names[0]
-                result["destination"] = place_names[1]
+                direction = self.detect_route_direction(query, ordered_places)
+                result["origin"] = direction["origin"] or place_names[0]
+                result["destination"] = direction["destination"] or place_names[1]
             elif len(place_names) == 1:
                 result["type"] = "single"
                 result["destination"] = place_names[0]

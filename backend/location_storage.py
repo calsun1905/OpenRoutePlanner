@@ -203,6 +203,7 @@ def update_location(location_id: str, updates: Dict) -> Optional[Dict]:
     ensure_db()
 
     allowed = {"name", "lat", "lon", "icon_type", "address"}
+    updates = updates or {}
     updates = {k: v for k, v in updates.items() if k in allowed}
 
     if not updates:

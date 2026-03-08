@@ -1,11 +1,11 @@
 ﻿"""
-geocoder.py - Yer ismi <-> Koordinat donusum modulu
+geocoder.py - Yer ismi <-> Koordinat dönüşüm modülü
 
 Nominatim API (OpenStreetMap) kullanarak:
 - Yer ismi -> koordinat (geocode)
 - Koordinat -> yer ismi (reverse_geocode)
 
-Ã‡ift katmanlÄ± cache (memory + SQLite) ve rate limiting desteÄŸi.
+Çift katmanlı cache (memory + SQLite) ve rate limiting desteği.
 """
 
 import os
