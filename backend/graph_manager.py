@@ -114,13 +114,14 @@ def find_nearest_node(G, lat: float, lon: float) -> int:
         # Kenarın iki uç noktasından kullanıcıya en yakın olanı seç
         u_data = G.nodes[u]
         v_data = G.nodes[v]
-        
+
         dist_u = ((u_data["y"] - lat) ** 2 + (u_data["x"] - lon) ** 2)
         dist_v = ((v_data["y"] - lat) ** 2 + (v_data["x"] - lon) ** 2)
-        
+
         return u if dist_u <= dist_v else v
-    except Exception:
+    except Exception as e:
         # Fallback: nearest_nodes kullan
+        print(f"[GraphManager] Manuel nearest node hatası, fallback kullanılıyor: {e}")
         return ox.nearest_nodes(G, X=lon, Y=lat)
 
 
@@ -187,7 +188,9 @@ def search_pois(place_name: str, category: str) -> list:
                 "image": str(image) if image else "",
             }
             pois.append(poi_data)
-        except Exception:
+        except Exception as e:
+            # Tek bir POI'nin hatası tüm aramayı bozmasın
+            print(f"[POI] POI verisi hatası (atlanıyor): {e}")
             continue
 
     print(f"[POI] {len(pois)} POI bulundu: {place_name} ({category})")

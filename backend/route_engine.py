@@ -41,23 +41,74 @@ def shortest_path(G, origin_node: int, dest_node: int) -> list:
         return []
 
 
-def nodes_to_coords(G, node_list: list) -> list:
+def _node_coord(G, node_id: int) -> List[float]:
+    """Graf node'unu [lat, lon] formatinda dondurur."""
+    data = G.nodes[node_id]
+    return [data["y"], data["x"]]  # y=lat, x=lon
+
+
+def _extract_edge_coords(G, u: int, v: int) -> List[List[float]]:
     """
-    Düğüm ID listesini [[lat, lon], ...] koordinat listesine çevirir.
-    
-    Args:
-        G: NetworkX grafiği
-        node_list: Düğüm ID listesi
-    
-    Returns:
-        list[list[float]]: [[lat, lon], ...]
+    Iki node arasindaki edge geometrisini [lat, lon] listesine cevirir.
+    Geometri yoksa veya okunamazsa [u, v] node koordinatlarini dondurur.
     """
-    coords = []
-    for node in node_list:
-        data = G.nodes[node]
-        coords.append([data["y"], data["x"]])  # y=lat, x=lon
+    default_coords = [_node_coord(G, u), _node_coord(G, v)]
+    edge_data = G.get_edge_data(u, v)
+    if not edge_data:
+        return default_coords
+
+    # Birden fazla paralel edge varsa "length" en kisa olani sec.
+    best = min(edge_data.values(), key=lambda d: d.get("length", float("inf")))
+    geom = best.get("geometry")
+    if geom is None:
+        return default_coords
+
+    try:
+        # Shapely LineString -> [(lon, lat), ...] formatinda gelir.
+        coords = [[lat, lon] for lon, lat in geom.coords]
+    except Exception:
+        return default_coords
+
+    if len(coords) < 2:
+        return default_coords
+
+    # Geometri yonu tersse rota yonune gore cevir.
+    u_coord = _node_coord(G, u)
+    v_coord = _node_coord(G, v)
+
+    def sqdist(a: List[float], b: List[float]) -> float:
+        return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
+
+    normal_cost = sqdist(coords[0], u_coord) + sqdist(coords[-1], v_coord)
+    reverse_cost = sqdist(coords[0], v_coord) + sqdist(coords[-1], u_coord)
+    if reverse_cost < normal_cost:
+        coords.reverse()
+
     return coords
 
+
+def nodes_to_coords(G, node_list: list) -> list:
+    """
+    Node listesi icin rota geometrisini [lat, lon] listesi olarak dondurur.
+    Edge geometry varsa ona gore cizer; yoksa node'lari dogrudan birlestirir.
+    """
+    if not node_list:
+        return []
+    if len(node_list) == 1:
+        return [_node_coord(G, node_list[0])]
+
+    route_coords: List[List[float]] = []
+    for i in range(len(node_list) - 1):
+        seg_coords = _extract_edge_coords(G, node_list[i], node_list[i + 1])
+        if not route_coords:
+            route_coords.extend(seg_coords)
+        else:
+            # Bir onceki segmentin son noktasi ile duplicate olusmasin.
+            if route_coords[-1] == seg_coords[0]:
+                route_coords.extend(seg_coords[1:])
+            else:
+                route_coords.extend(seg_coords)
+    return route_coords
 
 def solve_tsp(G, points: list) -> list:
     """
@@ -175,12 +226,13 @@ def calculate_route_stats(G, route_nodes: list) -> dict:
         try:
             # MultiDiGraph'ta birden fazla kenar olabilir, en kısasını al
             edge_data = G.get_edge_data(route_nodes[i], route_nodes[i + 1])
-            if edge_data:
+            if edge_data and len(edge_data) > 0:
                 # MultiDiGraph: ilk kenarın uzunluğunu al
                 first_key = list(edge_data.keys())[0]
                 length = edge_data[first_key].get("length", 0)
                 total_length += length
-        except Exception:
+        except Exception as e:
+            print(f"[RouteEngine] Kenar uzunluğu hesaplama hatası (segment {i}): {e}")
             continue
     
     total_km = round(total_length / 1000, 2)
@@ -221,7 +273,7 @@ def path_to_edges(G, path_nodes):
     edges = []
     for i in range(len(path_nodes) - 1):
         edge_data = G.get_edge_data(path_nodes[i], path_nodes[i + 1])
-        if edge_data:
+        if edge_data and len(edge_data) > 0:
             # MultiDiGraph'te ilk key'i al
             first_key = list(edge_data.keys())[0]
             edges.append((path_nodes[i], path_nodes[i + 1], first_key))
@@ -1019,7 +1071,8 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
                 "duration_minutes": shortest_stats["estimated_walk_minutes"],
                 "description": f"{shortest_stats['total_distance_km']:.1f} km"
             }]
-        except:
+        except (KeyError, ValueError, TypeError) as e:
+            print(f"[RouteEngine] Fallback rota hesaplama hatası: {e}")
             return []
 
     except Exception as e:

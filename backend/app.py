@@ -1,15 +1,15 @@
-"""
+﻿"""
 app.py - Flask API Sunucusu
 
-Frontend ile Backend arasındaki köprü.
-Rota optimizasyonu ve POI arama endpoint'leri sağlar.
+Frontend ile Backend arasÄ±ndaki kÃ¶prÃ¼.
+Rota optimizasyonu ve POI arama endpoint'leri saÄŸlar.
 """
 import os
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from graph_manager import get_graph, get_graph_for_points, search_pois
-from geocoder import geocode, reverse_geocode, geocode_batch, geocode_suggest
+from geocoder import geocode, reverse_geocode, geocode_batch, geocode_suggest, purge_old_geocodes
 from route_engine import (
     solve_tsp,
     build_full_route,
@@ -42,35 +42,68 @@ from location_storage import (
     delete_location,
     toggle_location_favorite,
 )
+from storage_db import ensure_db, run_sqlite_maintenance
 
-# Frontend klasörünün yolu
+# BERT NLP Engine (opsiyonel - kurulu deÄŸilse devre dÄ±ÅŸÄ±)
+try:
+    from bert_nlp_engine import get_bert_nlp_engine, is_bert_available
+    BERT_NLP_AVAILABLE = is_bert_available()
+    if BERT_NLP_AVAILABLE:
+        print("[app.py] BERT NLP Engine yÃ¼klendi âœ…")
+    else:
+        print("[app.py] BERT NLP Engine bulunamadÄ± (transformers/float32 kurulu degil) [WARN]")
+except ImportError:
+    BERT_NLP_AVAILABLE = False
+    print("[app.py] BERT NLP Engine modulu bulunamadi [WARN]")
+
+# Frontend klasÃ¶rÃ¼nÃ¼n yolu
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 CORS(app)  # Frontend'den gelen isteklere izin ver
 
-# Global değişkenler: cache
+# Global deÄŸiÅŸkenler: cache
 _graph_cache = {}
 _poi_cache = {}
+_startup_initialized = False
+
+
+def initialize_runtime() -> None:
+    """
+    Calisma zamani baslangic gorevlerini bir kez calistirir.
+    Flask calisma seklinden bagimsiz olarak ayni davranir.
+    """
+    global _startup_initialized
+    if _startup_initialized:
+        return
+
+    ensure_db(run_analyze=True)
+    run_sqlite_maintenance(checkpoint_mode="PASSIVE")
+    purge_old_geocodes(days=90)
+    _startup_initialized = True
+
 
 
 def _get_cached_graph(place_name: str):
-    """Graf objesini memory cache'te tutar (uygulama içi)."""
+    """Graf objesini memory cache'te tutar (uygulama iÃ§i)."""
     if place_name not in _graph_cache:
         _graph_cache[place_name] = get_graph(place_name)
     return _graph_cache[place_name]
+
+initialize_runtime()
+
 
 
 @app.route("/api/get-route", methods=["POST"])
 def api_get_route():
     """
-    Koordinat listesi alır, optimize edilmiş rota döner.
+    Koordinat listesi alÄ±r, optimize edilmiÅŸ rota dÃ¶ner.
     
     Request Body:
         {
             "points": [[lat, lon], [lat, lon], ...],
-            "place": "Kadikoy, Istanbul, Turkey"  (opsiyonel, varsayılan Kadıköy),
-            "route_type": "route_1" | "route_2" | "route_3"  (opsiyonel, varsayılan route_1)
+            "place": "Kadikoy, Istanbul, Turkey"  (opsiyonel, varsayÄ±lan KadÄ±kÃ¶y),
+            "route_type": "route_1" | "route_2" | "route_3"  (opsiyonel, varsayÄ±lan route_1)
         }
     
     Response:
@@ -86,10 +119,10 @@ def api_get_route():
         data = request.get_json()
 
         if not data or "points" not in data:
-            return jsonify({"error": "Geçersiz istek: 'points' alanı gerekli."}), 400
+            return jsonify({"error": "GeÃ§ersiz istek: 'points' alanÄ± gerekli."}), 400
 
         points = data["points"]
-        optimize = data.get("optimize", False)  # Varsayılan: sıralı bağla
+        optimize = data.get("optimize", False)  # VarsayÄ±lan: sÄ±ralÄ± baÄŸla
         route_type = data.get("route_type", "route_1")  # route_1, route_2, route_3
 
         print(f"[API] Get-route: {len(points)} nokta, optimize={optimize}, route_type={route_type}")
@@ -105,41 +138,41 @@ def api_get_route():
 
         for i, p in enumerate(points):
             if not isinstance(p, list) or len(p) != 2:
-                return jsonify({"error": f"Nokta {i} geçersiz format. [lat, lon] olmalı."}), 400
+                return jsonify({"error": f"Nokta {i} geÃ§ersiz format. [lat, lon] olmalÄ±."}), 400
             try:
                 float(p[0])
                 float(p[1])
             except (ValueError, TypeError):
-                return jsonify({"error": f"Nokta {i} geçersiz koordinat."}), 400
+                return jsonify({"error": f"Nokta {i} geÃ§ersiz koordinat."}), 400
 
-        # 1) Seçilen noktaları kapsayan grafı al (otomatik bölge algılama)
+        # 1) SeÃ§ilen noktalarÄ± kapsayan grafÄ± al (otomatik bÃ¶lge algÄ±lama)
         point_tuples = [(p[0], p[1]) for p in points]
-        # print(f"[API] Noktalar için graf alınıyor: {len(points)} nokta"))
+        # print(f"[API] Noktalar iÃ§in graf alÄ±nÄ±yor: {len(points)} nokta"))
         G = get_graph_for_points(point_tuples)
 
-        # 2) Sıralama: TSP optimizasyonu veya kullanıcı sırası
+        # 2) SÄ±ralama: TSP optimizasyonu veya kullanÄ±cÄ± sÄ±rasÄ±
         if optimize and len(point_tuples) > 2:
-            # print(f"[API] TSP çözülüyor: {len(points)} nokta"))
+            # print(f"[API] TSP Ã§Ã¶zÃ¼lÃ¼yor: {len(points)} nokta"))
             optimized_order = solve_tsp(G, point_tuples)
         else:
-            # print(f"[API] Sıralı rota: {len(points)} nokta"))
+            # print(f"[API] SÄ±ralÄ± rota: {len(points)} nokta"))
             optimized_order = list(range(len(point_tuples)))
 
-        # 3) Sıralanmış noktalar
+        # 3) SÄ±ralanmÄ±ÅŸ noktalar
         ordered_points = [point_tuples[i] for i in optimized_order]
 
-        # 4) Tam rotayı oluştur (alternatif rota tipi ile)
-        # route_type "route_1"|"route_2"|"route_3" string → route_index 0|1|2 int (build_alternative_routes int bekliyor)
+        # 4) Tam rotayÄ± oluÅŸtur (alternatif rota tipi ile)
+        # route_type "route_1"|"route_2"|"route_3" string -> route_index 0|1|2 int (build_alternative_routes int bekliyor)
         route_index = {"route_1": 0, "route_2": 1, "route_3": 2}.get(route_type, 0)
         route_nodes = build_alternative_routes(G, ordered_points, route_index)
 
         if not route_nodes:
-            return jsonify({"error": "Rota hesaplanamadı. Noktalar harita alanı dışında olabilir."}), 400
+            return jsonify({"error": "Rota hesaplanamadÄ±. Noktalar harita alanÄ± dÄ±ÅŸÄ±nda olabilir."}), 400
 
-        # 5) Koordinatlara çevir
+        # 5) Koordinatlara Ã§evir
         route_coords = nodes_to_coords(G, route_nodes)
 
-        # 6) İstatistikler
+        # 6) Ä°statistikler
         stats = calculate_route_stats(G, route_nodes)
 
         # 7) Google Maps linki
@@ -159,18 +192,18 @@ def api_get_route():
 
     except Exception as e:
         print(f"[API] Hata: {e}")
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/get-alternative-routes", methods=["POST"])
 def api_get_alternative_routes():
     """
-    Aynı noktalar için 3 farklı alternatif rota döner.
+    AynÄ± noktalar iÃ§in 3 farklÄ± alternatif rota dÃ¶ner.
 
     Basit sistem:
     - 3 rota: "Rota 1", "Rota 2", "Rota 3"
-    - Hepsi kısa rotaya yakın mesafede
-    - Geometrik olarak farklı sokaklardan geçer
+    - Hepsi kÄ±sa rotaya yakÄ±n mesafede
+    - Geometrik olarak farklÄ± sokaklardan geÃ§er
 
     Request Body:
         {
@@ -184,7 +217,7 @@ def api_get_alternative_routes():
                 {
                     "type": "route_1",
                     "name": "Rota 1",
-                    "icon": "📍",
+                    "icon": "@",
                     "route_coords": [[lat, lon], ...],
                     "distance_km": 4.5,
                     "duration_minutes": 55,
@@ -193,13 +226,13 @@ def api_get_alternative_routes():
                 {
                     "type": "route_2",
                     "name": "Rota 2",
-                    "icon": "📍",
+                    "icon": "@",
                     ...
                 },
                 {
                     "type": "route_3",
                     "name": "Rota 3",
-                    "icon": "📍",
+                    "icon": "@",
                     ...
                 }
             ]
@@ -209,7 +242,7 @@ def api_get_alternative_routes():
         data = request.get_json()
 
         if not data or "points" not in data:
-            return jsonify({"error": "Geçersiz istek: 'points' alanı gerekli."}), 400
+            return jsonify({"error": "GeÃ§ersiz istek: 'points' alanÄ± gerekli."}), 400
 
         points = data["points"]
         optimize = data.get("optimize", False)
@@ -232,11 +265,11 @@ def api_get_alternative_routes():
 
         ordered_points = [point_tuples[i] for i in optimized_order]
 
-        # PERFORMANS: Segment alternatifleri tek seferde hesaplanır (3x yerine 1x)
+        # PERFORMANS: Segment alternatifleri tek seferde hesaplanÄ±r (3x yerine 1x)
         try:
             batch_results = build_all_alternative_routes_batch(G, ordered_points)
         except Exception as e:
-            print(f"[API] Alternatif rota batch hatası: {e}")
+            print(f"[API] Alternatif rota batch hatasÄ±: {e}")
             batch_results = []
 
         alternatives = []
@@ -254,9 +287,9 @@ def api_get_alternative_routes():
             })
 
         if not alternatives:
-            return jsonify({"error": "Hiçbir alternatif rota hesaplanamadı."}), 400
+            return jsonify({"error": "HiÃ§bir alternatif rota hesaplanamadÄ±."}), 400
 
-        # Aynı rotaları filtrele: Birebir aynı koordinat listesi = tek rota
+        # AynÄ± rotalarÄ± filtrele: Birebir aynÄ± koordinat listesi = tek rota
         def _coords_equal(a, b):
             if len(a) != len(b):
                 return False
@@ -275,13 +308,13 @@ def api_get_alternative_routes():
 
     except Exception as e:
         print(f"[API] Hata: {e}")
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/search-pois", methods=["POST"])
 def api_search_pois():
     """
-    Belirtilen bölgede POI arar.
+    Belirtilen bÃ¶lgede POI arar.
     
     Request Body:
         {
@@ -301,7 +334,7 @@ def api_search_pois():
         data = request.get_json()
 
         if not data or "category" not in data:
-            return jsonify({"error": "'category' alanı gerekli."}), 400
+            return jsonify({"error": "'category' alanÄ± gerekli."}), 400
 
         place = data.get("place", "Kadikoy, Istanbul, Turkey")
         category = data["category"]
@@ -310,14 +343,14 @@ def api_search_pois():
 
         from osm_poi_dictionary import POI_MAPPING
         
-        # Validasyon: Eğer kelime sözlükte yoksa ve önceden tanımlanmış bir ingilizce anahtar değilse hata verilebilir.
-        # Ancak esneklik için sadece sözlük kontrolü yapalım. Eğer backend'de yoksa, fallback tag ile çalışır.
+        # Validasyon: EÄŸer kelime sÃ¶zlÃ¼kte yoksa ve Ã¶nceden tanÄ±mlanmÄ±ÅŸ bir ingilizce anahtar deÄŸilse hata verilebilir.
+        # Ancak esneklik iÃ§in sadece sÃ¶zlÃ¼k kontrolÃ¼ yapalÄ±m. EÄŸer backend'de yoksa, fallback tag ile Ã§alÄ±ÅŸÄ±r.
         if category.lower() not in POI_MAPPING and not category.isascii():
             pass # We will allow any category phrase that could be matched, to avoid failing valid English OSM categories too.
 
         cache_key = f"{place}::{category}"
         if cache_key in _poi_cache:
-            # print(f"[API] POI cache'den döndürülüyor: {cache_key}"))
+            # print(f"[API] POI cache'den dÃ¶ndÃ¼rÃ¼lÃ¼yor: {cache_key}"))
             pois = _poi_cache[cache_key]
         else:
             pois = search_pois(place, category)
@@ -327,22 +360,22 @@ def api_search_pois():
         return jsonify({"pois": pois})
 
     except Exception as e:
-        # print(f"[API] POI arama hatası: {e}"))
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        # print(f"[API] POI arama hatasÄ±: {e}"))
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
-    """Sunucu sağlık kontrolü."""
-    return jsonify({"status": "ok", "message": "OpenTrip API çalışıyor!"})
+    """Sunucu saÄŸlÄ±k kontrolÃ¼."""
+    return jsonify({"status": "ok", "message": "OpenTrip API Ã§alÄ±ÅŸÄ±yor!"})
 
 
 @app.route("/api/geocode/suggest", methods=["GET"])
 def api_geocode_suggest():
     """
-    Yazarken öneri için: Kısmi yer ismi → çoklu sonuç döner (autocomplete).
+    Yazarken Ã¶neri iÃ§in: KÄ±smi yer ismi -> coklu sonuc doner (autocomplete).
 
-    Query: ?q=Kadıköy&limit=6
+    Query: ?q=KadÄ±kÃ¶y&limit=6
     """
     try:
         q = request.args.get("q", "").strip()
@@ -350,18 +383,18 @@ def api_geocode_suggest():
         result = geocode_suggest(q, limit=limit)
         return jsonify(result)
     except Exception as e:
-        print(f"[API] Geocode suggest hatası: {e}")
+        print(f"[API] Geocode suggest hatasÄ±: {e}")
         return jsonify({"status": "success", "suggestions": []})
 
 
 @app.route("/api/geocode", methods=["POST"])
 def api_geocode():
     """
-    Yer ismini koordinata çevirir.
+    Yer ismini koordinata Ã§evirir.
 
     Request Body:
         {
-            "place": "Kadıköy Parkı, İstanbul"
+            "place": "KadÄ±kÃ¶y ParkÄ±, Ä°stanbul"
         }
 
     Response:
@@ -369,7 +402,7 @@ def api_geocode():
             "status": "success",
             "lat": 40.990,
             "lon": 29.029,
-            "display_name": "Kadıköy Parkı, İstanbul, Türkiye",
+            "display_name": "KadÄ±kÃ¶y ParkÄ±, Ä°stanbul, TÃ¼rkiye",
             "cached": false
         }
     """
@@ -377,7 +410,7 @@ def api_geocode():
         data = request.get_json()
 
         if not data or "place" not in data:
-            return jsonify({"error": "'place' alanı gerekli."}), 400
+            return jsonify({"error": "'place' alanÄ± gerekli."}), 400
 
         place_name = data["place"]
 
@@ -393,14 +426,14 @@ def api_geocode():
         return jsonify(result)
 
     except Exception as e:
-        print(f"[API] Geocode hatası: {e}")
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        print(f"[API] Geocode hatasÄ±: {e}")
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/reverse-geocode", methods=["POST"])
 def api_reverse_geocode():
     """
-    Koordinatı yer ismine çevirir.
+    KoordinatÄ± yer ismine Ã§evirir.
 
     Request Body:
         {
@@ -411,7 +444,7 @@ def api_reverse_geocode():
     Response:
         {
             "status": "success",
-            "display_name": "Kadıköy, İstanbul, Türkiye",
+            "display_name": "KadÄ±kÃ¶y, Ä°stanbul, TÃ¼rkiye",
             "address": "{...}",
             "cached": false
         }
@@ -420,7 +453,7 @@ def api_reverse_geocode():
         data = request.get_json()
 
         if not data or "lat" not in data or "lon" not in data:
-            return jsonify({"error": "'lat' ve 'lon' alanları gerekli."}), 400
+            return jsonify({"error": "'lat' ve 'lon' alanlarÄ± gerekli."}), 400
 
         lat = data["lat"]
         lon = data["lon"]
@@ -432,18 +465,18 @@ def api_reverse_geocode():
         return jsonify(result)
 
     except Exception as e:
-        print(f"[API] Reverse geocode hatası: {e}")
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        print(f"[API] Reverse geocode hatasÄ±: {e}")
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/geocode/batch", methods=["POST"])
 def api_geocode_batch():
     """
-    Toplu geocoding işlemi.
+    Toplu geocoding iÅŸlemi.
 
     Request Body:
         {
-            "places": ["Kadıköy", "Beşiktaş", "Taksim"]
+            "places": ["KadÄ±kÃ¶y", "BeÅŸiktaÅŸ", "Taksim"]
         }
 
     Response:
@@ -459,49 +492,49 @@ def api_geocode_batch():
         data = request.get_json()
 
         if not data or "places" not in data:
-            return jsonify({"error": "'places' alanı gerekli (liste)."}), 400
+            return jsonify({"error": "'places' alanÄ± gerekli (liste)."}), 400
 
         places = data["places"]
 
         if not isinstance(places, list):
-            return jsonify({"error": "'places' bir liste olmalı."}), 400
+            return jsonify({"error": "'places' bir liste olmalÄ±."}), 400
 
         if len(places) > 10:
-            return jsonify({"error": "En fazla 10 yer adı aynı anda işlenebilir."}), 400
+            return jsonify({"error": "En fazla 10 yer adÄ± aynÄ± anda iÅŸlenebilir."}), 400
 
         results = geocode_batch(places)
         return jsonify({"results": results})
 
     except Exception as e:
-        print(f"[API] Batch geocode hatası: {e}")
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        print(f"[API] Batch geocode hatasÄ±: {e}")
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/")
 def serve_frontend():
-    """Ana sayfa — Frontend'i sun."""
+    """Ana sayfa - Frontend'i sun."""
     return send_from_directory(FRONTEND_DIR, "index.html")
 
 
 # =============================================================================
-# ROTA KAYDETME VE YÜKLEME API'LERİ
+# ROTA KAYDETME VE YÃœKLEME API'LERÄ°
 # =============================================================================
 
 @app.route("/api/routes/save", methods=["POST"])
 def api_save_route():
     """
-    Rotayı kaydeder.
+    RotayÄ± kaydeder.
     
     Request Body:
         {
-            "name": "Kadıköy Turu",
-            "description": "Kadıköy'de gezilecek yerler",
+            "name": "KadÄ±kÃ¶y Turu",
+            "description": "KadÄ±kÃ¶y'de gezilecek yerler",
             "points": [[lat, lon], ...],
             "route_coords": [[lat, lon], ...],
             "distance_km": 4.5,
             "duration_minutes": 55,
             "route_type": "shortest",
-            "tags": ["tarihi", "kültürel"]
+            "tags": ["tarihi", "kÃ¼ltÃ¼rel"]
         }
     
     Response:
@@ -518,16 +551,16 @@ def api_save_route():
         required_fields = ["name", "points", "route_coords", "distance_km", "duration_minutes"]
         for field in required_fields:
             if field not in data:
-                return jsonify({"error": f"'{field}' alanı gerekli."}), 400
+                return jsonify({"error": f"'{field}' alanÄ± gerekli."}), 400
         
-        # Rotayı kaydet
+        # RotayÄ± kaydet
         route = save_route(
             name=data["name"],
             points=data["points"],
             route_coords=data["route_coords"],
             distance_km=data["distance_km"],
             duration_minutes=data["duration_minutes"],
-            route_type=data.get("route_type", "shortest"),
+            route_type=data.get("route_type", "route_1"),
             description=data.get("description", ""),
             tags=data.get("tags", [])
         )
@@ -535,22 +568,22 @@ def api_save_route():
         return jsonify({
             "status": "success",
             "route": route,
-            "message": f"'{route['name']}' rotası kaydedildi!"
+            "message": f"'{route['name']}' rotasÄ± kaydedildi!"
         })
     
     except Exception as e:
-        print(f"[API] Rota kaydetme hatası: {e}")
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        print(f"[API] Rota kaydetme hatasÄ±: {e}")
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/routes", methods=["GET"])
 def api_get_routes():
     """
-    Tüm kaydedilmiş rotaları getirir.
+    TÃ¼m kaydedilmiÅŸ rotalarÄ± getirir.
     
     Query Parameters:
         sort_by: created_at, name, distance_km, times_used, favorite
-        limit: Maksimum rota sayısı
+        limit: Maksimum rota sayÄ±sÄ±
     
     Response:
         {
@@ -570,14 +603,14 @@ def api_get_routes():
         })
     
     except Exception as e:
-        # print(f"[API] Rota listeleme hatası: {e}"))
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        # print(f"[API] Rota listeleme hatasÄ±: {e}"))
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/routes/<route_id>", methods=["GET"])
 def api_get_route_by_id(route_id):
     """
-    Belirli bir rotayı getirir.
+    Belirli bir rotayÄ± getirir.
     
     Response:
         {
@@ -588,24 +621,24 @@ def api_get_route_by_id(route_id):
         route = get_route(route_id)
         
         if not route:
-            return jsonify({"error": "Rota bulunamadı"}), 404
+            return jsonify({"error": "Rota bulunamadÄ±"}), 404
         
         return jsonify({"route": route})
     
     except Exception as e:
-        # print(f"[API] Rota getirme hatası: {e}"))
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        # print(f"[API] Rota getirme hatasÄ±: {e}"))
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/routes/<route_id>", methods=["PUT"])
 def api_update_route(route_id):
     """
-    Rotayı günceller.
+    RotayÄ± gÃ¼nceller.
     
     Request Body:
         {
-            "name": "Yeni İsim",
-            "description": "Yeni açıklama",
+            "name": "Yeni Ä°sim",
+            "description": "Yeni aÃ§Ä±klama",
             "tags": ["yeni", "etiketler"]
         }
     
@@ -621,23 +654,23 @@ def api_update_route(route_id):
         route = update_route(route_id, data)
         
         if not route:
-            return jsonify({"error": "Rota bulunamadı"}), 404
+            return jsonify({"error": "Rota bulunamadÄ±"}), 404
         
         return jsonify({
             "status": "success",
             "route": route,
-            "message": "Rota güncellendi"
+            "message": "Rota gÃ¼ncellendi"
         })
     
     except Exception as e:
-        print(f"[API] Rota güncelleme hatası: {e}")
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        print(f"[API] Rota gÃ¼ncelleme hatasÄ±: {e}")
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/routes/<route_id>", methods=["DELETE"])
 def api_delete_route(route_id):
     """
-    Rotayı siler.
+    RotayÄ± siler.
     
     Response:
         {
@@ -649,7 +682,7 @@ def api_delete_route(route_id):
         success = delete_route(route_id)
         
         if not success:
-            return jsonify({"error": "Rota bulunamadı"}), 404
+            return jsonify({"error": "Rota bulunamadÄ±"}), 404
         
         return jsonify({
             "status": "success",
@@ -657,14 +690,14 @@ def api_delete_route(route_id):
         })
     
     except Exception as e:
-        # print(f"[API] Rota silme hatası: {e}"))
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        # print(f"[API] Rota silme hatasÄ±: {e}"))
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/routes/<route_id>/favorite", methods=["POST"])
 def api_toggle_favorite(route_id):
     """
-    Rotayı favorilere ekler/çıkarır.
+    RotayÄ± favorilere ekler/Ã§Ä±karÄ±r.
     
     Response:
         {
@@ -677,7 +710,7 @@ def api_toggle_favorite(route_id):
         route = toggle_favorite(route_id)
         
         if not route:
-            return jsonify({"error": "Rota bulunamadı"}), 404
+            return jsonify({"error": "Rota bulunamadÄ±"}), 404
         
         return jsonify({
             "status": "success",
@@ -686,8 +719,8 @@ def api_toggle_favorite(route_id):
         })
     
     except Exception as e:
-        # print(f"[API] Favori işlemi hatası: {e}"))
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        # print(f"[API] Favori iÅŸlemi hatasÄ±: {e}"))
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/routes/search", methods=["GET"])
@@ -718,8 +751,8 @@ def api_search_routes():
         })
     
     except Exception as e:
-        print(f"[API] Rota arama hatası: {e}")
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        print(f"[API] Rota arama hatasÄ±: {e}")
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/routes/statistics", methods=["GET"])
@@ -741,30 +774,30 @@ def api_route_statistics():
         return jsonify(stats)
     
     except Exception as e:
-        # print(f"[API] İstatistik hatası: {e}"))
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        # print(f"[API] Ä°statistik hatasÄ±: {e}"))
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 # =============================================================================
-# ZAMAN PLANLAMA API'LERİ
+# ZAMAN PLANLAMA API'LERÄ°
 # =============================================================================
 
 @app.route("/api/timeline/create", methods=["POST"])
 def api_create_timeline():
     """
-    Rota için zaman çizelgesi oluşturur.
+    Rota iÃ§in zaman Ã§izelgesi oluÅŸturur.
     
     Request Body:
         {
             "points": [
-                {"name": "Kadıköy", "lat": 40.99, "lon": 29.03},
+                {"name": "KadÄ±kÃ¶y", "lat": 40.99, "lon": 29.03},
                 {"name": "Moda", "lat": 40.98, "lon": 29.04}
             ],
             "segment_distances": [1.2, 0.8],  # km cinsinden
             "start_time": "09:00",
-            "visit_duration": 30,  # dakika (varsayılan)
+            "visit_duration": 30,  # dakika (varsayÄ±lan)
             "transport_mode": "walking",
-            "custom_durations": {0: 45, 1: 60}  # Özel süreler (opsiyonel)
+            "custom_durations": {0: 45, 1: 60}  # Ã–zel sÃ¼reler (opsiyonel)
         }
     
     Response:
@@ -780,7 +813,7 @@ def api_create_timeline():
         
         # Zorunlu alanlar
         if not data or "points" not in data:
-            return jsonify({"error": "'points' alanı gerekli"}), 400
+            return jsonify({"error": "'points' alanÄ± gerekli"}), 400
         
         points = data["points"]
         segment_distances = data.get("segment_distances", [])
@@ -789,7 +822,7 @@ def api_create_timeline():
         transport_mode = data.get("transport_mode", "walking")
         custom_durations = data.get("custom_durations", {})
         
-        # String key'leri int'e çevir
+        # String key'leri int'e Ã§evir
         if custom_durations:
             custom_durations = {int(k): v for k, v in custom_durations.items()}
         
@@ -808,14 +841,14 @@ def api_create_timeline():
         return jsonify(timeline)
     
     except Exception as e:
-        # print(f"[API] Timeline oluşturma hatası: {e}"))
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        # print(f"[API] Timeline oluÅŸturma hatasÄ±: {e}"))
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/timeline/check-conflicts", methods=["POST"])
 def api_check_conflicts():
     """
-    Zaman çizelgesinde çakışmaları kontrol eder.
+    Zaman Ã§izelgesinde Ã§akÄ±ÅŸmalarÄ± kontrol eder.
     
     Request Body:
         {
@@ -831,7 +864,7 @@ def api_check_conflicts():
             "warnings": [
                 {
                     "point_index": 2,
-                    "warning": "Bu saat kapalı olabilir",
+                    "warning": "Bu saat kapalÄ± olabilir",
                     "arrival_time": "20:00"
                 }
             ]
@@ -841,12 +874,12 @@ def api_check_conflicts():
         data = request.get_json()
         
         if not data or "schedule" not in data:
-            return jsonify({"error": "'schedule' alanı gerekli"}), 400
+            return jsonify({"error": "'schedule' alanÄ± gerekli"}), 400
         
         schedule = data["schedule"]
         opening_hours = data.get("opening_hours", {})
         
-        # String key'leri int'e çevir
+        # String key'leri int'e Ã§evir
         if opening_hours:
             opening_hours = {int(k): v for k, v in opening_hours.items()}
         
@@ -855,14 +888,14 @@ def api_check_conflicts():
         return jsonify({"warnings": warnings})
     
     except Exception as e:
-        print(f"[API] Çakışma kontrolü hatası: {e}")
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        print(f"[API] Ã‡akÄ±ÅŸma kontrolÃ¼ hatasÄ±: {e}")
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/timeline/optimize", methods=["POST"])
 def api_optimize_timeline():
     """
-    Zaman çizelgesini optimize eder ve öneriler sunar.
+    Zaman Ã§izelgesini optimize eder ve Ã¶neriler sunar.
     
     Request Body:
         {
@@ -876,8 +909,8 @@ def api_optimize_timeline():
             "suggestions": [
                 {
                     "type": "duration_exceeded",
-                    "message": "Toplam süre 1s 30dk fazla",
-                    "suggestion": "Ziyaret sürelerini azaltın"
+                    "message": "Toplam sÃ¼re 1s 30dk fazla",
+                    "suggestion": "Ziyaret sÃ¼relerini azaltÄ±n"
                 }
             ]
         }
@@ -886,7 +919,7 @@ def api_optimize_timeline():
         data = request.get_json()
         
         if not data or "schedule" not in data:
-            return jsonify({"error": "'schedule' alanı gerekli"}), 400
+            return jsonify({"error": "'schedule' alanÄ± gerekli"}), 400
         
         schedule = data["schedule"]
         max_duration = data.get("max_duration_minutes")
@@ -897,18 +930,18 @@ def api_optimize_timeline():
         return jsonify(result)
     
     except Exception as e:
-        # print(f"[API] Optimizasyon hatası: {e}"))
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        # print(f"[API] Optimizasyon hatasÄ±: {e}"))
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 # =============================================================================
-# KULLANICI LOKASYON API'LERİ
+# KULLANICI LOKASYON API'LERÄ°
 # =============================================================================
 
 @app.route("/api/locations", methods=["GET"])
 def api_get_locations():
     """
-    Kaydedilmiş tüm lokasyonları getirir.
+    KaydedilmiÅŸ tÃ¼m lokasyonlarÄ± getirir.
     """
     try:
         sort_by = request.args.get("sort_by", "created_at")
@@ -921,7 +954,7 @@ def api_get_locations():
             "count": len(locations)
         })
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/locations", methods=["POST"])
@@ -935,7 +968,7 @@ def api_save_location():
         required_fields = ["name", "lat", "lon"]
         for field in required_fields:
             if field not in data:
-                return jsonify({"error": f"'{field}' alanı gerekli."}), 400
+                return jsonify({"error": f"'{field}' alanÄ± gerekli."}), 400
                 
         location = save_location(
             name=data["name"],
@@ -951,7 +984,7 @@ def api_save_location():
             "message": f"'{location['name']}' konumu kaydedildi!"
         })
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/locations/<location_id>", methods=["DELETE"])
@@ -963,61 +996,144 @@ def api_delete_location(location_id):
         success = delete_location(location_id)
         
         if not success:
-            return jsonify({"error": "Lokasyon bulunamadı"}), 404
+            return jsonify({"error": "Lokasyon bulunamadÄ±"}), 404
             
         return jsonify({
             "status": "success",
             "message": "Lokasyon silindi"
         })
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/locations/<location_id>", methods=["PUT"])
 def api_update_location(location_id):
     """
-    Lokasyonu günceller.
+    Lokasyonu gÃ¼nceller.
     """
     try:
         data = request.get_json()
         location = update_location(location_id, data)
         
         if not location:
-            return jsonify({"error": "Lokasyon bulunamadı"}), 404
+            return jsonify({"error": "Lokasyon bulunamadÄ±"}), 404
             
         return jsonify({
             "status": "success",
             "location": location,
-            "message": "Lokasyon güncellendi"
+            "message": "Lokasyon gÃ¼ncellendi"
         })
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
 
 
 @app.route("/api/locations/<location_id>/favorite", methods=["POST"])
 def api_toggle_location_favorite(location_id):
     """
-    Lokasyonun favori durumunu değiştirir.
+    Lokasyonun favori durumunu deÄŸiÅŸtirir.
     """
     try:
         location = toggle_location_favorite(location_id)
         
         if not location:
-            return jsonify({"error": "Lokasyon bulunamadı"}), 404
+            return jsonify({"error": "Lokasyon bulunamadÄ±"}), 404
             
         return jsonify({
             "status": "success",
             "location": location,
             "is_favorite": location.get("favorite", False),
-            "message": "Favorilere eklendi ⭐" if location.get("favorite") else "Favorilerden çıkarıldı"
+            "message": "Favorilere eklendi *" if location.get("favorite") else "Favorilerden cikarildi"
         })
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÄ±: {str(e)}"}), 500
+
+
+# =============================================================================
+# BERT NLP ENDPOINTS
+# =============================================================================
+
+@app.route("/api/nlp/parse", methods=["POST"])
+def api_nlp_parse():
+    """
+    DoÄŸal dil sorgusunu analiz eder ve yapÄ±landÄ±rÄ±lmÄ±ÅŸ veri dÃ¶ner.
+
+    Request Body:
+        {
+            "query": "KadÄ±kÃ¶y'den BeÅŸiktaÅŸ'a rota Ã§iz"
+        }
+
+    Response:
+        {
+            "type": "route",           # route | poi | multi | single | unknown
+            "confidence": 0.85,
+            "origin": "KadÄ±kÃ¶y",
+            "destination": "BeÅŸiktaÅŸ",
+            "locations": null,         # multi iÃ§in
+            "location": null,          # poi iÃ§in
+            "detected_places": [
+                {"place": "KadÄ±kÃ¶y", "similarity": 0.92},
+                {"place": "BeÅŸiktaÅŸ", "similarity": 0.88}
+            ],
+            "parse_time": 0.15,
+            "error": null
+        }
+    """
+    if not BERT_NLP_AVAILABLE:
+        return jsonify({
+            "error": "BERT NLP Engine aktif deÄŸil. Gerekli kÃ¼tÃ¼phaneler kurulu deÄŸil: pip install transformers torch"
+        }), 503
+
+    try:
+        data = request.get_json()
+
+        if not data or "query" not in data:
+            return jsonify({"error": "'query' alanÄ± gerekli"}), 400
+
+        query = data["query"].strip()
+
+        if not query or len(query) < 2:
+            return jsonify({"error": "Sorgu Ã§ok kÄ±sa"}), 400
+
+        print(f"[NLP] Sorgu: {query}")
+
+        # NLP engine'i al ve sorguyu analiz et
+        nlp_engine = get_bert_nlp_engine()
+        result = nlp_engine.parse(query)
+
+        print(f"[NLP] Tip: {result['type']} | Confidence: {result['confidence']:.2f}")
+        if result.get('origin'):
+            print(f"[NLP]   -> {result['origin']} -> {result.get('destination', '?')}")
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"[NLP ERROR] {str(e)}")
+        return jsonify({"error": f"NLP hatasÄ±: {str(e)}"}), 500
+
+
+@app.route("/api/nlp/status", methods=["GET"])
+def api_nlp_status():
+    """
+    NLP engine durumunu kontrol eder.
+
+    Response:
+        {
+            "available": true,
+            "engine": "bert-nlp",
+            "model": "dbmdz/bert-base-turkish-uncased"
+        }
+    """
+    return jsonify({
+        "available": BERT_NLP_AVAILABLE,
+        "engine": "bert-nlp" if BERT_NLP_AVAILABLE else None,
+        "model": "dbmdz/bert-base-turkish-uncased" if BERT_NLP_AVAILABLE else None
+    })
 
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("  OpenTrip API Sunucusu Başlatılıyor...")
+    print("  OpenTrip API Sunucusu BaÅŸlatÄ±lÄ±yor...")
     print("  http://localhost:5000")
     print("=" * 50)
     app.run(debug=True, port=5000)
+
