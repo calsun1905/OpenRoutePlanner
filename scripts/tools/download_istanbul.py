@@ -1,8 +1,10 @@
 import os
 import sys
 
-# Backend klasörünü Python yoluna ekleyelim ki graph_manager import edilebilsin
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
+# Script scripts/tools/ içinde; backend OpenRoutePlanner/backend'de
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root = os.path.join(_script_dir, '..', '..')
+sys.path.insert(0, os.path.join(_project_root, 'backend'))
 
 from graph_manager import get_graph
 
