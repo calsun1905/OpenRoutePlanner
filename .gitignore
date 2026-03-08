@@ -1,10 +1,12 @@
-﻿venv/
+venv/
 .venv/
 __pycache__/
 *.pyc
 *.pyo
 backend/data/*.graphml
 backend/data/saved_routes.json
+backend/data/saved_locations.json
+backend/data/app_data.db
 .env
 *.log
 
@@ -17,3 +19,6 @@ backend/models/bert-base-turkish-uncased/*
 
 cache/
 backend/cache/
+
+# Geçici debug çıktıları
+scripts/debug/

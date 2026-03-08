@@ -13,8 +13,15 @@ routeplanner/
 │   ├── backend/               ← Python Flask API
 │   ├── frontend/              ← HTML/CSS/JS arayüz
 │   ├── progress.md            ← İlerleme takibi (ana kaynak)
-│   ├── OSM_API_REHBERI.md     ← Nominatim, Overpass, Taginfo rehberi
 │   ├── PROJECT_INDEX.md       ← Bu dosya (proje indeksi)
+│   ├── docs/                  ← Dokümantasyon (OSM, raporlar, planlar)
+│   │   ├── osm/               ← OSM_API_REHBERI.md, nominatim-osm-basit.md vb.
+│   │   ├── raporlar/          ← Test ve fix raporları
+│   │   ├── planlar/           ← VERITABANI_DOKUMANTASYONU.md, PERFORMANS vb.
+│   │   └── DOSYA_YAPISI.md    ← Dosya yapısı rehberi
+│   ├── scripts/               ← Fix ve yardımcı scriptler
+│   │   ├── fix/               ← Encoding fix scriptleri
+│   │   └── tools/             ← download_istanbul.py, test_*.py vb.
 │   └── günlük-rapor/          ← Günlük notlar
 │
 ├── cache/                     ← API cache dosyaları (JSON)
@@ -122,7 +129,9 @@ routeplanner/
 | Dosya | İçerik |
 |-------|--------|
 | **progress.md** | İlerleme takibi, özellik listesi, bilinen sorunlar, TODO |
-| **OSM_API_REHBERI.md** | Nominatim, Overpass, Taginfo — OSM tag sistemi, projede kullanım |
+| **docs/DOSYA_YAPISI.md** | Dosya yapısı rehberi — tüm docs ve scripts konumları |
+| **docs/osm/OSM_API_REHBERI.md** | Nominatim, Overpass, Taginfo — OSM tag sistemi |
+| **docs/planlar/VERITABANI_DOKUMANTASYONU.md** | Veritabanı yapısı ve kullanım |
 | **PROJECT_INDEX.md** | Bu dosya — proje indeksi |
 
 ---

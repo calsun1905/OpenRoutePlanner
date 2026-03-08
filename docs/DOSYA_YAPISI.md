@@ -86,6 +86,8 @@ OpenRoutePlanner/
 | Dosya | Açıklama |
 |-------|----------|
 | **fix_osmnx.bat** | OSMnx kurulum/güncelleme (Windows) |
+| **fix_backend.py** | Backend encoding düzeltme |
+| **fix_emoji.py** | Emoji düzeltme (kritik dosyalar) |
 
 ### scripts/tools/ — Yardımcı Araçlar
 
@@ -98,6 +100,8 @@ OpenRoutePlanner/
 | **update_ui.py** | UI güncelleme aracı |
 | **test_100_routes.py** | 100 rota testi |
 | **test_routes_fast.py** | Hızlı rota testi |
+| **scan_encoding.py** | Bozuk karakter tarayıcı |
+| **deep_scan.py** | Derin encoding taraması (tüm dosyalar) |
 
 ### scripts/debug/ — Debug Çıktıları
 
