@@ -1,0 +1,45 @@
+╔════════════════════════════════════════════════════════╗
+║        OTURUM NOTU                                    ║
+║        Tarih: 09.03.2026                              ║
+╚════════════════════════════════════════════════════════╝
+
+### Bugunun Ozet Hedefi:
+- BERT gelistirme yonunu dokumante etmek
+- Kayip hava durumu planini repo icine geri almak
+- Progress ve gunluk raporu yeni yola gore guncellemek
+
+### Geri Alinan Dokumanlar:
+1. `docs/planlar/hava-durumu-entegrasyon-plani.md`
+   - Kaynak: gecici oturum/plan kaydi
+   - Icerik: OpenMeteo tabanli 3 fazli weather entegrasyonu
+
+2. `docs/planlar/bert-gelistirme-akisi.md`
+   - Icerik: regex-first yerine retrieval/linking tabanli BERT gelistirme akisi
+
+### BERT Tarafinda Guncel Yon:
+- Regex sadece fallback olacak
+- Ana akis:
+  `normalize -> mention detection -> candidate retrieval -> place linking -> slot filling -> intent merge`
+- En kritik kalite problemi:
+  origin/destination rollerini dogru atamak
+
+### Hava Durumu Tarafinda Guncel Yon:
+- Faz 1: `weather_service.py` + `weather_utils.py`
+- Temel endpointler:
+  - `GET /api/weather`
+  - `GET /api/weather/forecast`
+  - `POST /api/weather/check-route`
+- Sonraki adim:
+  timeline entegrasyonu ve hava bazli akilli oneriler
+
+### Progress Guncellemesi:
+- Eski BERT frontend ve `/api/nlp/parse` TODO maddeleri tamamlandi olarak guncellenecek
+- Yeni BERT pipeline refactor maddesi eklenecek
+- Weather Faz 1 TODO maddesi eklenecek
+
+### Sonraki Teknik Adimlar:
+1. BERT mention/linking/slot filling ayristirmasi
+2. Weather service MVP
+3. Timeline + hava entegrasyonu
+
+---

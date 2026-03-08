@@ -1,5 +1,19 @@
 # Progress - OpenRoutePlanner
 
+## 2026-03-09 Guncel Not
+
+- Hava durumu entegrasyon plani gecici oturum kaydindan geri alindi ve repo icine tasindi: `docs/planlar/hava-durumu-entegrasyon-plani.md`
+- BERT gelistirme akisi ayri plan dokumani olarak eklendi: `docs/planlar/bert-gelistirme-akisi.md`
+- BERT tarafinda yeni yon: `normalize -> mention detection -> candidate retrieval -> place linking -> slot filling -> intent merge`
+- Regex ana cozum degil; sadece dar fallback olarak kalacak.
+- Hava durumu tarafinda planlanan ilk teknik adim: `OpenMeteo tabanli weather_service + weather_utils + temel endpointler`
+
+### Guncel Odak
+
+1. BERT mention/linking/slot filling kalitesini artirmak
+2. Hava durumu servisinin Faz 1 temel altyapisini kurmak
+3. OSM-first ve local cache mantigini kontrollu sekilde genisletmek
+
 > 📂 Aylık ilerleme dosyaları için `progress/` klasörüne bakın
 > 📝 Güncel ay: **[2026-02.md](progress/2026-02.md)**
 
@@ -510,8 +524,10 @@ openroute/
 - [ ] OSM mekan endpoint'lerinin frontend'e entegrasyonu
 
 ### 🟡 Önemli
-- [ ] BERT NLP motorunun frontend'e bağlanması
-- [ ] `/api/nlp/parse` endpoint'inin app.py'ye eklenmesi
+- [x] BERT NLP motorunun frontend'e bağlanması (AI panel + parse akışı eklendi)
+- [x] `/api/nlp/parse` ve `/api/nlp/status` endpoint'lerinin app.py'ye eklenmesi
+- [ ] BERT pipeline'in `normalize -> mention detection -> candidate retrieval -> place linking -> slot filling` akışına tam ayrıştırılması
+- [ ] Hava durumu entegrasyonu Faz 1: `weather_service.py`, `weather_utils.py`, temel endpoint'ler
 - [ ] False positive azaltma (threshold iyileştirme)
 - [ ] Arama önerileri için lokal cache / fallback iyileştirmesi
 - [ ] Rota kaydetme edge case'lerinin tam doğrulanması
