@@ -45,6 +45,18 @@ except ImportError:
     except ImportError:
         def get_all_locations(): return []
 
+try:
+    from local_places import save_dynamic_place, get_dynamic_place_names
+except ImportError:
+    try:
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from local_places import save_dynamic_place, get_dynamic_place_names
+    except ImportError:
+        def save_dynamic_place(*args, **kwargs): return None
+        def get_dynamic_place_names(limit=500): return []
+
 
 
 # =============================================================================
@@ -82,6 +94,147 @@ QUERY_TEMPLATES = {
     ]
 }
 
+QUERY_NOISE_WORDS = {
+    "rota", "rotası", "yol", "güzergah", "git", "gidilir", "giderim",
+    "nasıl", "neler", "nereler", "var", "ne", "yapabilirim", "gez",
+    "gezdir", "göster", "çiz", "hesapla", "bir", "ve", "ile", "bu",
+    "yer", "nokta", "için", "yakında", "yakın", "istiyorum"
+}
+
+TOKEN_PATTERN = re.compile(r"[A-Za-z0-9ÇĞİÖŞÜçğıöşü]+(?:['’`][A-Za-z0-9ÇĞİÖŞÜçğıöşü]+)?")
+FROM_SUFFIXES = ("den", "dan", "ten", "tan", "nden", "ndan")
+TO_SUFFIXES_APOSTROPHE = ("ye", "ya", "e", "a", "na", "ne")
+TO_SUFFIXES_PLAIN = ("ye", "ya", "na", "ne")
+LOC_SUFFIXES = ("de", "da", "te", "ta")
+COMMON_ALIASES = {
+    "kadikoy": "kadıköy",
+    "besiktas": "beşiktaş",
+    "uskudar": "üsküdar",
+    "sisli": "şişli",
+    "cankaya": "çankaya",
+    "kizilay": "kızılay",
+    "goztepe": "göztepe",
+    "ortakoy": "ortaköy",
+    "bakirkoy": "bakırköy",
+}
+
+
+def normalize_query_text(text: str) -> str:
+    """Apostrof ve boşluk varyasyonlarını normalize eder."""
+    return re.sub(r"\s+", " ", text.replace("’", "'").replace("`", "'")).strip()
+
+
+def normalize_token_with_role(token: str) -> Tuple[str, Optional[str]]:
+    """
+    Token'ı normalize eder ve varsa rol ipucu üretir.
+    Örnek: "Kadıköy'den" -> ("kadıköy", "from")
+    """
+    cleaned = normalize_query_text(token).strip(".,;:!?()[]{}\"")
+    lowered = cleaned.casefold()
+
+    if not lowered:
+        return "", None
+
+    role_hint = None
+    stem = lowered
+
+    if "'" in lowered:
+        base, suffix = lowered.rsplit("'", 1)
+        if suffix in FROM_SUFFIXES:
+            stem, role_hint = base, "from"
+        elif suffix in TO_SUFFIXES_APOSTROPHE:
+            stem, role_hint = base, "to"
+        elif suffix in LOC_SUFFIXES:
+            stem, role_hint = base, "loc"
+    else:
+        for suffix in FROM_SUFFIXES:
+            if lowered.endswith(suffix) and len(lowered) > len(suffix) + 2:
+                stem, role_hint = lowered[:-len(suffix)], "from"
+                break
+        if role_hint is None:
+            for suffix in TO_SUFFIXES_PLAIN:
+                if lowered.endswith(suffix) and len(lowered) > len(suffix) + 2:
+                    stem, role_hint = lowered[:-len(suffix)], "to"
+                    break
+        if role_hint is None:
+            for suffix in LOC_SUFFIXES:
+                if lowered.endswith(suffix) and len(lowered) > len(suffix) + 2:
+                    stem, role_hint = lowered[:-len(suffix)], "loc"
+                    break
+
+    stem = stem.strip(".,;:!?()[]{}\"'")
+    stem = COMMON_ALIASES.get(stem, stem)
+    return stem, role_hint
+
+
+def extract_candidate_spans(query: str, max_ngram: int = 3) -> List[Dict[str, Any]]:
+    """
+    Sorgudan Türkçe ekleri soyulmuş, metin pozisyonu korunmuş aday span'ler çıkarır.
+    """
+    normalized_query = normalize_query_text(query)
+    token_matches = []
+
+    for match in TOKEN_PATTERN.finditer(normalized_query):
+        surface = match.group(0)
+        normalized, role_hint = normalize_token_with_role(surface)
+
+        if len(normalized) < 2 or normalized in QUERY_NOISE_WORDS:
+            continue
+
+        token_matches.append({
+            "surface": surface,
+            "normalized": normalized,
+            "start": match.start(),
+            "end": match.end(),
+            "role_hint": role_hint,
+            "token_count": 1,
+        })
+
+    spans = []
+    seen = set()
+
+    def add_span(surface: str, normalized: str, start: int, end: int, role_hint: Optional[str], token_count: int):
+        key = (start, end, normalized)
+        if key in seen:
+            return
+        seen.add(key)
+        spans.append({
+            "surface": surface,
+            "normalized": normalized,
+            "start": start,
+            "end": end,
+            "role_hint": role_hint,
+            "token_count": token_count,
+        })
+
+    for token in token_matches:
+        add_span(**token)
+
+    for size in range(2, max_ngram + 1):
+        for i in range(len(token_matches) - size + 1):
+            chunk = token_matches[i:i + size]
+            between_text = normalized_query[chunk[0]["end"]:chunk[-1]["start"]]
+            role_hints = {item["role_hint"] for item in chunk if item["role_hint"]}
+
+            if "," in between_text or len(role_hints) > 1:
+                continue
+
+            surface = normalized_query[chunk[0]["start"]:chunk[-1]["end"]]
+            normalized = " ".join(item["normalized"] for item in chunk)
+            role_hint = next((item["role_hint"] for item in reversed(chunk) if item["role_hint"]), None)
+
+            add_span(
+                surface=surface,
+                normalized=normalized,
+                start=chunk[0]["start"],
+                end=chunk[-1]["end"],
+                role_hint=role_hint,
+                token_count=size,
+            )
+
+    spans.sort(key=lambda item: (item["start"], -item["token_count"]))
+    return spans
+
 
 # =============================================================================
 # YER İSMİ VERİTABANI (OpenStreetMap entegrasyonu için)
@@ -101,18 +254,41 @@ class PlaceDatabase:
     OSM_API_URL = "https://nominatim.openstreetmap.org/search"
     OSM_RATE_LIMIT = 1.0  # saniye
 
-    def __init__(self, use_osm: bool = False):
+    def __init__(
+        self,
+        use_osm: bool = False,
+        prefer_osm_first: bool = False,
+        seed_static_places: bool = True,
+        seed_user_locations: bool = True,
+    ):
         self._places = {}  # {name: embedding}
         self._place_names = []  # List[str]
         self._embeddings = None  # np.ndarray matrix
         self._use_osm = use_osm  # OSM API açık mı?
+        self._prefer_osm_first = prefer_osm_first
+        self._osm_query_cache = {}
 
-        # Başlangıçta popüler Türk yerlerini ekle
-        self._seed_turkish_places()
+        self._seed_dynamic_cache()
 
-    def _seed_turkish_places(self):
-        """Türkiye'nin tüm yer isimlerini ve KULLANICI LOKASYONLARINI yükler."""
-        # 1. Kullanıcı lokasyonlarını ekle (Yüksek öncelikli)
+        if seed_user_locations:
+            self._seed_user_locations()
+
+        if seed_static_places:
+            self._seed_turkish_places()
+
+    def _seed_dynamic_cache(self):
+        """Kalıcı OSM cache içindeki dinamik yer adlarını yükler."""
+        try:
+            cached_places = get_dynamic_place_names()
+            for place in cached_places:
+                self.add_place(place)
+            if cached_places:
+                print(f"[PlaceDB] Dinamik OSM cache yüklendi: {len(cached_places)} yer")
+        except Exception as e:
+            print(f"[PlaceDB] Dinamik OSM cache yüklenemedi: {e}")
+
+    def _seed_user_locations(self):
+        """Kullanıcı lokasyonlarını ekler."""
         try:
             user_locations = get_all_locations()
             user_loc_count = 0
@@ -126,7 +302,8 @@ class PlaceDatabase:
         except Exception as e:
             print(f"[PlaceDB] Kullanıcı lokasyonları yüklenemedi: {e}")
 
-        # 2. Türkiye veritabanını ekle
+    def _seed_turkish_places(self):
+        """Türkiye'nin tüm yer isimlerini yükler."""
         try:
             if get_all_turkey_places:
                 all_places = get_all_turkey_places()
@@ -204,7 +381,8 @@ class PlaceDatabase:
         self,
         query: str,
         query_embedding: np.ndarray,
-        threshold: float = 0.75
+        threshold: float = 0.75,
+        bert_engine = None
     ) -> Optional[Dict[str, Any]]:
         """
         Sorguya en yakın yer ismini bulur.
@@ -219,45 +397,53 @@ class PlaceDatabase:
         Returns:
             En yakın eşleşme veya None
         """
+        if not self._place_names and self._use_osm and self._prefer_osm_first:
+            self.cache_osm_results(query)
+
         if not self._place_names:
             return None
 
-        # Cache'te ara
-        embeddings = self._embeddings
-        if embeddings is None:
-            return None
+        def score_embeddings(embedding_matrix: np.ndarray) -> Optional[Dict[str, Any]]:
+            similarities = np.dot(embedding_matrix, query_embedding)
+            norms = np.linalg.norm(embedding_matrix, axis=1) * np.linalg.norm(query_embedding)
 
-        # Cosine similarity hesapla
-        similarities = np.dot(embeddings, query_embedding)
-        norms = np.linalg.norm(embeddings, axis=1) * np.linalg.norm(query_embedding)
+            if np.all(norms == 0):
+                return None
 
-        # Sıfıra bölünme kontrolü
-        if np.all(norms == 0):
-            return None
+            similarities = np.divide(
+                similarities,
+                norms,
+                out=np.zeros_like(similarities),
+                where=norms != 0
+            )
 
-        # Sıfır olanları korumak için
-        similarities = np.divide(similarities, norms, out=np.zeros_like(similarities), where=norms!=0)
-
-        # En yüksek skoru bul
-        best_idx = np.argmax(similarities)
-        best_score = float(similarities[best_idx])
-
-        # Eşik üstündeyse döndür
-        if best_score >= threshold:
+            best_idx = int(np.argmax(similarities))
             return {
                 "place": self._place_names[best_idx],
-                "similarity": best_score,
+                "similarity": float(similarities[best_idx]),
                 "index": best_idx
             }
 
-        # Bulunamazsa ve OSM açıksa, API'ye sor
-        if self._use_osm and best_score < 0.50:
+        embeddings = self._embeddings
+        if embeddings is None and bert_engine is not None:
+            embeddings = self.get_embedding_matrix(bert_engine)
+
+        best_match = score_embeddings(embeddings) if embeddings is not None else None
+        if best_match and best_match["similarity"] >= threshold:
+            return best_match
+
+        # OSM-first modunda OSM adayları önce beslenmiş olur; burada ise son fallback çalışır.
+        if self._use_osm and (best_match is None or best_match["similarity"] < 0.50):
             print(f"[OSM API] '{query}' aranıyor...")
-            added = self.add_places_from_osm(query)
+            added = self.cache_osm_results(query)
 
             if added > 0:
                 print(f"[OSM API] {added} yeni yer eklendi!")
-                # Not: Yeni yerler için embedding daha sonra hesaplanmalı
+                if bert_engine is not None:
+                    refreshed_embeddings = self.get_embedding_matrix(bert_engine)
+                    refreshed_match = score_embeddings(refreshed_embeddings)
+                    if refreshed_match and refreshed_match["similarity"] >= threshold:
+                        return refreshed_match
 
         return None
 
@@ -321,15 +507,103 @@ class PlaceDatabase:
         Returns:
             Eklenen yer sayısı
         """
-        places = self.search_osm_api(query)
+        return self.cache_osm_results(query)
+
+    def cache_osm_results(self, query: str, limit: int = 5) -> int:
+        """
+        OSM'den yer arar, sonuçları memory + local_places cache'e yazar.
+        """
+        if not self._use_osm:
+            return 0
+
+        normalized_query = (query or "").strip().lower()
+        if len(normalized_query) < 2:
+            return 0
+
+        if normalized_query in self._osm_query_cache:
+            return self._osm_query_cache[normalized_query]
 
         added_count = 0
-        for place in places:
-            if place not in self._places:
-                self.add_place(place)
-                added_count += 1
 
+        try:
+            params = {
+                "q": f"{query}, Turkey",
+                "format": "json",
+                "countrycodes": "tr",
+                "limit": limit
+            }
+
+            response = requests.get(
+                self.OSM_API_URL,
+                params=params,
+                headers={"User-Agent": "OpenRoutePlanner/1.0"},
+                timeout=5
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+
+                for item in data:
+                    display_name = item.get("display_name", item.get("name", "")).strip()
+                    short_name = display_name.split(",")[0].strip()
+                    if not short_name:
+                        continue
+
+                    lat = item.get("lat")
+                    lon = item.get("lon")
+                    if lat is None or lon is None:
+                        continue
+
+                    if short_name not in self._places:
+                        self.add_place(short_name)
+                        added_count += 1
+
+                    save_dynamic_place(
+                        name=short_name,
+                        display_name=display_name,
+                        lat=float(lat),
+                        lon=float(lon),
+                        search_terms=f"{short_name.lower()} {display_name.lower()}",
+                    )
+
+                time.sleep(self.OSM_RATE_LIMIT)
+
+        except Exception as e:
+            print(f"[OSM API] Hata: {e}")
+
+        self._osm_query_cache[normalized_query] = added_count
         return added_count
+
+    def _build_osm_prefetch_queries(self, query: str, max_queries: int = 6) -> List[str]:
+        """
+        Kullanıcı sorgusundan OSM için daha anlamlı aday arama parçaları üretir.
+        """
+        phrases = []
+        spans = extract_candidate_spans(query, max_ngram=3)
+
+        for span in sorted(spans, key=lambda item: (-item["token_count"], item["start"])):
+            phrase = span["normalized"]
+            if len(phrase) < 2 or phrase in phrases:
+                continue
+            phrases.append(phrase)
+
+        return phrases[:max_queries]
+
+    def prefetch_osm_candidates(self, query: str, bert_engine=None, max_queries: int = 6) -> int:
+        """
+        Tek parse akışında kontrollü sayıda OSM sorgusu yaparak aday havuzunu büyütür.
+        """
+        if not self._use_osm or not self._prefer_osm_first:
+            return 0
+
+        added_total = 0
+        for candidate_query in self._build_osm_prefetch_queries(query, max_queries=max_queries):
+            added_total += self.cache_osm_results(candidate_query, limit=5)
+
+        if added_total > 0 and bert_engine is not None:
+            self.get_embedding_matrix(bert_engine)
+
+        return added_total
 
     def find_all_matches(
         self,
@@ -391,7 +665,12 @@ class BertNLPEngine:
         self.bert = get_bert_engine()
 
         # Yer ismi veritabanı (OSM API desteği ile)
-        self.places = PlaceDatabase(use_osm=True)  # OSM API AKTİF!
+        self.places = PlaceDatabase(
+            use_osm=True,
+            prefer_osm_first=True,
+            seed_static_places=False,
+            seed_user_locations=True,
+        )
 
         # Yer isimleri için embedding matrix'i HESAPLA
         print("[BERT NLP] Yer isimleri için embedding hesaplanıyor...")
@@ -476,6 +755,9 @@ class BertNLPEngine:
         found_places = []
         seen_places = set()
 
+        # OSM-first: Önce sorgudan canlı adaylar çekip aday havuzunu besle.
+        self.places.prefetch_osm_candidates(query, bert_engine=self.bert, max_queries=6)
+
         # 1. KELİME SEViYE: Tek kelimeler için yüksek threshold
         words = re.findall(r'\b[\wğüşıöçĞÜŞİÖÇ]+\b', query)
 
@@ -489,7 +771,8 @@ class BertNLPEngine:
             match = self.places.find_best_match(
                 query=word,
                 query_embedding=word_embedding,
-                threshold=0.75  # Yüksek threshold
+                threshold=0.75,  # Yüksek threshold
+                bert_engine=self.bert
             )
 
             if match and match["place"] not in seen_places:
@@ -519,7 +802,8 @@ class BertNLPEngine:
             match = self.places.find_best_match(
                 query=ngram,
                 query_embedding=ngram_embedding,
-                threshold=0.65  # Orta threshold (n-gram daha spesifik)
+                threshold=0.65,  # Orta threshold (n-gram daha spesifik)
+                bert_engine=self.bert
             )
 
             if match and match["place"] not in seen_places:

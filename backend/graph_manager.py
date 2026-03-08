@@ -8,6 +8,7 @@ ve POI (Points of Interest) aramalarını gerçekleştirir.
 import os
 import osmnx as ox
 import networkx as nx
+from route_config import ROUTE_CONFIG
 
 # Cache dizini
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
@@ -72,8 +73,12 @@ def get_graph_for_points(points: list):
         if dist > max_dist:
             max_dist = dist
     
-    # Minimum 500m, padding +300m. Maksimum 3500m (performans: çok geniş alan 10+ dk sürebilir)
-    radius = min(3500, max(500, max_dist + 300))
+    min_radius = ROUTE_CONFIG.get("GRAPH_RADIUS_MIN_M", 500)
+    padding = ROUTE_CONFIG.get("GRAPH_RADIUS_PADDING_M", 300)
+    max_radius = ROUTE_CONFIG.get("GRAPH_RADIUS_MAX_M", 3500)
+
+    # Minimum yarıçap + padding uygula. Maksimum değeri config yönetir.
+    radius = min(max_radius, max(min_radius, max_dist + padding))
     
     # Cache key: merkez + yarıçap
     cache_key = f"point_{center_lat:.4f}_{center_lon:.4f}_{int(radius)}"

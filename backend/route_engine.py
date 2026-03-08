@@ -16,6 +16,7 @@ import networkx as nx
 from networkx.algorithms.approximation import traveling_salesman_problem
 from networkx.algorithms.connectivity import edge_disjoint_paths, edge_connectivity
 from graph_manager import find_nearest_node
+from route_config import ROUTE_CONFIG
 import time
 import math
 from typing import Dict, List, Tuple, Optional
@@ -236,9 +237,9 @@ def calculate_route_stats(G, route_nodes: list) -> dict:
             continue
     
     total_km = round(total_length / 1000, 2)
-    
-    # Ortalama yürüme hızı: 5 km/saat
-    walk_speed_kmh = 5.0
+
+    # Ortalama yürüme hızı: config'den al
+    walk_speed_kmh = ROUTE_CONFIG.get("WALK_SPEED_KMH", 5.0)
     walk_minutes = round((total_km / walk_speed_kmh) * 60)
     
     return {
@@ -323,13 +324,13 @@ def dynamic_overlap_threshold(distance_km: float) -> float:
     """
     if distance_km < 1.0:
         # Çok kısa rotalarda neredeyse tüm yollar benzer olacağı için esnek ol
-        return 0.90
+        return ROUTE_CONFIG.get("OVERLAP_THRESHOLD_SHORT", 0.90)
     if distance_km < 3.0:
-        return 0.80
+        return ROUTE_CONFIG.get("OVERLAP_THRESHOLD_MEDIUM", 0.80)
     if distance_km < 7.0:
-        return 0.75
+        return ROUTE_CONFIG.get("OVERLAP_THRESHOLD_LONG", 0.75)
     # Çok uzun rotalarda gerçekten daha farklı yol iste
-    return 0.70
+    return ROUTE_CONFIG.get("OVERLAP_THRESHOLD_VERY_LONG", 0.70)
 
 
 def get_max_candidates(distance_km: float) -> int:
@@ -338,13 +339,13 @@ def get_max_candidates(distance_km: float) -> int:
     Kısa rotalarda daha az, uzun rotalarda daha fazla aday dener.
     """
     if distance_km < 1.0:
-        return 50   # Çok kısa rotalar
+        return ROUTE_CONFIG.get("MAX_CANDIDATES_VERY_SHORT", 50)   # Çok kısa rotalar
     elif distance_km < 3.0:
-        return 75   # Kısa rotalar
+        return ROUTE_CONFIG.get("MAX_CANDIDATES_SHORT", 75)        # Kısa rotalar
     elif distance_km < 7.0:
-        return 100  # Orta rotalar
+        return ROUTE_CONFIG.get("MAX_CANDIDATES_LONG", 100)        # Orta rotalar
     else:
-        return 150  # Uzun rotalar - maksimum alternatif şansı
+        return ROUTE_CONFIG.get("MAX_CANDIDATES_VERY_LONG", 150)   # Uzun rotalar - maksimum alternatif şansı
 
 
 # ===========================================================================
@@ -536,7 +537,7 @@ def dynamic_overlap_threshold_connectivity(distance_km: float, connectivity: int
     return base_threshold
 
 
-def apply_penalty_to_graph(G: nx.Graph, used_edges: list, penalty_factor: float = 2.0) -> nx.Graph:
+def apply_penalty_to_graph(G: nx.Graph, used_edges: list, penalty_factor: float = None) -> nx.Graph:
     """
     Kullanılan kenarlara ceza uygulayarak grafiği kopyalar.
 
@@ -556,6 +557,9 @@ def apply_penalty_to_graph(G: nx.Graph, used_edges: list, penalty_factor: float 
     Returns:
         nx.Graph: Penalize edilmiş graf kopyası
     """
+    if penalty_factor is None:
+        penalty_factor = ROUTE_CONFIG.get("PENALTY_FACTOR", 2.0)
+
     G_penalty = G.copy()
 
     # Her düğüm çifti için en az bir edge var mı kontrol et
@@ -585,7 +589,7 @@ def apply_penalty_to_graph(G: nx.Graph, used_edges: list, penalty_factor: float 
 
 def find_routes_with_penalty(G: nx.Graph, origin: int, dest: int,
                             used_edges: list, num_routes: int = 3,
-                            penalty_factor: float = 2.0) -> list:
+                            penalty_factor: float = None) -> list:
     """
     Penalty-based generation ile ekstra rotalar bulur.
 
@@ -608,6 +612,9 @@ def find_routes_with_penalty(G: nx.Graph, origin: int, dest: int,
     Returns:
         list[dict]: Penalty ile bulunan rotalar
     """
+    if penalty_factor is None:
+        penalty_factor = ROUTE_CONFIG.get("PENALTY_FACTOR", 2.0)
+
     penalty_routes = []
 
     try:
@@ -1001,7 +1008,7 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
                 G, origin_node, dest_node,
                 used_edges=body_edges,
                 num_routes=remaining + 1,
-                penalty_factor=2.0
+                penalty_factor=ROUTE_CONFIG.get("PENALTY_FACTOR", 2.0)
             )
             telemetry.yen_candidates = len(penalty_routes)
 

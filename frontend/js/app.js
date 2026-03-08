@@ -15,6 +15,7 @@ let routeGlowPolylines = [];  // Glow efektleri için ayrı takip
 let poiMarkers = [];
 let currentRouteData = null;
 let alternativeRoutesCache = {};  // Alternatif rota verileri cache'i (BUG FIX 07.03.2026)
+let currentNlpResult = null;
 
 // ========== MAP INIT ==========
 const map = L.map("map", {
@@ -48,6 +49,10 @@ const elToastContainer = document.getElementById("toastContainer");
 const elPlaceSearchInput = document.getElementById("placeSearchInput");
 const elBtnSearchPlace = document.getElementById("btnSearchPlace");
 const elSearchResults = document.getElementById("searchResults");
+const elNlpInput = document.getElementById("nlpInput");
+const elBtnNLP = document.getElementById("btnNLP");
+const elNlpResults = document.getElementById("nlpResults");
+const elNlpLoading = document.getElementById("nlpLoading");
 const elBtnShowAlternatives = document.getElementById("btnShowAlternatives");
 const elAlternativesPanel = document.getElementById("alternativesPanel");
 const elAlternativesList = document.getElementById("alternativesList");
@@ -124,8 +129,11 @@ function addPoint(lat, lng) {
 
     marker.bindPopup(
         `<strong>Nokta ${index + 1}</strong><br>${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
-         <button class="btn btn-primary btn-sm" style="margin-top: 8px; width: 100%;" 
-            onclick="openSaveLocationModal(${lat}, ${lng}, 'Nokta ${index + 1}')">
+         <button class="btn btn-primary btn-sm" style="margin-top: 8px; width: 100%;"
+            data-action-save-location
+            data-lat="${lat}"
+            data-lng="${lng}"
+            data-label="Nokta ${index + 1}">
             📍 Konumu Kaydet
          </button>`
     );
@@ -264,7 +272,7 @@ function updatePointsList() {
                     <span class="point-number">${i + 1}</span>
                     <span class="point-coords">${p[0].toFixed(4)}, ${p[1].toFixed(4)}</span>
                 </div>
-                <button class="btn-remove" onclick="removePoint(${i})" title="Sil">
+                <button class="btn-remove" data-action-remove-point data-index="${i}" title="Sil">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -336,12 +344,13 @@ function drawRoute(data) {
     }).addTo(map);
 
     // Rota çizgisi üstüne glow efekti
-    L.polyline(data.route_coords, {
+    const glow = L.polyline(data.route_coords, {
         color: "#a594f9",
         weight: 10,
         opacity: 0.2,
         smoothFactor: 1,
     }).addTo(map);
+    routeGlowPolylines.push(glow);
 
     // Haritayı rotaya sığdır
     map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
@@ -491,7 +500,7 @@ function buildPoiPopup(poi, emoji, label) {
     html += `</div>`;
 
     // Rotaya ekle butonu
-    html += `<button class="poi-card-btn" onclick="addPoint(${poi.lat}, ${poi.lon})">＋ Rotaya Ekle</button>`;
+    html += `<button class="poi-card-btn" data-action-add-point data-lat="${poi.lat}" data-lon="${poi.lon}">＋ Rotaya Ekle</button>`;
 
     html += `</div>`;
     return html;
@@ -544,6 +553,7 @@ elBtnConfirmSave.addEventListener("click", confirmSaveRoute);
 elBtnRefreshRoutes.addEventListener("click", loadSavedRoutes);
 elBtnShowTimeline.addEventListener("click", showTimelinePlanner);
 elBtnGenerateTimeline.addEventListener("click", generateTimeline);
+elBtnNLP.addEventListener("click", analyzeNaturalLanguageQuery);
 
 // Saved Location event listeners
 elBtnRefreshLocations.addEventListener("click", loadSavedLocations);
@@ -608,6 +618,11 @@ elPlaceSearchInput.addEventListener("keypress", function (e) {
 
 // Arama butonu
 elBtnSearchPlace.addEventListener("click", searchPlace);
+elNlpInput.addEventListener("keypress", function (e) {
+    if (e.key === "Enter") {
+        analyzeNaturalLanguageQuery();
+    }
+});
 
 // Dışarı tıklanınca önerileri kapat
 document.addEventListener("click", function (e) {
@@ -701,17 +716,34 @@ async function searchPlace() {
  */
 function displaySearchResult(data) {
     elSearchResults.style.display = "block";
+    const displayName = data.display_name || "Bilinmeyen konum";
+    const shortName = displayName.split(",")[0].trim();
 
     elSearchResults.innerHTML = `
-        <div class="search-result-item" onclick="selectSearchResult(${data.lat}, ${data.lon}, '${escapeHtml(data.display_name)}')">
-            <div class="search-result-name">📍 ${escapeHtml(data.display_name)}</div>
+        <div class="search-result-item">
+            <div class="search-result-name">📍 ${escapeHtml(displayName)}</div>
             <div class="search-result-coords">${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}</div>
-            <button class="btn btn-ghost btn-sm" style="margin-top:5px; width: 100%; border: 1px solid rgba(255,255,255,0.1);" 
-                onclick="event.stopPropagation(); openSaveLocationModal(${data.lat}, ${data.lon}, '${escapeHtml(data.display_name).split(',')[0]}')">
+            <button
+                class="btn btn-ghost btn-sm"
+                data-action="save-location"
+                style="margin-top:5px; width: 100%; border: 1px solid rgba(255,255,255,0.1);"
+            >
                 💾 Bu Konumu Kaydet
             </button>
         </div>
     `;
+
+    const resultItem = elSearchResults.querySelector(".search-result-item");
+    const saveButton = elSearchResults.querySelector("[data-action='save-location']");
+
+    resultItem.addEventListener("click", () => {
+        selectSearchResult(data.lat, data.lon, displayName);
+    });
+
+    saveButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openSaveLocationModal(data.lat, data.lon, shortName);
+    });
 }
 
 /**
@@ -738,6 +770,189 @@ function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
+}
+
+
+// ========== AI ASSISTANT (NLP) ==========
+
+async function geocodePlaceName(placeName) {
+    const response = await fetch(`${API_BASE}/geocode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ place: placeName }),
+    });
+
+    const data = await response.json();
+    if (!response.ok || data.status === "error") {
+        throw new Error(data.message || `"${placeName}" bulunamadı`);
+    }
+
+    return data;
+}
+
+function setNlpLoading(isLoading) {
+    elBtnNLP.disabled = isLoading;
+    elNlpLoading.style.display = isLoading ? "flex" : "none";
+}
+
+function buildNlpSummary(result) {
+    if (result.type === "route") {
+        return `${escapeHtml(result.origin || "?" )} → ${escapeHtml(result.destination || "?")}`;
+    }
+    if (result.type === "multi") {
+        return (result.locations || []).map(escapeHtml).join(" → ");
+    }
+    if (result.type === "poi") {
+        return `${escapeHtml(result.location || "Bilinmeyen konum")} için mekan araması`;
+    }
+    if (result.type === "single") {
+        return `${escapeHtml(result.destination || "Bilinmeyen hedef")} hedef olarak algılandı`;
+    }
+    return escapeHtml(result.error || "Sorgu anlaşılamadı");
+}
+
+function renderNlpResults(result) {
+    currentNlpResult = result;
+
+    const confidence = typeof result.confidence === "number"
+        ? `%${Math.round(result.confidence * 100)}`
+        : "—";
+
+    const detectedPlaces = Array.isArray(result.detected_places) ? result.detected_places : [];
+    const placesHtml = detectedPlaces.length > 0
+        ? `
+            <div class="nlp-result-places">
+                ${detectedPlaces.map((item) => `
+                    <span class="nlp-place-tag">
+                        📍 ${escapeHtml(item.place)}
+                    </span>
+                `).join("")}
+            </div>
+        `
+        : "";
+
+    const actions = [];
+    if (result.type === "route" || result.type === "multi") {
+        actions.push(`<button class="nlp-action-btn primary" data-action="apply-nlp">Haritaya Uygula</button>`);
+    } else if ((result.type === "single" && result.destination) || (result.type === "poi" && result.location)) {
+        actions.push(`<button class="nlp-action-btn primary" data-action="focus-nlp">Haritada Göster</button>`);
+    }
+
+    elNlpResults.innerHTML = `
+        <div class="nlp-result-item">
+            <div class="nlp-result-type">${escapeHtml(result.type || "unknown")}</div>
+            <div class="nlp-result-content">${buildNlpSummary(result)}</div>
+            <div class="nlp-result-confidence">Güven: ${confidence}</div>
+            ${placesHtml}
+            ${actions.length > 0 ? `<div class="nlp-actions">${actions.join("")}</div>` : ""}
+        </div>
+    `;
+    elNlpResults.style.display = "block";
+
+    elNlpResults.querySelectorAll("[data-action='apply-nlp']").forEach((button) => {
+        button.addEventListener("click", applyNlpResult);
+    });
+    elNlpResults.querySelectorAll("[data-action='focus-nlp']").forEach((button) => {
+        button.addEventListener("click", focusNlpLocation);
+    });
+}
+
+async function analyzeNaturalLanguageQuery() {
+    const query = elNlpInput.value.trim();
+
+    if (!query) {
+        showToast("Lütfen bir sorgu girin", "error");
+        return;
+    }
+
+    setNlpLoading(true);
+    elNlpResults.style.display = "none";
+
+    try {
+        const response = await fetch(`${API_BASE}/nlp/parse`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || "NLP analizi başarısız");
+        }
+
+        renderNlpResults(data);
+        showToast(`AI analiz tamamlandı (${data.engine || "nlp"})`, "success");
+    } catch (error) {
+        console.error("NLP analizi hatası:", error);
+        elNlpResults.innerHTML = `<div class="nlp-error">${escapeHtml(error.message)}</div>`;
+        elNlpResults.style.display = "block";
+        showToast(`Hata: ${error.message}`, "error");
+    } finally {
+        setNlpLoading(false);
+    }
+}
+
+async function applyNlpResult() {
+    if (!currentNlpResult) {
+        return;
+    }
+
+    const targetPlaces = [];
+    if (currentNlpResult.type === "route") {
+        if (currentNlpResult.origin) targetPlaces.push(currentNlpResult.origin);
+        if (currentNlpResult.destination) targetPlaces.push(currentNlpResult.destination);
+    } else if (currentNlpResult.type === "multi") {
+        targetPlaces.push(...(currentNlpResult.locations || []));
+    }
+
+    if (targetPlaces.length < 2) {
+        showToast("Uygulanacak yeterli konum bulunamadı", "error");
+        return;
+    }
+
+    showLoading("AI sonucu haritaya uygulanıyor...");
+
+    try {
+        clearAllPoints();
+
+        for (const placeName of targetPlaces) {
+            const place = await geocodePlaceName(placeName);
+            addPoint(place.lat, place.lon);
+        }
+
+        await calculateRoute();
+    } catch (error) {
+        console.error("NLP uygulama hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    } finally {
+        hideLoading();
+    }
+}
+
+async function focusNlpLocation() {
+    if (!currentNlpResult) {
+        return;
+    }
+
+    const placeName = currentNlpResult.location || currentNlpResult.destination;
+    if (!placeName) {
+        showToast("Gösterilecek konum bulunamadı", "error");
+        return;
+    }
+
+    showLoading("Konum bulunuyor...");
+
+    try {
+        const place = await geocodePlaceName(placeName);
+        map.setView([place.lat, place.lon], 16);
+        addPoint(place.lat, place.lon);
+        showToast(`"${placeName}" haritada gösterildi`, "success");
+    } catch (error) {
+        console.error("NLP konum gösterme hatası:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    } finally {
+        hideLoading();
+    }
 }
 
 
@@ -795,7 +1010,8 @@ function displayAlternativeRoutes(alternatives) {
         alternativeRoutesCache[alt.type] = {
             distance_km: alt.distance_km,
             duration_minutes: alt.duration_minutes,
-            route_coords: alt.route_coords
+            route_coords: alt.route_coords,
+            google_maps_link: alt.google_maps_link
         };
     });
 
@@ -823,7 +1039,10 @@ function displayAlternativeRoutes(alternatives) {
                         <span class="stat-text">${alt.duration_minutes} dk</span>
                     </div>
                 </div>
-                <button class="btn-select-route" onclick="selectAlternativeRoute('${alt.type}', ${JSON.stringify(alt.route_coords).replace(/"/g, '&quot;')})">
+                <button class="btn-select-route"
+                    data-action-select-alt
+                    data-type="${escapeHtml(alt.type)}"
+                    data-coords='${JSON.stringify(alt.route_coords)}'>
                     Bu Rotayı Seç
                 </button>
             </div>
@@ -889,8 +1108,13 @@ function selectAlternativeRoute(routeType, routeCoords) {
             route_coords: routeCoords,
             total_distance_km: altData.distance_km,
             estimated_walk_minutes: altData.duration_minutes,
-            route_type: routeType
+            route_type: routeType,
+            google_maps_link: altData.google_maps_link
         };
+    }
+
+    if (currentRouteData) {
+        showRouteInfo(currentRouteData);
     }
 
     // Butonları güncelle
@@ -1032,7 +1256,7 @@ function displaySavedRoutes(routes) {
             <div class="saved-route-card">
                 <div class="saved-route-header">
                     <h3 class="saved-route-name">${escapeHtml(route.name)}</h3>
-                    <button class="btn-favorite" onclick="toggleRouteFavorite('${route.id}')" title="Favori">
+                    <button class="btn-favorite" data-action-toggle-route-fav data-id="${escapeHtml(route.id)}" title="Favori">
                         ${favoriteIcon}
                     </button>
                 </div>
@@ -1048,10 +1272,10 @@ function displaySavedRoutes(routes) {
                     </div>
                 ` : ""}
                 <div class="saved-route-actions">
-                    <button class="btn-load-route" onclick="loadRoute('${route.id}')">
+                    <button class="btn-load-route" data-action-load-route data-id="${escapeHtml(route.id)}">
                         📍 Yükle
                     </button>
-                    <button class="btn-delete-route" onclick="deleteRoute('${route.id}')" title="Sil">
+                    <button class="btn-delete-route" data-action-delete-route data-id="${escapeHtml(route.id)}" title="Sil">
                         🗑️
                     </button>
                 </div>
@@ -1457,20 +1681,24 @@ function displaySavedLocationsSidebar(locations) {
         const favoriteIcon = loc.favorite ? "⭐" : "☆";
 
         html += `
-            <div class="saved-location-card" onclick="zoomToLocation(${loc.lat}, ${loc.lon}, '${escapeHtml(loc.name)}')">
+            <div class="saved-location-card"
+                 data-zoom-location
+                 data-lat="${loc.lat}"
+                 data-lon="${loc.lon}"
+                 data-name="${encodeURIComponent(loc.name)}">
                 <div class="saved-location-icon">${emoji}</div>
                 <div class="saved-location-info">
                     <h3 class="saved-location-name">${escapeHtml(loc.name)}</h3>
                     <p class="saved-location-address">Kullanım: ${loc.times_used || 0}</p>
                 </div>
-                <div class="saved-location-actions" onclick="event.stopPropagation()">
-                    <button class="ic-btn ic-btn-favorite" onclick="toggleLocationFavorite('${loc.id}')" title="Favori">
+                <div class="saved-location-actions" data-stop-propagation>
+                    <button class="ic-btn ic-btn-favorite" data-action-toggle-loc-fav data-id="${escapeHtml(loc.id)}" title="Favori">
                         ${favoriteIcon}
                     </button>
-                    <button class="ic-btn ic-btn-route" onclick="addPoint(${loc.lat}, ${loc.lon})" title="Rotaya Ekle">
+                    <button class="ic-btn ic-btn-route" data-action-add-point data-lat="${loc.lat}" data-lon="${loc.lon}" title="Rotaya Ekle">
                         ＋
                     </button>
-                    <button class="ic-btn ic-btn-delete" onclick="deleteSavedLocation('${loc.id}')" title="Sil">
+                    <button class="ic-btn ic-btn-delete" data-action-delete-loc data-id="${escapeHtml(loc.id)}" title="Sil">
                         ✖
                     </button>
                 </div>
@@ -1553,7 +1781,7 @@ function drawSavedLocationsOnMap(locations) {
 
         const marker = L.marker([loc.lat, loc.lon], { icon: icon }).addTo(map);
         marker.bindPopup(`<strong>${escapeHtml(loc.name)}</strong><br>
-                          <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="addPoint(${loc.lat}, ${loc.lon})">Rotaya Ekle</button>`);
+                          <button class="btn btn-primary btn-sm" style="margin-top:8px;" data-action-add-point data-lat="${loc.lat}" data-lon="${loc.lon}">Rotaya Ekle</button>`);
 
         customLocationMarkers.push(marker);
     });
@@ -1585,3 +1813,95 @@ function toggleSavedLocationsVisibility() {
         clearSavedLocationMarkers();
     }
 }
+
+// ========== EVENT DELEGATION - XSS Güvenlik Düzeltmeleri ==========
+// Tüm inline onclick handlers yerine tek bir event listener kullanılır
+// Bu, XSS saldırılarını önler ve daha iyi performans sağlar
+
+document.addEventListener("click", function(e) {
+    // Find closest element with data attribute (handles nested clicks)
+    const target = e.target.closest("[data-action-remove-point]");
+    if (target) {
+        const index = parseInt(target.dataset.index);
+        removePoint(index);
+        return;
+    }
+
+    // Add point from POI or saved locations
+    if (e.target.matches("[data-action-add-point]")) {
+        const lat = parseFloat(e.target.dataset.lat);
+        const lon = parseFloat(e.target.dataset.lon);
+        addPoint(lat, lon);
+        return;
+    }
+
+    // Save location from marker popup
+    if (e.target.matches("[data-action-save-location]")) {
+        const lat = parseFloat(e.target.dataset.lat);
+        const lng = parseFloat(e.target.dataset.lng);
+        const label = e.target.dataset.label;
+        openSaveLocationModal(lat, lng, label);
+        return;
+    }
+
+    // Toggle route favorite
+    if (e.target.matches("[data-action-toggle-route-fav]")) {
+        const id = e.target.dataset.id;
+        toggleRouteFavorite(id);
+        return;
+    }
+
+    // Load saved route
+    if (e.target.matches("[data-action-load-route]")) {
+        const id = e.target.dataset.id;
+        loadRoute(id);
+        return;
+    }
+
+    // Delete saved route
+    if (e.target.matches("[data-action-delete-route]")) {
+        const id = e.target.dataset.id;
+        deleteRoute(id);
+        return;
+    }
+
+    // Select alternative route
+    if (e.target.matches("[data-action-select-alt]")) {
+        const type = e.target.dataset.type;
+        const coords = JSON.parse(e.target.dataset.coords);
+        selectAlternativeRoute(type, coords);
+        return;
+    }
+
+    // Zoom to saved location (card click)
+    const locationCard = e.target.closest("[data-zoom-location]");
+    if (locationCard) {
+        const lat = parseFloat(locationCard.dataset.lat);
+        const lon = parseFloat(locationCard.dataset.lon);
+        const name = decodeURIComponent(locationCard.dataset.name);
+        zoomToLocation(lat, lon, name);
+        return;
+    }
+
+    // Toggle location favorite
+    if (e.target.matches("[data-action-toggle-loc-fav]")) {
+        const id = e.target.dataset.id;
+        toggleLocationFavorite(id);
+        // Stop propagation is handled by data-stop-propagation on parent
+        return;
+    }
+
+    // Delete saved location
+    if (e.target.matches("[data-action-delete-loc]")) {
+        const id = e.target.dataset.id;
+        deleteSavedLocation(id);
+        return;
+    }
+});
+
+// Handle stopPropagation for action buttons inside cards
+document.addEventListener("click", function(e) {
+    if (e.target.closest("[data-stop-propagation]")) {
+        e.stopPropagation();
+    }
+});

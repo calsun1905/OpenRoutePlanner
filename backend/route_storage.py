@@ -129,6 +129,7 @@ def save_route(
 
     route_id = str(uuid.uuid4())[:8]
     now = datetime.now().isoformat()
+    compact_route_coords = simplify_coords(route_coords)
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -144,7 +145,7 @@ def save_route(
             name,
             description,
             json.dumps(points),
-            json.dumps(route_coords),
+            json.dumps(compact_route_coords),
             distance_km,
             duration_minutes,
             route_type,
@@ -162,7 +163,7 @@ def save_route(
         "name": name,
         "description": description,
         "points": points,
-        "route_coords": route_coords,
+        "route_coords": compact_route_coords,
         "distance_km": distance_km,
         "duration_minutes": duration_minutes,
         "route_type": route_type,
@@ -247,6 +248,7 @@ def update_route(route_id: str, updates: Dict) -> Optional[Dict]:
     # Güncellenebilir alanlar
     allowed = {"name", "description", "points", "route_coords", "distance_km",
                "duration_minutes", "route_type", "tags", "favorite"}
+    updates = updates or {}
     updates = {k: v for k, v in updates.items() if k in allowed}
 
     if not updates:
@@ -258,7 +260,7 @@ def update_route(route_id: str, updates: Dict) -> Optional[Dict]:
     if "points" in updates:
         updates["points"] = json.dumps(updates["points"])
     if "route_coords" in updates:
-        updates["route_coords"] = json.dumps(updates["route_coords"])
+        updates["route_coords"] = json.dumps(simplify_coords(updates["route_coords"]))
     if "tags" in updates:
         updates["tags"] = json.dumps(updates["tags"])
     if "favorite" in updates:

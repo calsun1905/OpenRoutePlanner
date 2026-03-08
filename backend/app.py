@@ -1,8 +1,8 @@
 ﻿"""
 app.py - Flask API Sunucusu
 
-Frontend ile Backend arasÄ±ndaki kÃ¶prÃ¼.
-Rota optimizasyonu ve POI arama endpoint'leri saÄŸlar.
+Frontend ile Backend arasındaki köprü.
+Rota optimizasyonu ve POI arama endpoint'leri sağlar.
 """
 import os
 
@@ -43,26 +43,27 @@ from location_storage import (
     toggle_location_favorite,
 )
 from storage_db import ensure_db, run_sqlite_maintenance
+from nlp_engine import parse_query as regex_parse_query
 
-# BERT NLP Engine (opsiyonel - kurulu deÄŸilse devre dÄ±ÅŸÄ±)
+# BERT NLP Engine (opsiyonel - kurulu değilse regex fallback kullanılır)
 try:
     from bert_nlp_engine import get_bert_nlp_engine, is_bert_available
     BERT_NLP_AVAILABLE = is_bert_available()
     if BERT_NLP_AVAILABLE:
-        print("[app.py] BERT NLP Engine yÃ¼klendi âœ…")
+        print("[app.py] BERT NLP Engine yüklendi")
     else:
-        print("[app.py] BERT NLP Engine bulunamadÄ± (transformers/float32 kurulu degil) [WARN]")
+        print("[app.py] BERT NLP Engine bulunamadı, regex fallback aktif [WARN]")
 except ImportError:
     BERT_NLP_AVAILABLE = False
-    print("[app.py] BERT NLP Engine modulu bulunamadi [WARN]")
+    print("[app.py] BERT NLP Engine modülü bulunamadı, regex fallback aktif [WARN]")
 
-# Frontend klasÃ¶rÃ¼nÃ¼n yolu
+# Frontend klasörünün yolu
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 CORS(app)  # Frontend'den gelen isteklere izin ver
 
-# Global deÄŸiÅŸkenler: cache
+# Global değişkenler: cache
 _graph_cache = {}
 _poi_cache = {}
 _startup_initialized = False
@@ -116,7 +117,7 @@ def api_get_route():
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data or "points" not in data:
             return jsonify({"error": "GeÃ§ersiz istek: 'points' alanÄ± gerekli."}), 400
@@ -239,7 +240,7 @@ def api_get_alternative_routes():
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data or "points" not in data:
             return jsonify({"error": "GeÃ§ersiz istek: 'points' alanÄ± gerekli."}), 400
@@ -331,7 +332,7 @@ def api_search_pois():
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data or "category" not in data:
             return jsonify({"error": "'category' alanÄ± gerekli."}), 400
@@ -407,7 +408,7 @@ def api_geocode():
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data or "place" not in data:
             return jsonify({"error": "'place' alanÄ± gerekli."}), 400
@@ -450,7 +451,7 @@ def api_reverse_geocode():
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data or "lat" not in data or "lon" not in data:
             return jsonify({"error": "'lat' ve 'lon' alanlarÄ± gerekli."}), 400
@@ -489,7 +490,7 @@ def api_geocode_batch():
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data or "places" not in data:
             return jsonify({"error": "'places' alanÄ± gerekli (liste)."}), 400
@@ -545,7 +546,10 @@ def api_save_route():
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+
+        if not data:
+            return jsonify({"error": "Geçersiz veya eksik JSON gövdesi."}), 400
         
         # Zorunlu alanlar
         required_fields = ["name", "points", "route_coords", "distance_km", "duration_minutes"]
@@ -649,7 +653,10 @@ def api_update_route(route_id):
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+
+        if not data:
+            return jsonify({"error": "Geçersiz veya eksik JSON gövdesi."}), 400
         
         route = update_route(route_id, data)
         
@@ -809,7 +816,7 @@ def api_create_timeline():
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         
         # Zorunlu alanlar
         if not data or "points" not in data:
@@ -871,7 +878,7 @@ def api_check_conflicts():
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         
         if not data or "schedule" not in data:
             return jsonify({"error": "'schedule' alanÄ± gerekli"}), 400
@@ -916,7 +923,7 @@ def api_optimize_timeline():
         }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         
         if not data or "schedule" not in data:
             return jsonify({"error": "'schedule' alanÄ± gerekli"}), 400
@@ -963,7 +970,10 @@ def api_save_location():
     Yeni bir lokasyon kaydeder.
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+
+        if not data:
+            return jsonify({"error": "Geçersiz veya eksik JSON gövdesi."}), 400
         
         required_fields = ["name", "lat", "lon"]
         for field in required_fields:
@@ -1012,7 +1022,11 @@ def api_update_location(location_id):
     Lokasyonu gÃ¼nceller.
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+
+        if not data:
+            return jsonify({"error": "Geçersiz veya eksik JSON gövdesi."}), 400
+
         location = update_location(location_id, data)
         
         if not location:
@@ -1078,27 +1092,28 @@ def api_nlp_parse():
             "error": null
         }
     """
-    if not BERT_NLP_AVAILABLE:
-        return jsonify({
-            "error": "BERT NLP Engine aktif deÄŸil. Gerekli kÃ¼tÃ¼phaneler kurulu deÄŸil: pip install transformers torch"
-        }), 503
-
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data or "query" not in data:
-            return jsonify({"error": "'query' alanÄ± gerekli"}), 400
+            return jsonify({"error": "'query' alanı gerekli"}), 400
 
         query = data["query"].strip()
 
         if not query or len(query) < 2:
-            return jsonify({"error": "Sorgu Ã§ok kÄ±sa"}), 400
+            return jsonify({"error": "Sorgu çok kısa"}), 400
 
         print(f"[NLP] Sorgu: {query}")
 
-        # NLP engine'i al ve sorguyu analiz et
-        nlp_engine = get_bert_nlp_engine()
-        result = nlp_engine.parse(query)
+        if BERT_NLP_AVAILABLE:
+            nlp_engine = get_bert_nlp_engine()
+            result = nlp_engine.parse(query)
+            result["engine"] = "bert-nlp"
+        else:
+            result = regex_parse_query(query)
+            result["detected_places"] = []
+            result["parse_time"] = 0.0
+            result["engine"] = "regex-fallback"
 
         print(f"[NLP] Tip: {result['type']} | Confidence: {result['confidence']:.2f}")
         if result.get('origin'):
@@ -1108,7 +1123,7 @@ def api_nlp_parse():
 
     except Exception as e:
         print(f"[NLP ERROR] {str(e)}")
-        return jsonify({"error": f"NLP hatasÄ±: {str(e)}"}), 500
+        return jsonify({"error": f"NLP hatası: {str(e)}"}), 500
 
 
 @app.route("/api/nlp/status", methods=["GET"])
@@ -1124,15 +1139,16 @@ def api_nlp_status():
         }
     """
     return jsonify({
-        "available": BERT_NLP_AVAILABLE,
-        "engine": "bert-nlp" if BERT_NLP_AVAILABLE else None,
-        "model": "dbmdz/bert-base-turkish-uncased" if BERT_NLP_AVAILABLE else None
+        "available": True,
+        "engine": "bert-nlp" if BERT_NLP_AVAILABLE else "regex-fallback",
+        "model": "dbmdz/bert-base-turkish-uncased" if BERT_NLP_AVAILABLE else None,
+        "bert_available": BERT_NLP_AVAILABLE
     })
 
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("  OpenTrip API Sunucusu BaÅŸlatÄ±lÄ±yor...")
+    print("  OpenTrip API Sunucusu Başlatılıyor...")
     print("  http://localhost:5000")
     print("=" * 50)
     app.run(debug=True, port=5000)
