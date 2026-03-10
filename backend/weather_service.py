@@ -11,7 +11,7 @@ Created: 2026-03-10
 import time
 import requests
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Local imports
 import logging
@@ -22,6 +22,7 @@ from weather_utils import (
     get_weather_emoji,
     build_cache_key,
     get_weather_alert,
+    get_weather_advice,
     summarize_weather_data
 )
 
@@ -32,6 +33,9 @@ from weather_utils import (
 OPENMETEO_BASE_URL = "https://api.open-meteo.com/v1/forecast"
 CACHE_TTL_SECONDS = 900  # 15 dakika
 REQUEST_TIMEOUT = 10  # saniye
+MAX_RETRIES = 2  # ilk deneme + 2 tekrar = toplam 3 deneme
+RETRY_BACKOFF_BASE_SECONDS = 0.4
+RETRY_BACKOFF_MAX_SECONDS = 2.0
 
 # Current weather variables
 CURRENT_WEATHER_PARAMS = [
@@ -349,40 +353,86 @@ def _fetch_from_openmeteo(url: str) -> dict:
         RateLimitError: Rate limit asimi
         ParseError: Response parse hatasi
     """
-    try:
-        logger.info(f"Fetching from OpenMeteo: {url}")
-        start_time = time.time()
+    attempts = MAX_RETRIES + 1
+    last_error = None
 
-        response = requests.get(url, timeout=REQUEST_TIMEOUT)
+    for attempt in range(1, attempts + 1):
+        try:
+            logger.info(
+                "Fetching from OpenMeteo (attempt %s/%s): %s",
+                attempt, attempts, url
+            )
+            start_time = time.time()
+            response = requests.get(url, timeout=REQUEST_TIMEOUT)
+            response_time_ms = (time.time() - start_time) * 1000
+            logger.info(
+                "OpenMeteo response received: status=%s, response_time_ms=%s",
+                response.status_code, round(response_time_ms, 2)
+            )
 
-        response_time_ms = (time.time() - start_time) * 1000
-        logger.info(
-            "OpenMeteo response received: status=%s, response_time_ms=%s",
-            response.status_code, round(response_time_ms, 2)
-        )
+            # Rate limit: backoff ile tekrar dene, son denemede hata ver.
+            if response.status_code == 429:
+                last_error = RateLimitError("OpenMeteo rate limit exceeded")
+                if attempt < attempts:
+                    _sleep_with_backoff(attempt)
+                    continue
+                raise last_error
 
-        # Rate limit kontrolu
-        if response.status_code == 429:
-            raise RateLimitError("OpenMeteo rate limit exceeded")
-
-        # Hata kontrolu
-        if response.status_code != 200:
-            error_msg = f"OpenMeteo API error: {response.status_code}"
+            # 5xx: gecici say, tekrar dene.
             if response.status_code >= 500:
-                raise NetworkError(error_msg)
-            else:
-                raise ParseError(error_msg)
+                last_error = NetworkError(f"OpenMeteo API error: {response.status_code}")
+                if attempt < attempts:
+                    _sleep_with_backoff(attempt)
+                    continue
+                raise last_error
 
-        return response.json()
+            # 4xx (429 haric): tekrar denemeden parse/client hatasi don.
+            if response.status_code != 200:
+                raise ParseError(f"OpenMeteo API error: {response.status_code}")
 
-    except requests.exceptions.Timeout:
-        raise NetworkError("Request timeout")
-    except requests.exceptions.ConnectionError:
-        raise NetworkError("Connection error")
-    except requests.exceptions.RequestException as e:
-        raise NetworkError(f"Request failed: {str(e)}")
-    except ValueError as e:
-        raise ParseError(f"Failed to parse JSON: {str(e)}")
+            return response.json()
+
+        except requests.exceptions.Timeout:
+            last_error = NetworkError("Request timeout")
+            if attempt < attempts:
+                _sleep_with_backoff(attempt)
+                continue
+        except requests.exceptions.ConnectionError:
+            last_error = NetworkError("Connection error")
+            if attempt < attempts:
+                _sleep_with_backoff(attempt)
+                continue
+        except requests.exceptions.RequestException as e:
+            last_error = NetworkError(f"Request failed: {str(e)}")
+            if attempt < attempts:
+                _sleep_with_backoff(attempt)
+                continue
+        except ValueError as e:
+            raise ParseError(f"Failed to parse JSON: {str(e)}")
+
+        # Son denemede raise etmek icin dongu sonuna dusebiliriz.
+        if attempt == attempts and last_error is not None:
+            raise last_error
+
+    if last_error is not None:
+        raise last_error
+    raise NetworkError("Unknown network error")
+
+
+def _sleep_with_backoff(attempt: int) -> None:
+    """
+    Retry denemeleri arasinda exponential backoff uygular.
+    """
+    delay = min(
+        RETRY_BACKOFF_MAX_SECONDS,
+        RETRY_BACKOFF_BASE_SECONDS * (2 ** max(attempt - 1, 0)),
+    )
+    logger.warning(
+        "OpenMeteo request retry scheduled: delay_seconds=%s, attempt=%s",
+        round(delay, 2),
+        attempt,
+    )
+    time.sleep(delay)
 
 
 def _build_url_current(lat: float, lon: float) -> str:
@@ -846,9 +896,86 @@ def get_hourly_forecast(
         raise
 
 
+def get_weather_at_time(
+    lat: float,
+    lon: float,
+    target_time_str: str,
+    use_cache: bool = True
+) -> Optional[dict]:
+    """
+    Belirli bir tarih/saat için saatlik forecast'ten hava durumu döner.
+
+    target_time_str: ISO 8601 datetime ("2026-03-10T09:00:00") veya saat ("09:00")
+    """
+    if not validate_coordinates(lat, lon):
+        return None
+
+    try:
+        if "T" in target_time_str:
+            target_dt = datetime.fromisoformat(target_time_str.replace("Z", "")).replace(tzinfo=None)
+        else:
+            ts = target_time_str if len(target_time_str) > 5 else f"{target_time_str}:00"
+            today = datetime.now().strftime("%Y-%m-%d")
+            target_dt = datetime.fromisoformat(f"{today}T{ts}")
+    except (ValueError, TypeError):
+        logger.warning(f"get_weather_at_time: geçersiz zaman formatı: {target_time_str!r}")
+        return None
+
+    try:
+        forecast_result = get_hourly_forecast(lat, lon, hours=48, use_cache=use_cache)
+        if not forecast_result.get("success"):
+            return None
+
+        hourly = forecast_result["data"]["hourly"]
+        times = hourly.get("time", [])
+        if not times:
+            return None
+
+        # En yakın saati bul
+        best_idx = 0
+        best_diff = float("inf")
+        for i, t in enumerate(times):
+            try:
+                dt = datetime.fromisoformat(t.replace("Z", "")).replace(tzinfo=None)
+                diff = abs((dt - target_dt).total_seconds())
+                if diff < best_diff:
+                    best_diff = diff
+                    best_idx = i
+            except (ValueError, TypeError):
+                continue
+
+        wc_list = hourly.get("weather_code", [])
+        temp_list = hourly.get("temperature", [])
+        precip_list = hourly.get("precipitation", [])
+        precip_prob_list = hourly.get("precipitation_probability", [])
+        wind_list = hourly.get("wind_speed", [])
+
+        weather_code = wc_list[best_idx] if best_idx < len(wc_list) else 0
+        parsed = parse_weather_code(weather_code)
+
+        data = {
+            "forecast_time": times[best_idx] if best_idx < len(times) else None,
+            "temperature": temp_list[best_idx] if best_idx < len(temp_list) else None,
+            "precipitation": precip_list[best_idx] if best_idx < len(precip_list) else None,
+            "precipitation_probability": precip_prob_list[best_idx] if best_idx < len(precip_prob_list) else None,
+            "weather_code": weather_code,
+            "weather_description": parsed.get("description", "Unknown"),
+            "weather_tr": parsed.get("tr", "Bilinmiyor"),
+            "weather_emoji": get_weather_emoji(weather_code),
+            "wind_speed": wind_list[best_idx] if best_idx < len(wind_list) else None,
+        }
+        data["advice"] = get_weather_advice(data)
+        return data
+    except Exception as e:
+        logger.warning(f"get_weather_at_time başarısız ({lat},{lon}) {target_time_str!r}: {e}")
+        return None
+
+
 def check_route_weather(
     points: List[Dict],
-    start_time: Optional[str] = None
+    start_time: Optional[str] = None,
+    segment_distances: Optional[List[float]] = None,
+    transport_mode: str = "walking"
 ) -> dict:
     """
     Rota boyunca hava durumunu kontrol eder.
@@ -913,7 +1040,19 @@ def check_route_weather(
     route_weather = []
     warnings = []
 
-    for point in points:
+    # Forecast modu: start_time ISO datetime formatında (tarih + saat içeriyor)
+    _speeds_kmh = {"walking": 5.0, "cycling": 15.0, "driving": 30.0}
+    _speed = _speeds_kmh.get(transport_mode, 5.0)
+    _use_forecast = False
+    _arrival_dt = None
+    if start_time and "T" in start_time:
+        try:
+            _arrival_dt = datetime.fromisoformat(start_time.replace("Z", "")).replace(tzinfo=None)
+            _use_forecast = True
+        except (ValueError, TypeError):
+            pass
+
+    for i, point in enumerate(points):
         # Support both "lat"/"lon" and "latitude"/"longitude" (common API conventions)
         lat = point.get("lat") or point.get("latitude")
         lon = point.get("lon") or point.get("longitude")
@@ -931,19 +1070,26 @@ def check_route_weather(
             continue
 
         try:
-            result = get_current_weather(lat, lon)
-            current = result["data"]["current"]
+            if _use_forecast and _arrival_dt is not None:
+                current = get_weather_at_time(lat, lon, _arrival_dt.isoformat())
+            else:
+                result = get_current_weather(lat, lon)
+                current = result["data"]["current"]
 
             # Uyari kontrolu
-            alert = get_weather_alert(current)
+            alert = get_weather_alert(current or {})
             if alert:
                 warnings.append(f"{name}: {alert}")
+
+            # Akıllı tavsiyeler
+            advice = get_weather_advice(current or {})
 
             route_weather.append({
                 "point": name,
                 "lat": lat,
                 "lon": lon,
-                "weather": current
+                "weather": current,
+                "advice": advice
             })
 
         except Exception as e:
@@ -955,6 +1101,11 @@ def check_route_weather(
                 "weather": None,
                 "error": str(e)
             })
+
+        # Bir sonraki nokta için tahmini varış zamanını güncelle
+        if _use_forecast and _arrival_dt is not None and segment_distances and i < len(segment_distances):
+            travel_minutes = int((segment_distances[i] / _speed) * 60)
+            _arrival_dt += timedelta(minutes=travel_minutes)
 
     # Genel durum degerlendirmesi
     overall_conditions = _evaluate_overall_conditions(route_weather)
@@ -1156,6 +1307,8 @@ def get_service_status() -> dict:
         "config": {
             "cache_ttl_seconds": CACHE_TTL_SECONDS,
             "request_timeout": REQUEST_TIMEOUT,
+            "max_retries": MAX_RETRIES,
+            "retry_backoff_base_seconds": RETRY_BACKOFF_BASE_SECONDS,
             "api_url": OPENMETEO_BASE_URL
         }
     }

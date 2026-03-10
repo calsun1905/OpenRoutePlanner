@@ -1060,6 +1060,91 @@ def get_weather_color_code(weather_code: int) -> str:
         return "#CCCCCC"
 
 
+def get_weather_advice(weather_data: Dict) -> Dict:
+    """
+    Hava durumuna gore akilli tavsiyeler uretir.
+
+    Returns:
+        dict: {
+            "alert_level": "info" | "warning" | "danger",
+            "items": [{"emoji": str, "text": str, "type": str}, ...]
+        }
+    """
+    if not weather_data:
+        return {"alert_level": "info", "items": []}
+
+    temp = weather_data.get("temperature", 20)
+    precipitation = weather_data.get("precipitation", 0) or 0
+    precip_prob = weather_data.get("precipitation_probability", 0) or 0
+    wind_speed = weather_data.get("wind_speed", 0) or 0
+    wind_gusts = weather_data.get("wind_gusts", 0) or 0
+    weather_code = weather_data.get("weather_code", 0) or 0
+
+    items = []
+    alert_level = "info"
+
+    # --- Yağış uyarıları ---
+    if weather_code >= 95:
+        items.append({"emoji": "⛈️", "text": "Fırtına var, dışarı çıkmaktan kaçının", "type": "storm"})
+        alert_level = "danger"
+    elif weather_code in [71, 73, 75, 77, 85, 86]:
+        items.append({"emoji": "❄️", "text": "Kar yağıyor, kaygan zemine dikkat edin", "type": "snow"})
+        alert_level = "warning"
+    elif weather_code in [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82]:
+        if precipitation > 5 or precip_prob > 70:
+            items.append({"emoji": "🌧️", "text": "Yoğun yağmur, şemsiye şart", "type": "umbrella"})
+            alert_level = "warning"
+        else:
+            items.append({"emoji": "☂️", "text": "Yağmur bekleniyor, şemsiye alın", "type": "umbrella"})
+            if alert_level == "info":
+                alert_level = "warning"
+    elif precip_prob >= 50:
+        items.append({"emoji": "🌂", "text": f"Yağış ihtimali %{precip_prob}, yanınıza şemsiye alın", "type": "umbrella"})
+        if alert_level == "info":
+            alert_level = "warning"
+
+    # --- Sıcaklık uyarıları ---
+    if temp <= -5:
+        items.append({"emoji": "🥶", "text": "Çok soğuk! Mont, bere, eldiven şart", "type": "cold"})
+        alert_level = "danger"
+    elif temp < 5:
+        items.append({"emoji": "🧥", "text": "Soğuk hava, kalın mont giyin", "type": "cold"})
+        if alert_level == "info":
+            alert_level = "warning"
+    elif temp < 12:
+        items.append({"emoji": "🧣", "text": "Serin hava, ceket veya hırka alın", "type": "cold"})
+    elif temp >= 38:
+        items.append({"emoji": "🌡️", "text": "Aşırı sıcak! Bol su için, güneşten kaçının", "type": "heat"})
+        alert_level = "danger"
+    elif temp >= 32:
+        items.append({"emoji": "☀️", "text": "Çok sıcak, bol su için ve gölgede kalın", "type": "heat"})
+        if alert_level == "info":
+            alert_level = "warning"
+    elif temp >= 26:
+        items.append({"emoji": "😎", "text": "Güneşli ve sıcak, güneş kremi öneririz", "type": "sun"})
+
+    # --- Rüzgar uyarıları ---
+    if wind_gusts > 70 or wind_speed > 55:
+        items.append({"emoji": "💨", "text": "Çok güçlü rüzgar, şemsiye işe yaramaz", "type": "wind"})
+        alert_level = "danger"
+    elif wind_gusts > 45 or wind_speed > 35:
+        items.append({"emoji": "🌬️", "text": "Kuvvetli rüzgar, dikkatli olun", "type": "wind"})
+        if alert_level == "info":
+            alert_level = "warning"
+
+    # --- Sis uyarısı ---
+    if weather_code in [45, 48]:
+        items.append({"emoji": "🌫️", "text": "Sisli hava, görüş mesafesi düşük", "type": "fog"})
+        if alert_level == "info":
+            alert_level = "warning"
+
+    # İki olumsuz durum varsa seviyeyi warning'e çek
+    if len(items) >= 2 and alert_level == "info":
+        alert_level = "warning"
+
+    return {"alert_level": alert_level, "items": items}
+
+
 def get_weather_background_class(weather_code: int) -> str:
     """
     Hava durumuna gore CSS class adi dondurur.

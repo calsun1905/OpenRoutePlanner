@@ -1869,3 +1869,176 @@ body {
     color: var(--text-muted);
     font-size: 0.9rem;
 }
+
+/* --- Weather Widget --- */
+.weather-widget {
+    position: absolute;
+    bottom: 70px;
+    right: 10px;
+    z-index: 1000;
+    background: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(108, 92, 231, 0.2);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    box-shadow: var(--shadow-card);
+    cursor: default;
+    min-width: 135px;
+    opacity: 1;
+    transition: opacity 1.2s ease, border-color var(--transition-fast);
+    pointer-events: auto;
+}
+
+.weather-widget.auto-hide {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.weather-widget:hover {
+    opacity: 1 !important;
+    pointer-events: auto;
+    border-color: rgba(108, 92, 231, 0.4);
+}
+
+.weather-widget-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.weather-widget .weather-emoji {
+    font-size: 1.8rem;
+    line-height: 1;
+}
+
+.weather-widget .weather-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.weather-widget .weather-temp {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.weather-widget .weather-desc {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Timeline weather badge */
+.timeline-weather {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 5px;
+    font-size: 0.75rem;
+}
+
+.tl-weather-emoji { font-size: 1rem; }
+
+.tl-weather-temp {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.tl-weather-desc { color: var(--text-secondary); }
+
+/* Timeline advice items */
+.timeline-advice {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border-left: 3px solid;
+}
+
+.timeline-advice-info  { border-color: var(--accent-secondary); background: rgba(0,206,201,0.07); }
+.timeline-advice-warning { border-color: #f9ca24; background: rgba(249,202,36,0.08); }
+.timeline-advice-danger  { border-color: #e17055; background: rgba(225,112,85,0.1); }
+
+.tl-advice-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+}
+.tl-advice-emoji { font-size: 0.9rem; }
+.tl-advice-text  { color: var(--text-secondary); }
+
+/* ===== Weather Banner ===== */
+.weather-banner {
+    position: absolute;
+    bottom: 160px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1100;
+    min-width: 280px;
+    max-width: 420px;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    padding: 12px 14px;
+    border: 1px solid rgba(108,92,231,0.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    transform: translateX(-50%) translateY(10px);
+}
+
+.weather-banner.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
+
+.weather-banner-info    { border-color: rgba(0,206,201,0.4); }
+.weather-banner-warning { border-color: rgba(249,202,36,0.5); }
+.weather-banner-danger  { border-color: rgba(225,112,85,0.6); }
+
+.weather-banner-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 8px;
+}
+.weather-banner-icon { font-size: 1.1rem; }
+.weather-banner-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    flex: 1;
+}
+.weather-banner-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0 3px;
+    line-height: 1;
+}
+.weather-banner-close:hover { color: var(--text-primary); }
+
+.weather-banner-items {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.weather-banner-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+.wbi-emoji { font-size: 1rem; flex-shrink: 0; }
+.wbi-text  { line-height: 1.4; }

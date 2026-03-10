@@ -117,6 +117,9 @@ function addPoint(lat, lng) {
     const index = selectedPoints.length;
     selectedPoints.push([lat, lng]);
 
+    // Hava durumu widget'ını bu noktaya göre güncelle
+    fetchWeatherWidget(lat, lng);
+
     // Marker ekle
     const marker = L.marker([lat, lng], {
         icon: createNumberedIcon(index + 1),
@@ -163,6 +166,15 @@ function removePoint(index) {
     updatePointsList();
     updateButtons();
     clearRoute();
+
+    // Son kalan noktanın hava durumunu göster, yoksa harita merkezi
+    if (selectedPoints.length > 0) {
+        const last = selectedPoints[selectedPoints.length - 1];
+        fetchWeatherWidget(last[0], last[1]);
+    } else {
+        const center = map.getCenter();
+        fetchWeatherWidget(center.lat, center.lng);
+    }
 }
 
 function clearAllPoints() {
@@ -173,6 +185,10 @@ function clearAllPoints() {
     updateButtons();
     clearRoute();
     showToast("Tüm noktalar silindi", "info");
+
+    // Noktalar temizlenince harita merkezine geri dön
+    const center = map.getCenter();
+    fetchWeatherWidget(center.lat, center.lng);
 }
 
 // ========== UI UPDATES ==========
@@ -320,6 +336,9 @@ async function calculateRoute() {
         showRouteInfo(data);
         updateButtons();  // Buton durumlarını güncelle
         showToast("Rota başarıyla hesaplandı! ✨", "success");
+
+        // Hava durumu uyarılarını göster (arka planda, rotayı engelleme)
+        checkRouteWeatherAndShowBanner(selectedPoints);
 
     } catch (error) {
         console.error("Rota hesaplama hatası:", error);
@@ -590,6 +609,9 @@ showToast("Haritaya tıklayarak başlayın! 🗺️", "info");
 // Kaydedilmiş rotaları ve yerleri yükle
 loadSavedRoutes();
 loadSavedLocations();
+
+// Hava durumu widget'inı başlat
+initWeatherWidget();
 
 // ========== PLACE SEARCH (GEOCODING) ==========
 
@@ -899,7 +921,7 @@ async function analyzeNaturalLanguageQuery() {
         const response = await fetch(`${API_BASE}/nlp/parse`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query }),
+            body: JSON.stringify({ query, debug: true }),
         });
 
         const data = await response.json();
@@ -1467,7 +1489,8 @@ async function generateTimeline() {
                 segment_distances: segmentDistances,
                 start_time: startTime,
                 visit_duration: visitDuration,
-                transport_mode: "walking"
+                transport_mode: "walking",
+                include_weather: true
             }),
         });
 
@@ -1552,6 +1575,19 @@ function displayTimeline(timeline) {
                     <div class="timeline-duration">
                         ⏱️ ${item.visit_duration_minutes} dakika kalış
                     </div>
+                    ${item.weather ? `
+                    <div class="timeline-weather">
+                        <span class="tl-weather-emoji">${item.weather.weather_emoji || '🌡️'}</span>
+                        <span class="tl-weather-temp">${item.weather.temperature != null ? Math.round(item.weather.temperature) + '°C' : ''}</span>
+                        <span class="tl-weather-desc">${escapeHtml(item.weather.weather_tr || item.weather.weather_description || '')}</span>
+                    </div>
+                    ${item.weather.advice && item.weather.advice.items && item.weather.advice.items.length > 0 ? `
+                    <div class="timeline-advice timeline-advice-${item.weather.advice.alert_level}">
+                        ${item.weather.advice.items.map(a =>
+                            `<span class="tl-advice-item"><span class="tl-advice-emoji">${a.emoji}</span><span class="tl-advice-text">${escapeHtml(a.text)}</span></span>`
+                        ).join('')}
+                    </div>` : ''}
+                    ` : ''}
                     ${!isLast ? `
                         <div class="timeline-travel">
                             🚶‍♂️ ${item.next_travel_time_minutes} dakika yürüyüş
@@ -1932,3 +1968,130 @@ document.addEventListener("click", function(e) {
         e.stopPropagation();
     }
 });
+
+// ========== WEATHER WIDGET ==========
+
+let _weatherWidgetTimer = null;
+let _weatherHideTimer = null;
+
+async function fetchWeatherWidget(lat, lon) {
+    const el = document.getElementById("weatherWidget");
+    if (!el) return;
+
+    try {
+        const resp = await fetch(`${API_BASE}/weather?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (!data.success) return;
+
+        const cur = data.data.current;
+        document.getElementById("weatherWidgetEmoji").textContent = cur.weather_emoji || "🌍";
+        document.getElementById("weatherWidgetTemp").textContent = `${Math.round(cur.temperature)}°C`;
+        document.getElementById("weatherWidgetDesc").textContent = cur.weather_tr || cur.weather_description || "—";
+
+        // Göster ve 5 sn sonra otomatik kaybet
+        el.style.display = "block";
+        el.classList.remove("auto-hide");
+        if (_weatherHideTimer) clearTimeout(_weatherHideTimer);
+        _weatherHideTimer = setTimeout(() => {
+            el.classList.add("auto-hide");
+        }, 5000);
+    } catch (e) {
+        // fail silently — widget gösterilmez
+    }
+}
+
+function initWeatherWidget() {
+    // Sayfa açıldığında harita merkezinden başla
+    const center = map.getCenter();
+    fetchWeatherWidget(center.lat, center.lng);
+    // Nokta eklenmediği sürece harita hareketiyle güncelleme yapma
+}
+
+// ========== WEATHER BANNER ==========
+
+let _weatherBannerTimer = null;
+
+async function checkRouteWeatherAndShowBanner(points) {
+    if (!points || points.length < 1) return;
+    try {
+        const pointsPayload = points.map((p, i) => ({
+            lat: p[0], lon: p[1], name: `Nokta ${i + 1}`
+        }));
+        const resp = await fetch(`${API_BASE}/weather/check-route`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ points: pointsPayload })
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (!data.success) return;
+
+        const routeWeather = data.data.route_weather || [];
+        showWeatherBanner(routeWeather);
+    } catch (e) {
+        // sessiz hata – banner olmadan devam
+    }
+}
+
+function showWeatherBanner(routeWeather) {
+    // Tüm noktalardan tavsiye topla, tekrar edenleri filtrele
+    const seenTypes = new Set();
+    const allItems = [];
+    let topLevel = "info";
+
+    const levelOrder = { danger: 3, warning: 2, info: 1 };
+
+    routeWeather.forEach(rw => {
+        const advice = rw.advice;
+        if (!advice || !advice.items) return;
+        if (levelOrder[advice.alert_level] > levelOrder[topLevel]) {
+            topLevel = advice.alert_level;
+        }
+        advice.items.forEach(item => {
+            if (!seenTypes.has(item.type)) {
+                seenTypes.add(item.type);
+                allItems.push({ ...item, point: rw.point });
+            }
+        });
+    });
+
+    if (allItems.length === 0) {
+        hideWeatherBanner();
+        return;
+    }
+
+    const banner = document.getElementById("weatherBanner");
+    if (!banner) return;
+
+    const iconMap = { info: "ℹ️", warning: "⚠️", danger: "🚨" };
+    const titleMap = { info: "Hava Durumu Bilgisi", warning: "Hava Durumu Uyarısı", danger: "Tehlikeli Hava Koşulları" };
+
+    let html = `
+        <div class="weather-banner-header">
+            <span class="weather-banner-icon">${iconMap[topLevel]}</span>
+            <span class="weather-banner-title">${titleMap[topLevel]}</span>
+            <button class="weather-banner-close" onclick="hideWeatherBanner()">✕</button>
+        </div>
+        <div class="weather-banner-items">
+    `;
+    allItems.forEach(item => {
+        html += `<div class="weather-banner-item">
+            <span class="wbi-emoji">${item.emoji}</span>
+            <span class="wbi-text">${escapeHtml(item.text)}</span>
+        </div>`;
+    });
+    html += `</div>`;
+
+    banner.innerHTML = html;
+    banner.className = `weather-banner weather-banner-${topLevel} visible`;
+
+    // 12 saniye sonra otomatik kapat
+    if (_weatherBannerTimer) clearTimeout(_weatherBannerTimer);
+    _weatherBannerTimer = setTimeout(hideWeatherBanner, 12000);
+}
+
+function hideWeatherBanner() {
+    const banner = document.getElementById("weatherBanner");
+    if (banner) banner.classList.remove("visible");
+}
