@@ -63,21 +63,29 @@ class BERTEngine:
             self.model = AutoModel.from_pretrained(self.MODEL_NAME)
 
             # Varsayilan davranis: GPU zorunlu.
-            # ORP_BERT_FORCE_GPU=0 verilirse CPU fallback'a izin verilir.
+            # ORP_BERT_FORCE_GPU=1: GPU istenir.
+            # ORP_BERT_STRICT_GPU=1: CUDA yoksa hard-fail (varsayilan).
             force_gpu = _env_flag("ORP_BERT_FORCE_GPU", True)
+            strict_gpu = _env_flag("ORP_BERT_STRICT_GPU", True)
             cuda_available = torch.cuda.is_available()
             torch_build = getattr(torch, "__version__", "unknown")
             cuda_runtime = getattr(getattr(torch, "version", None), "cuda", None)
 
             if force_gpu and not cuda_available:
-                raise RuntimeError(
-                    "GPU zorunlu mod acik (ORP_BERT_FORCE_GPU=1) ancak CUDA kullanilabilir degil.\n"
+                warn_message = (
+                    "GPU talep edildi (ORP_BERT_FORCE_GPU=1) ancak CUDA kullanilabilir degil.\n"
                     f"torch sürümü: {torch_build}, torch CUDA: {cuda_runtime}\n"
-                    "Muhtemel neden: CPU-only torch kurulumu.\n"
-                    "Cozum (venv aktifken):\n"
-                    "  pip uninstall -y torch torchvision torchaudio\n"
-                    "  pip install --index-url https://download.pytorch.org/whl/cu124 torch torchvision torchaudio"
+                    "CPU modunda devam edilecek."
                 )
+                if strict_gpu:
+                    raise RuntimeError(
+                        warn_message
+                        + "\nORP_BERT_STRICT_GPU=1 oldugu icin islem durduruldu.\n"
+                        "Cozum (venv aktifken):\n"
+                        "  pip uninstall -y torch torchvision torchaudio\n"
+                        "  pip install --index-url https://download.pytorch.org/whl/cu124 torch torchvision torchaudio"
+                    )
+                print(f"[BERT WARN] {warn_message}")
 
             # GPU varsa kullan, degilse (izinliyse) CPU fallback.
             self.device = "cuda" if cuda_available else "cpu"
@@ -165,6 +173,56 @@ class BERTEngine:
 
         return all_embeddings
 
+    def get_runtime_metrics(self) -> Dict[str, Any]:
+        """
+        BERT runtime donanım kullanım metriklerini döner.
+
+        Returns:
+            dict: cihaz, CUDA ve (varsa) GPU bellek metrikleri
+        """
+        metrics: Dict[str, Any] = {
+            "device": self.device,
+            "model": self.MODEL_NAME,
+        }
+
+        try:
+            import torch
+        except Exception as exc:
+            metrics["metrics_error"] = f"torch import hatasi: {exc}"
+            return metrics
+
+        metrics["torch_version"] = getattr(torch, "__version__", "unknown")
+        metrics["cuda_available"] = bool(torch.cuda.is_available())
+        metrics["torch_cuda_runtime"] = getattr(getattr(torch, "version", None), "cuda", None)
+
+        if self.device != "cuda" or not torch.cuda.is_available():
+            return metrics
+
+        try:
+            device_index = torch.cuda.current_device()
+            device_props = torch.cuda.get_device_properties(device_index)
+
+            total_mem_mb = device_props.total_memory / (1024 * 1024)
+            allocated_mb = torch.cuda.memory_allocated(device_index) / (1024 * 1024)
+            reserved_mb = torch.cuda.memory_reserved(device_index) / (1024 * 1024)
+            max_allocated_mb = torch.cuda.max_memory_allocated(device_index) / (1024 * 1024)
+
+            metrics.update(
+                {
+                    "gpu_name": torch.cuda.get_device_name(device_index),
+                    "gpu_index": device_index,
+                    "gpu_total_mem_mb": round(total_mem_mb, 1),
+                    "gpu_allocated_mb": round(allocated_mb, 1),
+                    "gpu_reserved_mb": round(reserved_mb, 1),
+                    "gpu_max_allocated_mb": round(max_allocated_mb, 1),
+                    "gpu_utilization_pct": round((allocated_mb / total_mem_mb) * 100, 2) if total_mem_mb else 0.0,
+                }
+            )
+        except Exception as exc:
+            metrics["metrics_error"] = f"cuda metrik hatasi: {exc}"
+
+        return metrics
+
     def similarity(self, text1: str, text2: str) -> float:
         """
         İki metin arasındaki cosine similarity'yi hesaplar.
@@ -241,8 +299,8 @@ class BERTEngine:
         if best_score >= threshold:
             return {
                 "match": best_match,
-                "similarity": best_score,
-                "index": best_idx
+                "similarity": float(best_score),
+                "index": int(best_idx)
             }
 
         return None

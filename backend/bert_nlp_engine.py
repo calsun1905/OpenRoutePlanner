@@ -102,6 +102,9 @@ QUERY_NOISE_WORDS = {
     "nasıl", "neler", "nereler", "var", "ne", "yapabilirim", "gez",
     "gezdir", "göster", "çiz", "hesapla", "bir", "ve", "ile", "bu",
     "yer", "nokta", "için", "yakında", "yakın", "istiyorum",
+    "gitmek", "gidelim", "gideyim", "gidelım",
+    "dolaş", "dolas", "dolaşalım", "dolasalim", "dolaşmak", "dolasmak",
+    "gezelim", "plani", "planı", "turu", "turu",
     "merhaba", "selam", "nasılsın", "nasilsin", "bugün", "yarın", "yarin",
     "hava", "durumu", "mı", "mi", "mu", "mü"
 }
@@ -229,7 +232,10 @@ def normalize_token_with_role(token: str) -> Tuple[str, Optional[str]]:
                     break
         if role_hint is None:
             for suffix in LOC_SUFFIXES:
-                if lowered.endswith(suffix) and len(lowered) > len(suffix) + 2:
+                # "-da/-de/-ta/-te" plain ek soyma kuralı çok agresif olursa
+                # "Galata" gibi gerçek yer adlarını yanlış kırpar.
+                # Bu yüzden daha uzun tokenlarda uygula.
+                if lowered.endswith(suffix) and len(lowered) > len(suffix) + 4:
                     stem, role_hint = lowered[:-len(suffix)], "loc"
                     break
 
@@ -485,7 +491,8 @@ class PlaceDatabase:
         query: str,
         query_embedding: np.ndarray,
         threshold: float = 0.75,
-        bert_engine = None
+        bert_engine = None,
+        allow_below_threshold: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """
         Sorguya en yakın yer ismini bulur.
@@ -514,6 +521,7 @@ class PlaceDatabase:
                 "place": canonical_name,
                 "similarity": 1.0,
                 "index": self._place_name_to_index.get(canonical_name, -1),
+                "source": "lookup-exact",
             }
 
         def score_embeddings(embedding_matrix: np.ndarray) -> Optional[Dict[str, Any]]:
@@ -534,7 +542,8 @@ class PlaceDatabase:
             return {
                 "place": self._place_names[best_idx],
                 "similarity": float(similarities[best_idx]),
-                "index": best_idx
+                "index": best_idx,
+                "source": "embedding-cache",
             }
 
         embeddings = self._embeddings
@@ -546,6 +555,7 @@ class PlaceDatabase:
             return best_match
 
         # OSM-first modunda OSM adayları önce beslenmiş olur; burada ise son fallback çalışır.
+        refreshed_match = None
         if self._use_osm and (best_match is None or best_match["similarity"] < 0.50):
             print(f"[OSM API] '{query}' aranıyor...")
             added = self.cache_osm_results(query)
@@ -556,7 +566,13 @@ class PlaceDatabase:
                     refreshed_embeddings = self.get_embedding_matrix(bert_engine)
                     refreshed_match = score_embeddings(refreshed_embeddings)
                     if refreshed_match and refreshed_match["similarity"] >= threshold:
+                        refreshed_match["source"] = "embedding-osm-refresh"
                         return refreshed_match
+
+        if allow_below_threshold:
+            fallback_match = refreshed_match or best_match
+            if fallback_match:
+                return fallback_match
 
         return None
 
@@ -840,7 +856,7 @@ class BertNLPEngine:
         self._template_embeddings = embeddings
         return embeddings
 
-    def classify_query_type(self, query: str) -> Tuple[str, float]:
+    def classify_query_type_with_scores(self, query: str) -> Tuple[str, float, Dict[str, float]]:
         """
         Sorgunun tipini sınıflandırır.
 
@@ -848,13 +864,14 @@ class BertNLPEngine:
             query: Kullanıcı sorgusu
 
         Returns:
-            (query_type, confidence): "route", "poi", "multi", "single", "unknown"
+            (query_type, confidence, score_map)
         """
         query_embedding = self.bert.encode(query)
         template_embeddings = self._get_template_embeddings()
 
         best_type = "unknown"
         best_score = 0.0
+        score_map: Dict[str, float] = {}
 
         # Her query type için ortalama similarity hesapla
         for query_type, template_embs in template_embeddings.items():
@@ -868,6 +885,7 @@ class BertNLPEngine:
 
             # Ortalama similarity
             avg_score = np.mean(scores) if scores else 0.0
+            score_map[query_type] = float(avg_score)
 
             if avg_score > best_score:
                 best_score = avg_score
@@ -875,11 +893,18 @@ class BertNLPEngine:
 
         # Threshold altındaysa unknown
         if best_score < 0.5:
-            return "unknown", best_score
+            return "unknown", float(best_score), score_map
 
-        return best_type, best_score
+        return best_type, float(best_score), score_map
 
-    def extract_places(self, query: str) -> List[Dict[str, Any]]:
+    def classify_query_type(self, query: str) -> Tuple[str, float]:
+        """
+        Sorgunun tipini sınıflandırır.
+        """
+        query_type, confidence, _ = self.classify_query_type_with_scores(query)
+        return query_type, confidence
+
+    def extract_places(self, query: str, trace: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
         Sorgudan yer isimlerini çıkarır.
 
@@ -896,6 +921,7 @@ class BertNLPEngine:
         """
         best_matches = {}
         candidate_spans = extract_candidate_spans(query, max_ngram=3)
+        span_trace_rows = [] if trace is not None else None
 
         # OSM-first: Önce sorgudan canlı adaylar çekip aday havuzunu besle.
         self.places.prefetch_osm_candidates(query, bert_engine=self.bert, max_queries=6)
@@ -907,10 +933,43 @@ class BertNLPEngine:
                 query=span["normalized"],
                 query_embedding=span_embedding,
                 threshold=threshold,
-                bert_engine=self.bert
+                bert_engine=self.bert,
+                allow_below_threshold=(trace is not None),
             )
 
             if not match:
+                if span_trace_rows is not None:
+                    span_trace_rows.append({
+                        "surface": span["surface"],
+                        "normalized": span["normalized"],
+                        "role_hint": span["role_hint"],
+                        "token_count": span["token_count"],
+                        "threshold": float(threshold),
+                        "best_place": None,
+                        "best_similarity": None,
+                        "best_similarity_percent": None,
+                        "accepted": False,
+                        "reason": "no-match",
+                    })
+                continue
+
+            accepted = float(match.get("similarity", 0.0)) >= float(threshold)
+            if span_trace_rows is not None:
+                span_trace_rows.append({
+                    "surface": span["surface"],
+                    "normalized": span["normalized"],
+                    "role_hint": span["role_hint"],
+                    "token_count": span["token_count"],
+                    "threshold": float(threshold),
+                    "best_place": match.get("place"),
+                    "best_similarity": float(match.get("similarity", 0.0)),
+                    "best_similarity_percent": round(float(match.get("similarity", 0.0)) * 100.0, 2),
+                    "accepted": accepted,
+                    "match_source": match.get("source"),
+                    "reason": "accepted" if accepted else "below-threshold",
+                })
+
+            if not accepted:
                 continue
 
             candidate = {
@@ -955,6 +1014,12 @@ class BertNLPEngine:
             found_places = found_places[:5]
 
         found_places.sort(key=lambda item: (item["start"], -item["token_count"], -item["similarity"]))
+
+        if trace is not None:
+            trace["candidate_spans"] = span_trace_rows or []
+            trace["span_count"] = len(candidate_spans)
+            trace["accepted_span_count"] = sum(1 for row in (span_trace_rows or []) if row.get("accepted"))
+
         return found_places
 
     def detect_route_direction(self, query: str, detected_places: List[Dict[str, Any]]) -> Dict[str, Optional[str]]:
@@ -1060,7 +1125,7 @@ class BertNLPEngine:
         )[0]
         return best["place"]
 
-    def parse(self, query: str) -> Dict[str, Any]:
+    def parse(self, query: str, include_trace: bool = False) -> Dict[str, Any]:
         """
         Ana parse fonksiyonu.
 
@@ -1091,11 +1156,15 @@ class BertNLPEngine:
                 "detected_places": []
             }
 
+        trace_data: Optional[Dict[str, Any]] = {} if include_trace else None
+
         # 1. Sorgu tipini sınıflandır
-        query_type, type_confidence = self.classify_query_type(query)
+        query_type, type_confidence, type_scores = self.classify_query_type_with_scores(query)
+        initial_query_type = query_type
+        initial_type_confidence = float(type_confidence)
 
         # 2. Yer isimlerini çıkar
-        detected_places = self.extract_places(query)
+        detected_places = self.extract_places(query, trace=trace_data)
         ordered_places = sorted(
             detected_places,
             key=lambda item: (item.get("start", 0), -item.get("token_count", 1), -item.get("similarity", 0.0))
@@ -1125,6 +1194,20 @@ class BertNLPEngine:
         elif len(place_names) >= 2 and {"from", "to"}.issubset(role_hints):
             query_type = "route"
             type_confidence = max(float(type_confidence), 0.78)
+
+        if trace_data is not None:
+            trace_data["query"] = query
+            trace_data["query_type_initial"] = initial_query_type
+            trace_data["confidence_initial"] = initial_type_confidence
+            trace_data["query_type_final"] = query_type
+            trace_data["confidence_final"] = float(type_confidence)
+            trace_data["type_scores"] = {k: float(v) for k, v in type_scores.items()}
+            trace_data["intent_signals"] = {
+                "has_poi_cue": has_poi_cue,
+                "has_multi_cue": has_multi_cue,
+                "role_hints": sorted(role_hints),
+                "detected_place_names": place_names,
+            }
 
         # 3. Numpy değerlerini Python native türlere çevir (JSON için)
         detected_places_json = [
@@ -1169,12 +1252,41 @@ class BertNLPEngine:
                 result["error"] = "Sorgu anlaşılamadı"
 
         elif query_type == "multi":
-            # Tüm yer isimlerini locations'a ekle
-            result["locations"] = place_names if len(place_names) >= 2 else place_names
+            # Çoklu sorguda tekil span'ler (token_count=1) genelde daha güvenilir.
+            strong_single_places = []
+            seen_places = set()
+            for item in ordered_places:
+                if int(item.get("token_count", 1)) != 1:
+                    continue
+                if float(item.get("similarity", 0.0)) < 0.78:
+                    continue
+                place = item.get("place")
+                if not place or place in seen_places:
+                    continue
+                seen_places.add(place)
+                strong_single_places.append(place)
+
+            if len(strong_single_places) >= 2:
+                result["locations"] = strong_single_places
+            else:
+                result["locations"] = place_names if len(place_names) >= 2 else place_names
 
         elif query_type == "single":
             # Tek hedefte önce "to" rol ipucunu, yoksa ilk yeri kullan
             destination_match = next((p for p in ordered_places if p.get("role_hint") == "to"), None)
+            if destination_match is None:
+                single_token_candidates = [p for p in ordered_places if int(p.get("token_count", 1)) == 1]
+                candidate_pool = single_token_candidates if single_token_candidates else ordered_places
+                if candidate_pool:
+                    destination_match = sorted(
+                        candidate_pool,
+                        key=lambda p: (
+                            -float(p.get("similarity", 0.0)),
+                            int(p.get("token_count", 1)),
+                            int(p.get("start", 0)),
+                        ),
+                    )[0]
+
             result["destination"] = destination_match["place"] if destination_match else (place_names[0] if place_names else None)
 
         elif query_type == "unknown":
@@ -1204,6 +1316,16 @@ class BertNLPEngine:
 
         # Parse süresi
         result["parse_time"] = time.time() - start_time
+        if trace_data is not None:
+            trace_data["parse_time_ms"] = round(float(result["parse_time"]) * 1000.0, 2)
+            trace_data["selected"] = {
+                "type": result.get("type"),
+                "origin": result.get("origin"),
+                "destination": result.get("destination"),
+                "location": result.get("location"),
+                "locations": result.get("locations"),
+            }
+            result["trace"] = trace_data
 
         return result
 

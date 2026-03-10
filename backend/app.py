@@ -5,6 +5,53 @@ Frontend ile Backend arasındaki köprü.
 Rota optimizasyonu ve POI arama endpoint'leri sağlar.
 """
 import os
+import sys
+import json
+import time
+import builtins
+from datetime import datetime
+from functools import partial
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    """ENV'den bool değer okur."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_float(name: str, default: float) -> float:
+    """ENV'den float değer okur."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw.strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def _configure_live_console_output() -> None:
+    """
+    Console stream buffering'i azaltır ve print'i anlık flush edecek şekilde ayarlar.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(line_buffering=True, write_through=True)
+            except TypeError:
+                reconfigure(line_buffering=True)
+
+    if _env_flag("ORP_LOG_FORCE_PRINT_FLUSH", True):
+        if not getattr(builtins.print, "__orp_forced_flush__", False):
+            forced_print = partial(builtins.print, flush=True)
+            setattr(forced_print, "__orp_forced_flush__", True)
+            builtins.print = forced_print
+
+
+_configure_live_console_output()
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -62,6 +109,7 @@ try:
         get_current_weather,
         get_hourly_forecast,
         check_route_weather,
+        get_weather_at_time,
         get_service_status,
         clear_cache as clear_weather_cache,
         health_check as weather_health_check
@@ -96,27 +144,142 @@ Compress(app)  # gzip compression aktif et - %60-70 bandwidth tasarrufu
 # Global değişkenler: LRU cache manager
 _graph_cache_manager = get_graph_cache()
 _poi_cache_manager = get_poi_cache()
-_startup_initialized = False
+_runtime_initialized = False
+_graph_preload_initialized = False
+_last_bert_metrics_log_ts = 0.0
+
+# BERT donanım metrik logları:
+# ORP_BERT_LOG_METRICS=1/0
+# ORP_BERT_METRICS_INTERVAL_SEC=float (default 0.5s)
+_BERT_METRICS_LOG_ENABLED = _env_flag("ORP_BERT_LOG_METRICS", True)
+_BERT_METRICS_INTERVAL_SEC = max(0.0, _env_float("ORP_BERT_METRICS_INTERVAL_SEC", 0.5))
+_PRELOAD_POPULAR_REGIONS_ON_STARTUP = _env_flag("ORP_PRELOAD_POPULAR_REGIONS_ON_STARTUP", True)
+_BERT_PARSE_TRACE_LOG_ENABLED = _env_flag("ORP_BERT_PARSE_TRACE", True)
+
+
+def _should_log_bert_metrics(force: bool = False) -> bool:
+    """BERT metrik loglarının hızını sınırlar."""
+    global _last_bert_metrics_log_ts
+    if not _BERT_METRICS_LOG_ENABLED:
+        return False
+    now = time.time()
+    if force or (now - _last_bert_metrics_log_ts) >= _BERT_METRICS_INTERVAL_SEC:
+        _last_bert_metrics_log_ts = now
+        return True
+    return False
+
+
+def _log_bert_runtime_metrics(stage: str, bert_engine_instance=None, force: bool = False) -> None:
+    """
+    BERT runtime donanım kullanımını loglar.
+    """
+    if not _should_log_bert_metrics(force=force):
+        return
+
+    try:
+        engine = bert_engine_instance
+        if engine is None:
+            from bert_engine import get_bert_engine
+            engine = get_bert_engine()
+
+        if engine is None or not hasattr(engine, "get_runtime_metrics"):
+            print(f"[BERT METRICS] {stage} | metrik API mevcut degil")
+            return
+
+        metrics = engine.get_runtime_metrics()
+        print(f"[BERT METRICS] {stage} | {json.dumps(metrics, ensure_ascii=False)}")
+    except Exception as metric_exc:
+        print(f"[BERT METRICS] {stage} | toplanamadi: {metric_exc}")
+
+
+def _log_bert_parse_trace(trace: dict) -> None:
+    """
+    BERT parse trace bilgisini okunabilir satirlar halinde yazdirir.
+    """
+    try:
+        if not trace:
+            print("[BERT TRACE] Trace verisi yok")
+            return
+
+        print("[BERT TRACE] --- Parse Karar Akisi ---")
+        print(
+            "[BERT TRACE] Tip: %s (%.2f) -> %s (%.2f)" % (
+                trace.get("query_type_initial", "unknown"),
+                float(trace.get("confidence_initial", 0.0)),
+                trace.get("query_type_final", "unknown"),
+                float(trace.get("confidence_final", 0.0)),
+            )
+        )
+
+        scores = trace.get("type_scores") or {}
+        if scores:
+            ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+            score_text = ", ".join(f"{k}={float(v)*100:.1f}%" for k, v in ordered)
+            print(f"[BERT TRACE] Type scorelari: {score_text}")
+
+        signals = trace.get("intent_signals") or {}
+        print(
+            "[BERT TRACE] Sinyaller: poi_cue=%s | multi_cue=%s | role_hints=%s"
+            % (
+                bool(signals.get("has_poi_cue")),
+                bool(signals.get("has_multi_cue")),
+                signals.get("role_hints", []),
+            )
+        )
+
+        span_rows = trace.get("candidate_spans") or []
+        for idx, row in enumerate(span_rows, start=1):
+            best_place = row.get("best_place") or "-"
+            sim_percent = row.get("best_similarity_percent")
+            sim_text = "-" if sim_percent is None else f"{float(sim_percent):.2f}%"
+            threshold = float(row.get("threshold", 0.0)) * 100.0
+            print(
+                "[BERT TRACE] Span#%s '%s' -> %s | sim=%s | esik=%.2f%% | kabul=%s | sebep=%s | kaynak=%s"
+                % (
+                    idx,
+                    row.get("surface", ""),
+                    best_place,
+                    sim_text,
+                    threshold,
+                    bool(row.get("accepted")),
+                    row.get("reason", "-"),
+                    row.get("match_source", "-"),
+                )
+            )
+
+        selected = trace.get("selected") or {}
+        print(f"[BERT TRACE] Secilen cikti: {json.dumps(selected, ensure_ascii=False)}")
+        print(f"[BERT TRACE] Parse sure: {trace.get('parse_time_ms', '-') } ms")
+        print("[BERT TRACE] --------------------------")
+    except Exception as trace_exc:
+        print(f"[BERT TRACE] log yazdirilamadi: {trace_exc}")
 
 
 def initialize_runtime() -> None:
     """
-    Calisma zamani baslangic gorevlerini bir kez calistirir.
-    Flask calisma seklinden bagimsiz olarak ayni davranir.
+    Calisma zamani temel baslangic gorevlerini bir kez calistirir.
     """
-    global _startup_initialized
-    if _startup_initialized:
+    global _runtime_initialized
+    if _runtime_initialized:
         return
 
     ensure_db(run_analyze=True)
     run_sqlite_maintenance(checkpoint_mode="PASSIVE")
     purge_old_geocodes(days=90)
 
-    # Populer bölgelerin grafilerini ön yükle
-    # İlk rota hesaplamalarını %80 daha hızlı yapar
-    preload_popular_regions()
+    _runtime_initialized = True
 
-    _startup_initialized = True
+
+def initialize_graph_preload() -> None:
+    """
+    Populer bolgelerin grafilerini bir kez on yukler.
+    """
+    global _graph_preload_initialized
+    if _graph_preload_initialized:
+        return
+
+    preload_popular_regions()
+    _graph_preload_initialized = True
 
 
 
@@ -135,7 +298,13 @@ def _get_cached_graph(place_name: str):
     _graph_cache_manager.put(place_name, graph)
     return graph
 
-initialize_runtime()
+
+@app.before_request
+def _ensure_runtime_initialized():
+    """
+    WSGI/moduler import senaryolarinda runtime gorevlerini lazy baslatir.
+    """
+    initialize_runtime()
 
 
 def _disable_bert_runtime(exc: Exception) -> None:
@@ -954,9 +1123,29 @@ def api_create_timeline():
         
         if "error" in timeline:
             return jsonify(timeline), 400
-        
+
+        # Hava durumu entegrasyonu (opsiyonel)
+        include_weather = data.get("include_weather", False)
+        if include_weather and WEATHER_SERVICE_AVAILABLE and "schedule" in timeline:
+            today = datetime.now().strftime("%Y-%m-%d")
+            for item in timeline["schedule"]:
+                coords = item.get("coordinates") or [None, None]
+                lat = coords[0] if len(coords) > 0 else None
+                lon = coords[1] if len(coords) > 1 else None
+                arrival_time = item.get("arrival_time", "")
+                if lat is not None and lon is not None and arrival_time:
+                    try:
+                        item["weather"] = get_weather_at_time(
+                            lat, lon, f"{today}T{arrival_time}:00"
+                        )
+                    except Exception:
+                        item["weather"] = None
+                else:
+                    item["weather"] = None
+            timeline["weather_included"] = True
+
         return jsonify(timeline)
-    
+
     except Exception as e:
         # print(f"[API] Timeline oluşturma hatası: {e}"))
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
@@ -1235,6 +1424,7 @@ def api_nlp_parse():
             return jsonify({"error": "'query' alanı metin olmalı"}), 400
 
         query = query_value.strip()
+        debug_trace_requested = bool(data.get("debug", False)) or _BERT_PARSE_TRACE_LOG_ENABLED
 
         if not query or len(query) < 2:
             print(f"[NLP API] ❌ Sorgu çok kısa")
@@ -1250,8 +1440,16 @@ def api_nlp_parse():
         print(f"[NLP API] 🤖 BERT motoru kullanılıyor...")
         try:
             nlp_engine = get_bert_nlp_engine()
-            result = nlp_engine.parse(query)
+            _log_bert_runtime_metrics(
+                stage="parse:before",
+                bert_engine_instance=getattr(nlp_engine, "bert", None)
+            )
+            result = nlp_engine.parse(query, include_trace=debug_trace_requested)
             result["engine"] = "bert-nlp"
+            _log_bert_runtime_metrics(
+                stage="parse:after",
+                bert_engine_instance=getattr(nlp_engine, "bert", None)
+            )
             print(f"[NLP API] ✅ BERT parse başarılı")
         except Exception as bert_exc:
             print(f"[NLP API] ❌ BERT hatası: {bert_exc}")
@@ -1266,6 +1464,8 @@ def api_nlp_parse():
             print(f"[NLP API]    - Rota: {result['origin']} → {result.get('destination', '?')}")
         if result.get('detected_places'):
             print(f"[NLP API]    - Tespit edilen yerler: {[p['place'] for p in result['detected_places']]}")
+        if debug_trace_requested:
+            _log_bert_parse_trace(result.get("trace") or {})
         print(f"[NLP API] 📤 Dönen response: {result}")
         print(f"{'='*60}\n")
 
@@ -1340,10 +1540,12 @@ def api_nlp_similarity():
         print(f"[NLP API] 🔄 BERT engine yükleniyor...")
         from bert_engine import get_bert_engine
         engine = get_bert_engine()
+        _log_bert_runtime_metrics(stage="similarity:before", bert_engine_instance=engine)
         print(f"[NLP API] ✅ BERT engine hazır")
 
         print(f"[NLP API] 🧮 Benzerlik hesaplanıyor...")
         similarity = engine.similarity(text1, text2)
+        _log_bert_runtime_metrics(stage="similarity:after", bert_engine_instance=engine)
         print(f"[NLP API] ✅ Sonuç: {similarity:.4f}")
 
         result = {
@@ -1411,10 +1613,12 @@ def api_nlp_best_match():
         print(f"[NLP API] 🔄 BERT engine yükleniyor...")
         from bert_engine import get_bert_engine
         engine = get_bert_engine()
+        _log_bert_runtime_metrics(stage="best-match:before", bert_engine_instance=engine)
         print(f"[NLP API] ✅ BERT engine hazır")
 
         print(f"[NLP API] 🧮 En iyi eşleşme aranıyor...")
         result = engine.find_best_match(query, candidates, threshold=threshold)
+        _log_bert_runtime_metrics(stage="best-match:after", bert_engine_instance=engine)
 
         if result:
             print(f"[NLP API] ✅ Eşleşme bulundu: {result['match']} (benzerlik: {result['similarity']:.4f})")
@@ -1596,13 +1800,15 @@ def api_check_route_weather():
 
         points = data["points"]
         start_time = data.get("start_time")
+        segment_distances = data.get("segment_distances")
+        transport_mode = data.get("transport_mode", "walking")
 
         if not points or len(points) == 0:
             return jsonify({"error": "En az bir nokta gerekli"}), 400
 
-        print(f"[Weather] Route check: {len(points)} points")
+        print(f"[Weather] Route check: {len(points)} noktalar, forecast={'evet' if start_time and 'T' in str(start_time) else 'hayır'}")
 
-        result = check_route_weather(points, start_time)
+        result = check_route_weather(points, start_time, segment_distances, transport_mode)
 
         if result.get("success"):
             return jsonify(result)
@@ -1690,5 +1896,7 @@ if __name__ == "__main__":
     print("  OpenTrip API Sunucusu Başlatılıyor...")
     print("  http://localhost:5000")
     print("=" * 50)
+    initialize_runtime()
+    if _PRELOAD_POPULAR_REGIONS_ON_STARTUP:
+        initialize_graph_preload()
     app.run(debug=False, port=5000)
-
