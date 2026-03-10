@@ -37,6 +37,7 @@ def test_nlp_status(client):
     data = rv.get_json()
     assert 'available' in data
     assert 'engine' in data
+    assert data.get('available') == data.get('bert_available')
 
 
 def test_nlp_parse_with_query(client):
@@ -44,11 +45,10 @@ def test_nlp_parse_with_query(client):
     rv = client.post('/api/nlp/parse',
                     json={'query': 'İstanbul\'dan Ankara\'ya rota çiz'},
                     content_type='application/json')
-    assert rv.status_code in [200, 503]  # 503 if BERT not installed
+    assert rv.status_code == 200
     data = rv.get_json()
-    if rv.status_code == 200:
-        assert 'type' in data
-        assert 'confidence' in data
+    assert 'type' in data
+    assert 'confidence' in data
 
 
 def test_nlp_parse_empty_query(client):
@@ -56,7 +56,17 @@ def test_nlp_parse_empty_query(client):
     rv = client.post('/api/nlp/parse',
                     json={'query': ''},
                     content_type='application/json')
-    assert rv.status_code in [400, 503]
+    assert rv.status_code == 400
+
+
+def test_nlp_parse_non_string_query(client):
+    """NLP parse endpoint testi - query string olmalı"""
+    rv = client.post('/api/nlp/parse',
+                    json={'query': 123},
+                    content_type='application/json')
+    assert rv.status_code == 400
+    data = rv.get_json()
+    assert 'error' in data
 
 
 def test_geocode_forward(client):

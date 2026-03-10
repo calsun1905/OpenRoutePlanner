@@ -594,19 +594,40 @@ loadSavedLocations();
 // ========== PLACE SEARCH (GEOCODING) ==========
 
 // Debounce: yazmayı bitirdikten sonra öneri isteği at
+// İyileştirme: Request cancellation + adaptive delay
 let suggestDebounceTimer = null;
+let suggestAbortController = null;
 const SUGGEST_DELAY_MS = 400;
+const SUGGEST_DELAY_MS_SHORT = 200;  // Kısa sorgular için daha hızlı
 
 elPlaceSearchInput.addEventListener("input", function () {
-    clearTimeout(suggestDebounceTimer);
     const query = elPlaceSearchInput.value.trim();
 
     if (query.length < 2) {
         elSearchResults.style.display = "none";
+        clearTimeout(suggestDebounceTimer);
+        if (suggestAbortController) {
+            suggestAbortController.abort();  // Bekleyen isteği iptal et
+        }
         return;
     }
 
-    suggestDebounceTimer = setTimeout(() => fetchSuggestions(query), SUGGEST_DELAY_MS);
+    // Önceki isteği iptal et
+    if (suggestAbortController) {
+        suggestAbortController.abort();
+    }
+
+    // Yeni AbortController oluştur
+    suggestAbortController = new AbortController();
+
+    // Adaptive delay: kısa sorgular daha hızlı, uzun sorgular daha yavaş
+    const delay = query.length < 4 ? SUGGEST_DELAY_MS_SHORT : SUGGEST_DELAY_MS;
+
+    clearTimeout(suggestDebounceTimer);
+    suggestDebounceTimer = setTimeout(
+        () => fetchSuggestions(query, suggestAbortController.signal),
+        delay
+    );
 });
 
 // Enter tuşu ile tam arama
@@ -633,10 +654,12 @@ document.addEventListener("click", function (e) {
 
 /**
  * Yazarken öneri listesi getirir (autocomplete)
+ * İyileştirme: AbortController ile request cancellation
  */
-async function fetchSuggestions(query) {
+async function fetchSuggestions(query, signal = null) {
     try {
-        const response = await fetch(`${API_BASE}/geocode/suggest?q=${encodeURIComponent(query)}&limit=6`);
+        const options = signal ? { signal } : {};
+        const response = await fetch(`${API_BASE}/geocode/suggest?q=${encodeURIComponent(query)}&limit=6`, options);
         const data = await response.json();
 
         if (data.status !== "success" || !data.suggestions || data.suggestions.length === 0) {
@@ -663,6 +686,10 @@ async function fetchSuggestions(query) {
             });
         });
     } catch (err) {
+        // AbortError ise sessizce geç (kullanıcı hala yazıyor)
+        if (err.name === 'AbortError') {
+            return;
+        }
         console.error("Öneri hatası:", err);
         elSearchResults.style.display = "none";
     }
