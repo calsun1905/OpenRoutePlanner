@@ -1,12 +1,15 @@
-﻿"""
+"""
 storage_db.py - SQLite veritabani baglantisi ve sema
 
 Rota ve lokasyon verileri icin ortak app_data.db kullanir.
+Connection pooling ile performans iyilestirmesi.
 """
 
 import os
 import sqlite3
 import threading
+import time
+from typing import Optional
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 DB_PATH = os.path.join(DATA_DIR, "app_data.db")
@@ -16,10 +19,95 @@ os.makedirs(DATA_DIR, exist_ok=True)
 _SCHEMA_READY = False
 _SCHEMA_LOCK = threading.Lock()
 
+# Connection pooling: Her thread icin tek bir connection
+# Bu sayede ayni thread'deki istekler ayni baglantiyi tekrar kullanir
+_thread_local = threading.local()
 
-def get_connection() -> sqlite3.Connection:
-    """Veritabani baglantisi doner."""
-    conn = sqlite3.connect(DB_PATH)
+# Connection pool yapilandirmasi
+_MAX_CONNECTION_AGE_SECONDS = 300  # 5 dakika sonra baglanti yenilensin
+_POOL_ENABLED = True  # Connection pooling aktif/pasif
+
+
+class _PooledConnection:
+    """
+    Connection wrapper sınıfı.
+    close() çağrıldığında bağlantıyı gerçekten kapatmak yerine
+    pool'a geri döndürür. Bu sayede mevcut kodla uyumludur.
+    """
+
+    def __init__(self, conn: sqlite3.Connection, pool_key: str = 'default'):
+        self._conn = conn
+        self._pool_key = pool_key
+        self._closed = False
+
+    def __getattr__(self, name):
+        """Tüm çağrıları gerçek bağlantıya yönlendir."""
+        if self._closed:
+            raise sqlite3.ProgrammingError("Connection is closed")
+        return getattr(self._conn, name)
+
+    def cursor(self):
+        """Cursor döndür."""
+        if self._closed:
+            raise sqlite3.ProgrammingError("Connection is closed")
+        return self._conn.cursor()
+
+    def execute(self, sql, parameters=()):
+        """SQL çalıştır."""
+        if self._closed:
+            raise sqlite3.ProgrammingError("Connection is closed")
+        return self._conn.execute(sql, parameters)
+
+    def executemany(self, sql, seq_of_parameters=()):
+        """Çoklu SQL çalıştır."""
+        if self._closed:
+            raise sqlite3.ProgrammingError("Connection is closed")
+        return self._conn.executemany(sql, seq_of_parameters)
+
+    def commit(self):
+        """Transaction commit."""
+        if self._closed:
+            raise sqlite3.ProgrammingError("Connection is closed")
+        return self._conn.commit()
+
+    def rollback(self):
+        """Transaction rollback."""
+        if self._closed:
+            raise sqlite3.ProgrammingError("Connection is closed")
+        return self._conn.rollback()
+
+    def close(self):
+        """
+        Baglantiyi kapatir.
+        Pool modunda: Gerçekten kapatmaz, sadece işaretler.
+        Normal modunda: Gerçekten kapatır.
+        """
+        if self._closed:
+            return
+
+        self._closed = True
+        # Pool'da tutulan referansı temizle
+        if hasattr(_thread_local, 'connection') and _thread_local.connection is self._conn:
+            _thread_local.connection = None
+
+    @property
+    def row_factory(self):
+        return self._conn.row_factory
+
+    @row_factory.setter
+    def row_factory(self, value):
+        self._conn.row_factory = value
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+
+def _create_connection() -> sqlite3.Connection:
+    """Yeni bir baglanti olusturur ve performans ayarlarini yapar."""
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
 
     # Performans optimizasyonlari
@@ -30,6 +118,70 @@ def get_connection() -> sqlite3.Connection:
     conn.execute("PRAGMA temp_store = MEMORY;")
 
     return conn
+
+
+def get_connection() -> sqlite3.Connection:
+    """
+    Veritabani baglantisi doner.
+    Connection pooling: Ayni thread'deki cagrilarda ayni baglantiyi tekrar kullanir.
+
+    Not: close() çağrıldığında bağlantı pool'a döner, gerçekten kapanmaz.
+    """
+    if not _POOL_ENABLED:
+        return _create_connection()
+
+    current_time = time.time()
+
+    # Thread-local connection kontrol et
+    if not hasattr(_thread_local, 'raw_connection') or _thread_local.raw_connection is None:
+        _thread_local.raw_connection = _create_connection()
+        _thread_local.connection_created_at = current_time
+        return _PooledConnection(_thread_local.raw_connection)
+
+    # Baglanti yaslanmis mi kontrol et
+    conn_age = current_time - _thread_local.connection_created_at
+    if conn_age > _MAX_CONNECTION_AGE_SECONDS:
+        # Eski baglantiyi kapat ve yenisini olustur
+        try:
+            _thread_local.raw_connection.close()
+        except Exception:
+            pass  # Zaten kapali olabilir
+        _thread_local.raw_connection = _create_connection()
+        _thread_local.connection_created_at = current_time
+        return _PooledConnection(_thread_local.raw_connection)
+
+    # Baglanti hala gecerli mi kontrol et
+    try:
+        _thread_local.raw_connection.execute("SELECT 1")
+    except sqlite3.Error:
+        # Baglanti bozulmus, yenisini olustur
+        _thread_local.raw_connection = _create_connection()
+        _thread_local.connection_created_at = current_time
+
+    return _PooledConnection(_thread_local.raw_connection)
+
+
+def close_connection() -> None:
+    """
+    Mevcut thread'in baglantisini kapatir.
+    Connection pool'u temizlemek icin kullanilabilir.
+    """
+    if hasattr(_thread_local, 'raw_connection') and _thread_local.raw_connection is not None:
+        try:
+            _thread_local.raw_connection.close()
+        except Exception:
+            pass
+        _thread_local.raw_connection = None
+
+
+def close_all_connections() -> None:
+    """
+    Tum thread'lerin baglantilarini kapatir.
+    Uygulama kapatilirken cagrilmalidir.
+    """
+    global _thread_local
+    close_connection()
+    _thread_local = threading.local()
 
 
 def init_schema(conn: sqlite3.Connection, run_analyze: bool = False) -> None:

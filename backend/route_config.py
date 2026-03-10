@@ -1,5 +1,5 @@
 """
-route_config.py - Rota Motoru Konfigürasyon Sabitleri v3.0
+route_config.py - Rota Motoru Konfigürasyon Sabitleri v3.1
 
 route_engine.py içindeki tüm hardcoded değerlerin merkezi referansı.
 Şu an sadece referans amaçlı — ilerleyen aşamada route_engine.py buradan okuyacak.
@@ -25,6 +25,25 @@ ROUTE_CONFIG = {
     "GRAPH_RADIUS_MIN_M": 500,
     "GRAPH_RADIUS_PADDING_M": 300,
     "GRAPH_RADIUS_MAX_M": 3500,
+
+    # =========================================================================
+    # CACHE YÖNETİMİ — LRU Cache Ayarları
+    # =========================================================================
+
+    # Graph cache maksimum boyutu (RAM'de tutulan graf sayısı)
+    "GRAPH_CACHE_MAXSIZE": 10,
+
+    # Graph cache TTL (saniye) - 1 saat sonra yeniden yüklenir
+    "GRAPH_CACHE_TTL": 3600,
+
+    # Graph cache dizini (disk)
+    "GRAPH_CACHE_DIR": "backend/data",
+
+    # POI cache maksimum boyutu
+    "POI_CACHE_MAXSIZE": 50,
+
+    # POI cache TTL (saniye) - 30 dakika
+    "POI_CACHE_TTL": 1800,
 
     # =========================================================================
     # OVERLAP (ÖRTÜŞMe) EŞİKLERİ — dynamic_overlap_threshold()

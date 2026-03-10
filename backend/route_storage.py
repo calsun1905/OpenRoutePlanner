@@ -216,8 +216,11 @@ def get_route(route_id: str) -> Optional[Dict]:
     return _row_to_route(row) if row else None
 
 
-def get_all_routes(sort_by: str = "created_at", limit: int = None) -> List[Dict]:
-    """Tüm rotaları getirir."""
+def get_all_routes(sort_by: str = "created_at", limit: int = None, offset: int = 0) -> List[Dict]:
+    """
+    Tüm rotaları getirir.
+    Pagination desteği eklenmiştir.
+    """
     ensure_db()
     _migrate_from_json_if_needed()
 
@@ -231,14 +234,30 @@ def get_all_routes(sort_by: str = "created_at", limit: int = None) -> List[Dict]
 
     conn = get_connection()
     cursor = conn.cursor()
+
+    # Önce toplam sayıyı al
+    cursor.execute("SELECT COUNT(*) FROM routes")
+    total_count = cursor.fetchone()[0]
+
     sql = f"SELECT * FROM routes ORDER BY {order}"
     if limit:
-        sql += f" LIMIT {int(limit)}"
+        sql += f" LIMIT {int(limit)} OFFSET {int(offset)}"
     cursor.execute(sql)
     rows = cursor.fetchall()
     conn.close()
 
     return [_row_to_route(row) for row in rows]
+
+
+def get_routes_count() -> int:
+    """Toplam rota sayısını döner."""
+    ensure_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM routes")
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
 
 
 def update_route(route_id: str, updates: Dict) -> Optional[Dict]:

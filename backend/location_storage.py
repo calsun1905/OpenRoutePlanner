@@ -158,8 +158,11 @@ def _get_location_by_id(location_id: str) -> Optional[Dict]:
     return _row_to_location(row) if row else None
 
 
-def get_all_locations(sort_by: str = "created_at", limit: int = None) -> List[Dict]:
-    """Tüm lokasyonları getirir."""
+def get_all_locations(sort_by: str = "created_at", limit: int = None, offset: int = 0) -> List[Dict]:
+    """
+    Tüm lokasyonları getirir.
+    Pagination desteği eklenmiştir.
+    """
     ensure_db()
     _migrate_from_json_if_needed()
 
@@ -174,12 +177,23 @@ def get_all_locations(sort_by: str = "created_at", limit: int = None) -> List[Di
     cursor = conn.cursor()
     sql = f"SELECT * FROM locations ORDER BY {order}"
     if limit:
-        sql += f" LIMIT {int(limit)}"
+        sql += f" LIMIT {int(limit)} OFFSET {int(offset)}"
     cursor.execute(sql)
     rows = cursor.fetchall()
     conn.close()
 
     return [_row_to_location(row) for row in rows]
+
+
+def get_locations_count() -> int:
+    """Toplam lokasyon sayısını döner."""
+    ensure_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM locations")
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
 
 
 def increment_usage(location_id: str) -> Optional[Dict]:

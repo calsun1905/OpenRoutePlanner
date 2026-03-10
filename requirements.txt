@@ -1,12 +1,19 @@
 flask==3.1.0
 flask-cors==5.0.1
+flask-compress==1.17
 osmnx==2.0.1
 networkx==3.4.2
 scikit-learn==1.6.1
 pandas==2.2.3
 requests==2.32.3
 transformers==4.48.0
-torch==2.5.1
 sentence-transformers==3.3.1
+# PyTorch CUDA 13.0 için manuel kurulum gereklidir:
+# pip uninstall torch -y
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+# (RTX 5070 / Blackwell desteği için CUDA 13.0 gerekir)
 pytest==8.0.0
 pytest-cov==4.0.0
+# Data validation and settings management
+pydantic==2.10.4
+pydantic-settings==2.6.1
