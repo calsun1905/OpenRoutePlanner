@@ -138,6 +138,24 @@ Cache stratejisi:
 
 ---
 
+## Kabul Kriterleri (Olculebilir)
+
+1. Faz 1 endpoint kapsami:
+   - `GET /api/weather`, `GET /api/weather/forecast`, `POST /api/weather/check-route` endpoint'leri calisir durumda olmali
+2. Faz 1 dogrulama:
+   - Her endpoint icin en az 1 basarili + 1 hatali senaryo testi olmali
+3. Performans:
+   - Cache hit durumunda weather endpoint p95 <= 250 ms
+   - Cache miss durumunda weather endpoint p95 <= 1200 ms
+4. Cache davranisi:
+   - Ayni lokasyon/saat araliginda 15 dk icinde tekrarlayan isteklerde dis API cagrisi azaltilmali (cache hit metriği kayda alinmali)
+5. Faz 2 timeline entegrasyonu:
+   - Timeline'da her segment icin en az `sicaklik`, `yagis olasiligi`, `ruzgar` alanlari gorunmeli
+6. Faz 3 oneriler:
+   - Hava kosuluna bagli en az 3 farkli kural (yagmur/sicak/ruzgar) aktif ve testli olmali
+
+---
+
 ## Baglantili Dokumanlar
 
 - `docs/planlar/bert-gelistirme-akisi.md`
