@@ -13,8 +13,10 @@ Model: dbmdz/bert-base-turkish-uncased
 Yer Verisi: OpenStreetMap (Nominatim API)
 """
 
+import os
 import re
 import time
+import threading
 import requests
 from typing import Dict, List, Optional, Any, Tuple
 import numpy as np
@@ -46,16 +48,17 @@ except ImportError:
         def get_all_locations(): return []
 
 try:
-    from local_places import save_dynamic_place, get_dynamic_place_names
+    from local_places import save_dynamic_place, get_dynamic_place_names, get_all_local_place_names
 except ImportError:
     try:
         import sys
         from pathlib import Path
         sys.path.insert(0, str(Path(__file__).parent))
-        from local_places import save_dynamic_place, get_dynamic_place_names
+        from local_places import save_dynamic_place, get_dynamic_place_names, get_all_local_place_names
     except ImportError:
         def save_dynamic_place(*args, **kwargs): return None
         def get_dynamic_place_names(limit=500): return []
+        def get_all_local_place_names(limit=2000, include_dynamic=True): return []
 
 
 
@@ -98,7 +101,19 @@ QUERY_NOISE_WORDS = {
     "rota", "rotası", "yol", "güzergah", "git", "gidilir", "giderim",
     "nasıl", "neler", "nereler", "var", "ne", "yapabilirim", "gez",
     "gezdir", "göster", "çiz", "hesapla", "bir", "ve", "ile", "bu",
-    "yer", "nokta", "için", "yakında", "yakın", "istiyorum"
+    "yer", "nokta", "için", "yakında", "yakın", "istiyorum",
+    "merhaba", "selam", "nasılsın", "nasilsin", "bugün", "yarın", "yarin",
+    "hava", "durumu", "mı", "mi", "mu", "mü"
+}
+
+POI_CUE_WORDS = {
+    "neler", "nereler", "nerede", "civar", "civarinda", "çevre", "cevre",
+    "yakın", "yakin", "var", "kahve", "yemek", "müze", "muze",
+    "gezilecek", "göster", "goster", "mekan",
+}
+
+MULTI_CUE_WORDS = {
+    "ve", "gezi", "tur", "turu", "plan", "plani", "dolaş", "dolas", ",",
 }
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9ÇĞİÖŞÜçğıöşü]+(?:['’`][A-Za-z0-9ÇĞİÖŞÜçğıöşü]+)?")
@@ -117,6 +132,62 @@ COMMON_ALIASES = {
     "ortakoy": "ortaköy",
     "bakirkoy": "bakırköy",
 }
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    """ENV'den bool değer okur."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+_TR_FOLD_TABLE = str.maketrans(
+    {
+        "ç": "c",
+        "ğ": "g",
+        "ı": "i",
+        "ö": "o",
+        "ş": "s",
+        "ü": "u",
+    }
+)
+
+
+def normalize_place_key(value: str) -> str:
+    """Yer adı karşılaştırmaları için normalize anahtar üretir."""
+    text = normalize_query_text(value or "").casefold()
+    text = re.sub(r"[^a-z0-9çğıöşü\s]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return COMMON_ALIASES.get(text, text)
+
+
+def build_place_lookup_keys(value: str) -> List[str]:
+    """Yer lookup için varyasyonlu anahtar listesi üretir."""
+    base = normalize_place_key(value)
+    if not base:
+        return []
+
+    keys = set()
+    variants = {base}
+
+    # Türkçe buffer harfi nedeniyle kayıp/ekli "y" varyantı.
+    if base.endswith("y") and len(base) > 2:
+        variants.add(base[:-1])
+    else:
+        variants.add(base + "y")
+
+    for item in variants:
+        if not item:
+            continue
+        keys.add(item)
+        keys.add(item.translate(_TR_FOLD_TABLE))
+        aliased = COMMON_ALIASES.get(item)
+        if aliased:
+            keys.add(aliased)
+            keys.add(aliased.translate(_TR_FOLD_TABLE))
+
+    return [k for k in keys if k]
 
 
 def normalize_query_text(text: str) -> str:
@@ -258,17 +329,28 @@ class PlaceDatabase:
         self,
         use_osm: bool = False,
         prefer_osm_first: bool = False,
+        seed_dynamic_cache: bool = True,
+        seed_local_places: bool = True,
         seed_static_places: bool = True,
         seed_user_locations: bool = True,
     ):
         self._places = {}  # {name: embedding}
         self._place_names = []  # List[str]
+        self._place_name_to_index = {}  # {name: index}
+        self._normalized_place_lookup = {}  # {normalized_key: canonical_name}
         self._embeddings = None  # np.ndarray matrix
         self._use_osm = use_osm  # OSM API açık mı?
         self._prefer_osm_first = prefer_osm_first
+        # {normalized_query: {"added_count": int, "expires_at": float}}
         self._osm_query_cache = {}
 
-        self._seed_dynamic_cache()
+        if seed_dynamic_cache:
+            self._seed_dynamic_cache()
+
+        if seed_local_places:
+            # local_places tablosundan yalnızca seed kayıtları çekilir.
+            # Dinamik OSM cache ayrı bir adımda yönetilir.
+            self._seed_local_places(include_dynamic=False)
 
         if seed_user_locations:
             self._seed_user_locations()
@@ -301,6 +383,20 @@ class PlaceDatabase:
                 print(f"[PlaceDB] {user_loc_count} özel kullanıcı lokasyonu eklendi.")
         except Exception as e:
             print(f"[PlaceDB] Kullanıcı lokasyonları yüklenemedi: {e}")
+
+    def _seed_local_places(self, include_dynamic: bool = True):
+        """local_places tablosundaki kayıtları ekler."""
+        try:
+            local_places = get_all_local_place_names(limit=2000, include_dynamic=include_dynamic)
+            added = 0
+            for place in local_places:
+                if place not in self._places:
+                    self.add_place(place)
+                    added += 1
+            if added > 0:
+                print(f"[PlaceDB] local_places kaynagi eklendi: {added} yer")
+        except Exception as e:
+            print(f"[PlaceDB] local_places yuklenemedi: {e}")
 
     def _seed_turkish_places(self):
         """Türkiye'nin tüm yer isimlerini yükler."""
@@ -356,6 +452,13 @@ class PlaceDatabase:
             else:
                 self._places[place_name] = embedding
             self._place_names.append(place_name)
+            self._place_name_to_index[place_name] = len(self._place_names) - 1
+            normalized_key = normalize_place_key(place_name)
+            if normalized_key and normalized_key not in self._normalized_place_lookup:
+                self._normalized_place_lookup[normalized_key] = place_name
+            folded_key = normalized_key.translate(_TR_FOLD_TABLE) if normalized_key else ""
+            if folded_key and folded_key not in self._normalized_place_lookup:
+                self._normalized_place_lookup[folded_key] = place_name
             self._embeddings = None  # Reset matrix
 
     def get_embedding_matrix(self, bert_engine) -> np.ndarray:
@@ -402,6 +505,16 @@ class PlaceDatabase:
 
         if not self._place_names:
             return None
+
+        for lookup_key in build_place_lookup_keys(query):
+            canonical_name = self._normalized_place_lookup.get(lookup_key)
+            if not canonical_name:
+                continue
+            return {
+                "place": canonical_name,
+                "similarity": 1.0,
+                "index": self._place_name_to_index.get(canonical_name, -1),
+            }
 
         def score_embeddings(embedding_matrix: np.ndarray) -> Optional[Dict[str, Any]]:
             similarities = np.dot(embedding_matrix, query_embedding)
@@ -520,10 +633,13 @@ class PlaceDatabase:
         if len(normalized_query) < 2:
             return 0
 
-        if normalized_query in self._osm_query_cache:
-            return self._osm_query_cache[normalized_query]
+        now = time.time()
+        cache_entry = self._osm_query_cache.get(normalized_query)
+        if cache_entry and cache_entry.get("expires_at", 0) > now:
+            return int(cache_entry.get("added_count", 0))
 
         added_count = 0
+        request_succeeded = False
 
         try:
             params = {
@@ -541,6 +657,7 @@ class PlaceDatabase:
             )
 
             if response.status_code == 200:
+                request_succeeded = True
                 data = response.json()
 
                 for item in data:
@@ -567,11 +684,22 @@ class PlaceDatabase:
                     )
 
                 time.sleep(self.OSM_RATE_LIMIT)
+            else:
+                print(f"[OSM API] Beklenmeyen status: {response.status_code}")
 
         except Exception as e:
             print(f"[OSM API] Hata: {e}")
 
-        self._osm_query_cache[normalized_query] = added_count
+        # Ağ/HTTP hatalarında cache yazma; böylece sonraki denemede tekrar sorgulanır.
+        if request_succeeded:
+            ttl_seconds = 3600 if added_count > 0 else 300
+            self._osm_query_cache[normalized_query] = {
+                "added_count": added_count,
+                "expires_at": time.time() + ttl_seconds,
+            }
+        else:
+            self._osm_query_cache.pop(normalized_query, None)
+
         return added_count
 
     def _build_osm_prefetch_queries(self, query: str, max_queries: int = 6) -> List[str]:
@@ -664,12 +792,26 @@ class BertNLPEngine:
         # BERT engine'i al (singleton)
         self.bert = get_bert_engine()
 
+        # Konfigürasyon: ENV ile runtime davranışı kontrol edilebilir.
+        # ORP_BERT_USE_OSM=1/0
+        # ORP_BERT_PREFER_OSM_FIRST=1/0
+        # ORP_BERT_SEED_STATIC=1/0
+        # ORP_BERT_SEED_USER_LOCATIONS=1/0
+        use_osm = _env_flag("ORP_BERT_USE_OSM", True)
+        prefer_osm_first = _env_flag("ORP_BERT_PREFER_OSM_FIRST", False)
+        seed_dynamic_cache = _env_flag("ORP_BERT_SEED_DYNAMIC", use_osm)
+        seed_local_places = _env_flag("ORP_BERT_SEED_LOCAL", True)
+        seed_static_places = _env_flag("ORP_BERT_SEED_STATIC", True)
+        seed_user_locations = _env_flag("ORP_BERT_SEED_USER_LOCATIONS", True)
+
         # Yer ismi veritabanı (OSM API desteği ile)
         self.places = PlaceDatabase(
-            use_osm=True,
-            prefer_osm_first=True,
-            seed_static_places=False,
-            seed_user_locations=True,
+            use_osm=use_osm,
+            prefer_osm_first=prefer_osm_first,
+            seed_dynamic_cache=seed_dynamic_cache,
+            seed_local_places=seed_local_places,
+            seed_static_places=seed_static_places,
+            seed_user_locations=seed_user_locations,
         )
 
         # Yer isimleri için embedding matrix'i HESAPLA
@@ -760,7 +902,7 @@ class BertNLPEngine:
 
         for span in candidate_spans:
             span_embedding = self.bert.encode(span["normalized"])
-            threshold = 0.75 if span["token_count"] == 1 else 0.65
+            threshold = 0.78 if span["token_count"] == 1 else 0.70
             match = self.places.find_best_match(
                 query=span["normalized"],
                 query_embedding=span_embedding,
@@ -805,7 +947,7 @@ class BertNLPEngine:
 
         found_places = [
             item for item in best_matches.values()
-            if item["similarity"] >= 0.65
+            if item["similarity"] >= 0.72
         ]
 
         if len(found_places) > 5:
@@ -834,22 +976,33 @@ class BertNLPEngine:
             key=lambda item: (item.get("start", 0), -item.get("token_count", 1), -item.get("similarity", 0.0))
         )
 
+        def select_best(items: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+            if not items:
+                return None
+            return sorted(
+                items,
+                key=lambda item: (
+                    -float(item.get("similarity", 0.0)),
+                    item.get("token_count", 1),
+                    item.get("start", 0),
+                ),
+            )[0]
+
         origin = None
         destination = None
         origin_item = None
         destination_item = None
 
-        for item in ordered_places:
-            if item.get("role_hint") == "from":
-                origin_item = item
-                origin = item["place"]
-                break
+        from_candidates = [item for item in ordered_places if item.get("role_hint") == "from"]
+        to_candidates = [item for item in ordered_places if item.get("role_hint") == "to"]
 
-        for item in ordered_places:
-            if item.get("role_hint") == "to" and item["place"] != origin:
-                destination_item = item
-                destination = item["place"]
-                break
+        origin_item = select_best(from_candidates)
+        if origin_item:
+            origin = origin_item["place"]
+
+        destination_item = select_best([item for item in to_candidates if item["place"] != origin])
+        if destination_item:
+            destination = destination_item["place"]
 
         if origin_item and not destination:
             for item in ordered_places:
@@ -875,6 +1028,37 @@ class BertNLPEngine:
                     break
 
         return {"origin": origin, "destination": destination}
+
+    def _choose_best_poi_location(self, ordered_places: List[Dict[str, Any]]) -> Optional[str]:
+        """POI sorgularında en güvenilir lokasyon adayını seçer."""
+        if not ordered_places:
+            return None
+
+        exact_candidates = [p for p in ordered_places if float(p.get("similarity", 0.0)) >= 0.999]
+        if exact_candidates:
+            exact_candidates.sort(key=lambda p: (p.get("token_count", 1), p.get("start", 0)))
+            return exact_candidates[0]["place"]
+
+        role_loc_candidates = [p for p in ordered_places if p.get("role_hint") == "loc"]
+        if role_loc_candidates:
+            role_loc_candidates.sort(
+                key=lambda p: (
+                    p.get("token_count", 1),
+                    -float(p.get("similarity", 0.0)),
+                    p.get("start", 0),
+                )
+            )
+            return role_loc_candidates[0]["place"]
+
+        best = sorted(
+            ordered_places,
+            key=lambda p: (
+                -float(p.get("similarity", 0.0)),
+                p.get("token_count", 1),
+                p.get("start", 0),
+            ),
+        )[0]
+        return best["place"]
 
     def parse(self, query: str) -> Dict[str, Any]:
         """
@@ -917,6 +1101,30 @@ class BertNLPEngine:
             key=lambda item: (item.get("start", 0), -item.get("token_count", 1), -item.get("similarity", 0.0))
         )
         place_names = [p["place"] for p in ordered_places]
+        role_hints = {p.get("role_hint") for p in ordered_places if p.get("role_hint")}
+        normalized_query = normalize_place_key(query)
+        query_tokens = set(normalized_query.split())
+        has_poi_cue = bool(query_tokens & POI_CUE_WORDS)
+        has_multi_cue = bool(query_tokens & MULTI_CUE_WORDS) or ("," in query)
+
+        # Intent'i span tabanlı sinyallerle rafine et.
+        if (
+            len(place_names) >= 3
+            and ("from" not in role_hints and "to" not in role_hints)
+            and has_multi_cue
+            and not has_poi_cue
+        ):
+            query_type = "multi"
+            type_confidence = max(float(type_confidence), 0.78)
+        elif query_type == "route" and has_poi_cue and ("from" not in role_hints and "to" not in role_hints):
+            query_type = "poi"
+            type_confidence = max(float(type_confidence), 0.75)
+        if len(place_names) >= 2 and ("from" in role_hints):
+            query_type = "route"
+            type_confidence = max(float(type_confidence), 0.80)
+        elif len(place_names) >= 2 and {"from", "to"}.issubset(role_hints):
+            query_type = "route"
+            type_confidence = max(float(type_confidence), 0.78)
 
         # 3. Numpy değerlerini Python native türlere çevir (JSON için)
         detected_places_json = [
@@ -954,10 +1162,11 @@ class BertNLPEngine:
                 result["destination"] = place_names[1]
 
         elif query_type == "poi":
-            # Önce location ipucu olan span'i kullan, yoksa metindeki ilk yeri al
-            location_match = next((p for p in ordered_places if p.get("role_hint") == "loc"), None)
-            result["location"] = location_match["place"] if location_match else (place_names[0] if place_names else None)
+            result["location"] = self._choose_best_poi_location(ordered_places)
             result["query_type"] = "search"
+            if not result["location"]:
+                result["type"] = "unknown"
+                result["error"] = "Sorgu anlaşılamadı"
 
         elif query_type == "multi":
             # Tüm yer isimlerini locations'a ekle
@@ -974,13 +1183,22 @@ class BertNLPEngine:
                 result["type"] = "multi"
                 result["locations"] = place_names
             elif len(place_names) == 2:
-                result["type"] = "route"
-                direction = self.detect_route_direction(query, ordered_places)
-                result["origin"] = direction["origin"] or place_names[0]
-                result["destination"] = direction["destination"] or place_names[1]
+                strong_match = all(p.get("similarity", 0.0) >= 0.78 for p in ordered_places[:2])
+                has_direction_hint = bool({"from", "to"} & role_hints)
+                if strong_match or has_direction_hint:
+                    result["type"] = "route"
+                    direction = self.detect_route_direction(query, ordered_places)
+                    result["origin"] = direction["origin"] or place_names[0]
+                    result["destination"] = direction["destination"] or place_names[1]
+                else:
+                    result["error"] = "Sorgu anlaşılamadı"
             elif len(place_names) == 1:
-                result["type"] = "single"
-                result["destination"] = place_names[0]
+                single_candidate = ordered_places[0]
+                if single_candidate.get("similarity", 0.0) >= 0.82 and single_candidate.get("role_hint") == "to":
+                    result["type"] = "single"
+                    result["destination"] = place_names[0]
+                else:
+                    result["error"] = "Sorgu anlaşılamadı"
             else:
                 result["error"] = "Sorgu anlaşılamadı"
 
@@ -995,6 +1213,7 @@ class BertNLPEngine:
 # =============================================================================
 
 _bert_nlp_engine = None
+_bert_nlp_engine_lock = threading.Lock()
 
 def get_bert_nlp_engine() -> BertNLPEngine:
     """
@@ -1003,7 +1222,9 @@ def get_bert_nlp_engine() -> BertNLPEngine:
     global _bert_nlp_engine
 
     if _bert_nlp_engine is None:
-        _bert_nlp_engine = BertNLPEngine()
+        with _bert_nlp_engine_lock:
+            if _bert_nlp_engine is None:
+                _bert_nlp_engine = BertNLPEngine()
 
     return _bert_nlp_engine
 

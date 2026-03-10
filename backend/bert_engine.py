@@ -16,6 +16,7 @@ Kullanım:
 """
 
 import os
+import threading
 from typing import List, Optional, Dict, Any
 import numpy as np
 
@@ -26,6 +27,14 @@ import numpy as np
 
 _bert_model = None
 _tokenizer = None
+_bert_model_lock = threading.Lock()
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 # =============================================================================
@@ -53,8 +62,25 @@ class BERTEngine:
             self.tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
             self.model = AutoModel.from_pretrained(self.MODEL_NAME)
 
-            # GPU varsa kullan, yoksa CPU
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            # Varsayilan davranis: GPU zorunlu.
+            # ORP_BERT_FORCE_GPU=0 verilirse CPU fallback'a izin verilir.
+            force_gpu = _env_flag("ORP_BERT_FORCE_GPU", True)
+            cuda_available = torch.cuda.is_available()
+            torch_build = getattr(torch, "__version__", "unknown")
+            cuda_runtime = getattr(getattr(torch, "version", None), "cuda", None)
+
+            if force_gpu and not cuda_available:
+                raise RuntimeError(
+                    "GPU zorunlu mod acik (ORP_BERT_FORCE_GPU=1) ancak CUDA kullanilabilir degil.\n"
+                    f"torch sürümü: {torch_build}, torch CUDA: {cuda_runtime}\n"
+                    "Muhtemel neden: CPU-only torch kurulumu.\n"
+                    "Cozum (venv aktifken):\n"
+                    "  pip uninstall -y torch torchvision torchaudio\n"
+                    "  pip install --index-url https://download.pytorch.org/whl/cu124 torch torchvision torchaudio"
+                )
+
+            # GPU varsa kullan, degilse (izinliyse) CPU fallback.
+            self.device = "cuda" if cuda_available else "cpu"
             self.model = self.model.to(self.device)
             self.model.eval()  # Evaluation mode
 
@@ -238,7 +264,9 @@ def get_bert_engine() -> BERTEngine:
     global _bert_model
 
     if _bert_model is None:
-        _bert_model = BERTEngine()
+        with _bert_model_lock:
+            if _bert_model is None:
+                _bert_model = BERTEngine()
 
     return _bert_model
 

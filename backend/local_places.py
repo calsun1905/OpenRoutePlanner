@@ -200,3 +200,32 @@ def get_dynamic_place_names(limit: int = 500) -> List[str]:
     conn.close()
 
     return [row["name"] for row in rows if row["name"]]
+
+
+def get_all_local_place_names(limit: int = 2000, include_dynamic: bool = True) -> List[str]:
+    """
+    local_places tablosundaki yer adlarını döner.
+
+    Args:
+        limit: Maksimum kayıt sayısı
+        include_dynamic: False ise place_type='osm_dynamic' kayıtlarını hariç tutar
+    """
+    _seed_if_empty()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    sql = """
+        SELECT name
+        FROM local_places
+        WHERE name IS NOT NULL AND TRIM(name) != ''
+    """
+    if not include_dynamic:
+        sql += "\n        AND place_type != 'osm_dynamic'"
+    sql += """
+        ORDER BY id DESC
+        LIMIT ?
+    """
+    cursor.execute(sql, (int(limit),))
+    rows = cursor.fetchall()
+    conn.close()
+    return [row["name"] for row in rows if row["name"]]
