@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 BERT Test Lab - Semantic Search Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1e1b4b;
+            --dark-light: #312e81;
+            --light: #f8fafc;
+            --gray: #64748b;
+            --gray-light: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 100%);
+            min-height: 100vh;
+            color: var(--light);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--gray);
+            font-size: 1.1rem;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-top: 15px;
+        }
+
+        .status-badge.connected {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .status-badge.disconnected {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-badge.connected .status-dot {
+            background: var(--success);
+        }
+
+        .status-badge.disconnected .status-dot {
+            background: var(--danger);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+        }
+
+        /* Cards */
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-icon {
+            font-size: 1.8rem;
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        /* Inputs */
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: var(--light);
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--light);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .quick-btn {
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            border-radius: 8px;
+        }
+
+        /* Results */
+        .result-box {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            min-height: 100px;
+        }
+
+        .result-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: var(--gray);
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Similarity Score */
+        .score-display {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .score-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: conic-gradient(var(--success) var(--score), rgba(255,255,255,0.1) 0);
+            position: relative;
+        }
+
+        .score-circle::before {
+            content: '';
+            position: absolute;
+            width: 65px;
+            height: 65px;
+            background: var(--dark-light);
+            border-radius: 50%;
+        }
+
+        .score-circle span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .score-bar {
+            flex: 1;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--danger), var(--warning), var(--success));
+            border-radius: 6px;
+            transition: width 0.5s ease;
+        }
+
+        /* Parsed Query Display */
+        .parsed-result {
+            display: grid;
+            gap: 10px;
+        }
+
+        .parsed-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .parsed-label {
+            color: var(--gray);
+            font-size: 0.85rem;
+            min-width: 100px;
+        }
+
+        .parsed-value {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .parsed-value.highlight {
+            color: var(--success);
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .tag-type { background: rgba(99, 102, 241, 0.3); color: var(--primary); }
+        .tag-origin { background: rgba(16, 185, 129, 0.3); color: var(--success); }
+        .tag-destination { background: rgba(239, 68, 68, 0.3); color: var(--danger); }
+        .tag-location { background: rgba(245, 158, 11, 0.3); color: var(--warning); }
+
+        /* Places List */
+        .places-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .place-item {
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .place-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.05);
+        }
+
+        /* Model Info */
+        .model-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .info-item {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+
+        .info-label {
+            color: var(--gray);
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* Chat Interface */
+        .chat-container {
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .chat-message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chat-message.user {
+            align-self: flex-end;
+            background: var(--primary);
+            color: white;
+        }
+
+        .chat-message.bert {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--light);
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-input-area input {
+            flex: 1;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .model-info {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: var(--dark-light);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: var(--danger); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🧠 BERT Test Lab</h1>
+            <p>Türkçe Doğal Dil İşleme - Semantic Search & Typo Tolerance Demo</p>
+            <div class="status-badge" id="statusBadge">
+                <span class="status-dot"></span>
+                <span id="statusText">Bağlanıyor...</span>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid">
+            <!-- 1. Model Info Card -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon">ℹ️</span>
+                    <span class="card-title">Model Bilgisi</span>
+                </div>
+                <div class="model-info">
+                    <div class="info-item">
+                        <div class="info-label">Model</div>
+                        <div class="info-value">dbmdz/bert-base-turkish-uncased</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Engine</div>
+                        <div class="info-value" id="engineType">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Embedding Boyutu</div>
+                        <div class="info-value">768</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Dil</div>
+                        <div class="info-value">Türkçe 🇹🇷</div>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" onclick="checkStatus()" style="width: 100%; margin-top: 15px;">
+                    🔄 Durumu Kontrol Et
+                </button>
+            </div>
+
+            <!-- 2. Similarity Test -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon">🔍</span>
+                    <span class="card-title">Semantic Similarity</span>
+                </div>
+                <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 15px;">
+                    İki metin arasındaki anlamsal benzerliği ölçün. Typo tolerance test edin!
+                </p>
+                <div class="input-group">
+                    <label>Metin 1</label>
+                    <input type="text" id="simText1" placeholder="örn: Kadıköy" value="Kadıköy">
+                </div>
+                <div class="input-group">
+                    <label>Metin 2</label>
+                    <input type="text" id="simText2" placeholder="örn: Kadiköy" value="Kadiköy">
+                </div>
+                <button class="btn btn-primary" onclick="testSimilarity()">
+                    🎯 Benzerlik Hesapla
+                </button>
+                <div class="btn-group">
+                    <button class="btn btn-secondary quick-btn" onclick="setSimTest('Kadıköy', 'Kadiköy')">Typo Test</button>
+                    <button class="btn btn-secondary quick-btn" onclick="setSimTest('İstanbul', 'İ斯坦布尔')">Farklı Yazım</button>
+                    <button class="btn btn-secondary quick-btn" onclick="setSimTest('Kadıköy', 'Beşiktaş')">Farklı Yerler</button>
+                </div>
+                <div class="result-box" id="simResult">
+                    <div style="text-align: center; color: var(--gray);">
+                        Sonuç burada görünecek...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Query Parser -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon">🗺️</span>
+                    <span class="card-title">Sorgu Ayrıştırıcı</span>
+                </div>
+                <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 15px;">
+                    Doğal dil sorgularını ayıştırın - origin, destination, tip algılama
+                </p>
+                <div class="input-group">
+                    <label>Rota Sorgusu</label>
+                    <input type="text" id="queryInput" placeholder="örn: Kadıköy'den Taksim'e nasıl gidilir?" value="Kadıköy'den Taksim'e nasıl gidilir?">
+                </div>
+                <button class="btn btn-primary" onclick="parseQuery()">
+                    🧠 Sorguyu Ayrıştır
+                </button>
+                <div class="btn-group">
+                    <button class="btn btn-secondary quick-btn" onclick="setQuery('Kadıköy\'den Beşiktaş\'a rota')">Rota</button>
+                    <button class="btn btn-secondary quick-btn" onclick="setQuery('Taksim yakınlarındaki kafeler')">POI Arama</button>
+                    <button class="btn btn-secondary quick-btn" onclick="setQuery('kadikoyden mecidiyekoye')">Typo ile Rota</button>
+                </div>
+                <div class="result-box" id="queryResult">
+                    <div style="text-align: center; color: var(--gray);">
+                        Sonuç burada görünecek...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Best Match Finder -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon">🎯</span>
+                    <span class="card-title">En Yakın Eşleşme</span>
+                </div>
+                <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 15px;">
+                    Adaylar arasından en yakın yer ismini bulun (typo tolerant)
+                </p>
+                <div class="input-group">
+                    <label>Aranacak Yer</label>
+                    <input type="text" id="matchQuery" placeholder="örn: kadikoy" value="kadikoy">
+                </div>
+                <div class="input-group">
+                    <label>Aday Yerler</label>
+                    <textarea id="matchCandidates" placeholder="Her satıra bir aday yazın...">Kadıköy
+Beşiktaş
+Taksim
+Mecidiyeköy
+Şişli</textarea>
+                </div>
+                <div class="input-group">
+                    <label>Minimum Eşik: <span id="thresholdValue">0.75</span></label>
+                    <input type="range" id="matchThreshold" min="0" max="1" step="0.05" value="0.75" style="width: 100%;" oninput="document.getElementById('thresholdValue').textContent = this.value">
+                </div>
+                <button class="btn btn-primary" onclick="findBestMatch()">
+                    🎯 En Yakınını Bul
+                </button>
+                <div class="result-box" id="matchResult">
+                    <div style="text-align: center; color: var(--gray);">
+                        Sonuç burada görünecek...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Interactive Chat -->
+            <div class="card" style="grid-column: span 2;">
+                <div class="card-header">
+                    <span class="card-icon">💬</span>
+                    <span class="card-title">BERT ile Sohbet</span>
+                </div>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="chat-message bert">
+                            Merhaba! Ben BERT tabanlı NLP asistanınız. Türkçe sorgularınızı anlayabilirim. Rota, POI arama veya yer ismi sorgularınızı yazın! 🚀
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chatInput" placeholder="Bir sorgu yazın..." onkeypress="if(event.key==='Enter')sendChat()">
+                        <button class="btn btn-primary" onclick="sendChat()">Gönder</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api/nlp';
+
+        // Toast Notification
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Check Status
+        async function checkStatus() {
+            console.log('%c[HTML] 🔍 Durum kontrolü başlatılıyor...', 'color: #00bcd4; font-weight: bold');
+            const badge = document.getElementById('statusBadge');
+            const text = document.getElementById('statusText');
+            const engineType = document.getElementById('engineType');
+
+            try {
+                console.log('%c[HTML] 📤 /status istek gönderiliyor...', 'color: #2196f3');
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+                console.log('%c[HTML] 📥 /status response:', 'color: #4caf50', data);
+
+                if (data.available) {
+                    badge.className = 'status-badge connected';
+                    text.textContent = 'BERT Aktif';
+                    engineType.textContent = data.engine || 'bert-nlp';
+                    showToast('BERT engine aktif!', 'success');
+                    console.log('%c[HTML] ✅ BERT AKTİF!', 'color: #4caf50; font-weight: bold');
+                } else {
+                    badge.className = 'status-badge disconnected';
+                    text.textContent = 'BERT Aktif Değil';
+                    engineType.textContent = data.engine || 'regex-fallback';
+                    showToast('BERT engine bulunamadı, regex modunda', 'error');
+                    console.log('%c[HTML] ❌ BERT AKTİF DEĞİL!', 'color: #f44336; font-weight: bold');
+                }
+            } catch (error) {
+                badge.className = 'status-badge disconnected';
+                text.textContent = 'Bağlantı Hatası';
+                showToast('Backend\'e bağlanılamadı', 'error');
+                console.error('[HTML] ❌ Status check failed:', error);
+            }
+        }
+
+        // Similarity Test
+        function setSimText(text1, text2) {
+            document.getElementById('simText1').value = text1;
+            document.getElementById('simText2').value = text2;
+        }
+
+        function setSimTest(text1, text2) {
+            setSimText(text1, text2);
+            testSimilarity();
+        }
+
+        async function testSimilarity() {
+            console.log('%c[HTML] 🔍 Similarity testi başlatılıyor...', 'color: #00bcd4; font-weight: bold');
+            const text1 = document.getElementById('simText1').value;
+            const text2 = document.getElementById('simText2').value;
+            const resultBox = document.getElementById('simResult');
+
+            if (!text1 || !text2) {
+                showToast('Lütfen her iki metni de girin', 'error');
+                return;
+            }
+
+            console.log('%c[HTML] 📤 Gönderilen:', 'color: #2196f3', { text1, text2 });
+            resultBox.innerHTML = '<div class="result-loading"><div class="spinner"></div> Hesaplanıyor...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/similarity`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text1, text2 })
+                });
+                const data = await response.json();
+                console.log('%c[HTML] 📥 /similarity response:', 'color: #4caf50', data);
+
+                const score = data.similarity || 0;
+                const percentage = Math.round(score * 100);
+
+                resultBox.innerHTML = `
+                    <div class="score-display">
+                        <div class="score-circle" style="--score: ${percentage}%">
+                            <span>${percentage}%</span>
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="font-size: 0.9rem; margin-bottom: 8px;">Benzerlik Skoru</div>
+                            <div class="score-bar">
+                                <div class="score-bar-fill" style="width: ${percentage}%"></div>
+                            </div>
+                            <div style="margin-top: 10px; font-size: 0.85rem; color: var(--gray);">
+                                "${text1}" ↔ "${text2}"
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                resultBox.innerHTML = `<div style="color: var(--danger);">Hata: ${error.message}</div>`;
+                showToast('Benzerlik hesaplanamadı', 'error');
+                console.error('%c[HTML] ❌ Similarity hatası:', 'color: #f44336', error);
+            }
+        }
+
+        // Query Parser
+        function setQuery(query) {
+            document.getElementById('queryInput').value = query;
+            parseQuery();
+        }
+
+        async function parseQuery() {
+            console.log('%c[HTML] 🔍 Parse query başlatılıyor...', 'color: #00bcd4; font-weight: bold');
+            const query = document.getElementById('queryInput').value;
+            const resultBox = document.getElementById('queryResult');
+
+            if (!query) {
+                showToast('Lütfen bir sorgu girin', 'error');
+                return;
+            }
+
+            console.log('%c[HTML] 📤 Gönderilen sorgu:', 'color: #2196f3', query);
+            resultBox.innerHTML = '<div class="result-loading"><div class="spinner"></div> Ayrıştırılıyor...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/parse`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                const data = await response.json();
+                console.log('%c[HTML] 📥 /parse response:', 'color: #4caf50', data);
+
+                let html = '<div class="parsed-result">';
+                html += `<div class="parsed-item">
+                    <span class="parsed-label">Sorgu Tipi</span>
+                    <span class="tag tag-type">${data.type || 'bilinmiyor'}</span>
+                </div>`;
+
+                if (data.origin) {
+                    html += `<div class="parsed-item">
+                        <span class="parsed-label">Başlangıç</span>
+                        <span class="parsed-value highlight tag tag-origin">${data.origin}</span>
+                    </div>`;
+                }
+
+                if (data.destination) {
+                    html += `<div class="parsed-item">
+                        <span class="parsed-label">Varış</span>
+                        <span class="parsed-value highlight tag tag-destination">${data.destination}</span>
+                    </div>`;
+                }
+
+                if (data.location) {
+                    html += `<div class="parsed-item">
+                        <span class="parsed-label">Konum</span>
+                        <span class="parsed-value highlight tag tag-location">${data.location}</span>
+                    </div>`;
+                }
+
+                if (data.detected_places && data.detected_places.length > 0) {
+                    html += `<div class="parsed-item">
+                        <span class="parsed-label">Tespit Edilenler</span>
+                        <div class="places-list">
+                            ${data.detected_places.map(p => `<span class="place-item">${p.place || p}</span>`).join('')}
+                        </div>
+                    </div>`;
+                }
+
+                html += '</div>';
+                resultBox.innerHTML = html;
+            } catch (error) {
+                resultBox.innerHTML = `<div style="color: var(--danger);">Hata: ${error.message}</div>`;
+                showToast('Sorgu ayrıştırılamadı', 'error');
+                console.error('%c[HTML] ❌ Parse hatası:', 'color: #f44336', error);
+            }
+        }
+
+        // Best Match
+        async function findBestMatch() {
+            console.log('%c[HTML] 🔍 Best match başlatılıyor...', 'color: #00bcd4; font-weight: bold');
+            const query = document.getElementById('matchQuery').value;
+            const candidatesText = document.getElementById('matchCandidates').value;
+            const threshold = parseFloat(document.getElementById('matchThreshold').value);
+            const resultBox = document.getElementById('matchResult');
+
+            if (!query || !candidatesText) {
+                showToast('Lütfen sorgu ve adayları girin', 'error');
+                return;
+            }
+
+            const candidates = candidatesText.split('\n').filter(c => c.trim());
+            console.log('%c[HTML] 📤 Gönderilen:', 'color: #2196f3', { query, candidates, threshold });
+            resultBox.innerHTML = '<div class="result-loading"><div class="spinner"></div> Aranıyor...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/best-match`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, candidates, threshold })
+                });
+                const data = await response.json();
+                console.log('%c[HTML] 📥 /best-match response:', 'color: #4caf50', data);
+
+                if (data.match) {
+                    const score = Math.round(data.similarity * 100);
+                    resultBox.innerHTML = `
+                        <div style="text-align: center;">
+                            <div style="font-size: 3rem; margin-bottom: 10px;">🎯</div>
+                            <div style="font-size: 1.5rem; font-weight: 600; margin-bottom: 5px;">${data.match}</div>
+                            <div class="score-bar" style="margin: 15px 0;">
+                                <div class="score-bar-fill" style="width: ${score}%"></div>
+                            </div>
+                            <div style="color: ${score >= 80 ? 'var(--success)' : 'var(--warning)'};">
+                                Benzerlik: %${score}
+                            </div>
+                            <div style="margin-top: 10px; font-size: 0.85rem; color: var(--gray);">
+                                İndex: ${data.index}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    resultBox.innerHTML = `
+                        <div style="text-align: center; color: var(--warning);">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">😕</div>
+                            <div>Eşleşme bulunamadı</div>
+                            <div style="font-size: 0.85rem; margin-top: 5px;">
+                                Eşik değeri: %${Math.round(threshold * 100)}
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultBox.innerHTML = `<div style="color: var(--danger);">Hata: ${error.message}</div>`;
+                showToast('Eşleşme aranamadı', 'error');
+            }
+        }
+
+        // Chat
+        async function sendChat() {
+            console.log('%c[HTML] 🔍 Chat mesajı gönderiliyor...', 'color: #00bcd4; font-weight: bold');
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            const messagesContainer = document.getElementById('chatMessages');
+
+            if (!message) return;
+
+            console.log('%c[HTML] 📤 Gönderilen chat mesajı:', 'color: #2196f3', message);
+
+            // Add user message
+            messagesContainer.innerHTML += `
+                <div class="chat-message user">${message}</div>
+            `;
+            input.value = '';
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            // Add typing indicator
+            const typingId = 'typing-' + Date.now();
+            messagesContainer.innerHTML += `
+                <div class="chat-message bert" id="${typingId}">
+                    <div class="spinner"></div>
+                </div>
+            `;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            try {
+                const response = await fetch(`${API_BASE}/parse`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: message })
+                });
+                const data = await response.json();
+                console.log('%c[HTML] 📥 /parse (chat) response:', 'color: #4caf50', data);
+
+                // Remove typing indicator
+                document.getElementById(typingId).remove();
+
+                // Format response
+                let responseText = `Sorgu tipi: <strong>${data.type || 'bilinmiyor'}</strong>\n`;
+
+                if (data.origin) responseText += `📍 Başlangıç: ${data.origin}\n`;
+                if (data.destination) responseText += `🎯 Varış: ${data.destination}\n`;
+                if (data.location) responseText += `📍 Konum: ${data.location}\n`;
+                if (data.detected_places?.length) {
+                    responseText += `\nTespit edilen yerler:\n`;
+                    data.detected_places.forEach(p => {
+                        responseText += `  • ${p.place || p}\n`;
+                    });
+                }
+
+                messagesContainer.innerHTML += `
+                    <div class="chat-message bert">${responseText}</div>
+                `;
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            } catch (error) {
+                document.getElementById(typingId)?.remove();
+                console.error('%c[HTML] ❌ Chat hatası:', 'color: #f44336', error);
+                messagesContainer.innerHTML += `
+                    <div class="chat-message bert" style="color: var(--danger);">
+                        Hata: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize
+        checkStatus();
+    </script>
+</body>
+</html>

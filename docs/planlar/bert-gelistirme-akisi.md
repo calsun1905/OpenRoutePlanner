@@ -2,6 +2,9 @@
 
 Bu dokuman, BERT tarafini nasil gelistirecegimizi ve mevcut yaklasimdan hedef mimariye nasil gececegimizi kisa ve net sekilde anlatir.
 
+Detayli kutu bazli akis semasi icin:
+- `docs/planlar/bert-calisma-akis-semasi.md`
+
 ## Hedef
 
 Regex ana cozum olmasin.
@@ -325,6 +328,22 @@ Intent tarafini guclendir:
 
 ---
 
+## Kabul Kriterleri (Olculebilir)
+
+1. Route rol dogrulugu:
+   - En az 100 etiketli route sorgusunda `origin/destination` dogru atama orani >= %90
+2. Ekli Turkce sorgu dayanikliligi:
+   - Apostrof ve ek iceren test setinde mention yakalama orani >= %95
+3. Pipeline cikti butunlugu:
+   - Her mention icin `surface`, `normalized`, `start`, `end`, `role_hint` alanlari donmeli
+4. Performans:
+   - Warm cache durumunda `parse()` p95 <= 350 ms
+   - OSM fallback durumunda `parse()` p95 <= 1500 ms
+5. Regex bagimliligi:
+   - Route/POI/single/multi kararlarinin >= %90'i regex fallback disi ana pipeline ile uretilmeli
+
+---
+
 ## En Kisa Ozet
 
 Yeni sistemin akisi su olacak:
@@ -346,4 +365,3 @@ Bu gecisle birlikte sistem:
 - open-world place retrieval mantigina gecer
 - yeni yer isimlerine ve canli OSM verisine daha iyi uyum saglar
 - origin / destination hatalarini azaltir
-
