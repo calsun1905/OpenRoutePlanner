@@ -1,4 +1,4 @@
-﻿"""
+"""
 geocoder.py - Yer ismi <-> Koordinat dönüşüm modülü
 
 Nominatim API (OpenStreetMap) kullanarak:
@@ -19,57 +19,57 @@ from typing import List, Dict, Optional
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
-# SQLite cache dosyasÄ±
+# SQLite cache dosyası
 CACHE_DB = os.path.join(CACHE_DIR, "geocodes.db")
 
-# Nominatim API ayarlarÄ±
+# Nominatim API ayarları
 NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org"
 NOMINATIM_SEARCH_URL = f"{NOMINATIM_BASE_URL}/search"
 NOMINATIM_REVERSE_URL = f"{NOMINATIM_BASE_URL}/reverse"
 
-# Rate limiting: 1 request/saniye (Nominatim kullanÄ±m ÅŸartÄ±)
+# Rate limiting: 1 request/saniye (Nominatim kullanım şartı)
 RATE_LIMIT_SECONDS = 1.0
 _last_request_time = 0.0
 
-# Memory cache (uygulama Ã¶mrÃ¼ boyunca)
+# Memory cache (uygulama ömrü boyunca)
 _geocode_cache: Dict[str, dict] = {}
 _reverse_geocode_cache: Dict[str, dict] = {}
 
 
 # =============================================================================
-# Exception SÄ±nÄ±flarÄ±
+# Exception Sınıfları
 # =============================================================================
 
 class LocationNotFoundError(Exception):
-    """Yer bulunamadÄ±ÄŸÄ±nda fÄ±rlatÄ±lÄ±r."""
+    """Yer bulunamadığında fırlatılır."""
     pass
 
 
 class NetworkError(Exception):
-    """AÄŸ hatasÄ±nda fÄ±rlatÄ±lÄ±r."""
+    """Ağ hatasında fırlatılır."""
     pass
 
 
 class InvalidQueryError(Exception):
-    """GeÃ§ersiz sorguda fÄ±rlatÄ±lÄ±r."""
+    """Geçersiz sorguda fırlatılır."""
     pass
 
 
 # =============================================================================
-# Cache FonksiyonlarÄ±
+# Cache Fonksiyonları
 # =============================================================================
 
 def _init_cache_db() -> sqlite3.Connection:
     """
-    SQLite cache veritabanÄ±nÄ± baÅŸlatÄ±r.
-    PRAGMA optimizasyonlarÄ± uygulanÄ±r (WAL, cache, mmap).
+    SQLite cache veritabanını başlatır.
+    PRAGMA optimizasyonları uygulanır (WAL, cache, mmap).
 
     Returns:
-        sqlite3.Connection: VeritabanÄ± baÄŸlantÄ±sÄ±
+        sqlite3.Connection: Veritabanı bağlantısı
     """
     conn = sqlite3.connect(CACHE_DB)
 
-    # Performans optimizasyonlarÄ± (PERFORMANS_OPTIMIZASYON_PLANI.md â€” Faz 1)
+    # Performans optimizasyonları (PERFORMANS_OPTIMIZASYON_PLANI.md â€” Faz 1)
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous = NORMAL;")
     conn.execute("PRAGMA cache_size = -1048576;")   # 1 GB RAM cache
@@ -139,22 +139,22 @@ def purge_old_geocodes(days: int = 90) -> int:
     return deleted
 
 def _query_hash(query: str) -> str:
-    """Sorgu string'i iÃ§in hash Ã¼retir."""
+    """Sorgu string'i için hash üretir."""
     return hashlib.md5(query.encode("utf-8")).hexdigest()
 
 
 def _lat_lon_key(lat: float, lon: float) -> str:
-    """Koordinat iÃ§in cache anahtarÄ± Ã¼retir."""
+    """Koordinat için cache anahtarı üretir."""
     return f"{lat:.6f}_{lon:.6f}"
 
 
 def _get_from_cache(query_hash: str, table: str = "geocodes") -> Optional[dict]:
     """
-    SQLite cache'ten veri Ã§eker.
+    SQLite cache'ten veri çeker.
 
     Args:
-        query_hash: Cache anahtarÄ±
-        table: Tablo adÄ± ("geocodes" veya "reverse_geocodes")
+        query_hash: Cache anahtarı
+        table: Tablo adı ("geocodes" veya "reverse_geocodes")
 
     Returns:
         dict veya None
@@ -189,7 +189,7 @@ def _get_from_cache(query_hash: str, table: str = "geocodes") -> Optional[dict]:
                     "address": row[1]
                 }
     except Exception as e:
-        print(f"[Geocoder] Cache okuma hatasÄ±: {e}")
+        print(f"[Geocoder] Cache okuma hatası: {e}")
     finally:
         if conn is not None:
             conn.close()
@@ -202,9 +202,9 @@ def _save_to_cache(query_hash: str, data: dict, table: str = "geocodes") -> None
     Veriyi SQLite cache'e kaydeder.
 
     Args:
-        query_hash: Cache anahtarÄ±
+        query_hash: Cache anahtarı
         data: Kaydedilecek veri
-        table: Tablo adÄ±
+        table: Tablo adı
     """
     try:
         conn = _init_cache_db()
@@ -245,7 +245,7 @@ def _save_to_cache(query_hash: str, data: dict, table: str = "geocodes") -> None
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"[Geocoder] Cache yazma hatasÄ±: {e}")
+        print(f"[Geocoder] Cache yazma hatası: {e}")
 
 
 # =============================================================================
@@ -270,15 +270,15 @@ def _rate_limit() -> None:
 
 
 # =============================================================================
-# API FonksiyonlarÄ±
+# API Fonksiyonları
 # =============================================================================
 
 def geocode(place_name: str) -> dict:
     """
-    Yer ismini koordinata Ã§evirir.
+    Yer ismini koordinata çevirir.
 
     Args:
-        place_name: Yer ismi (Ã¶rn: "KadÄ±kÃ¶y, Ä°stanbul")
+        place_name: Yer ismi (örn: "Kadıköy, İstanbul")
 
     Returns:
         dict: Success veya error response
@@ -291,7 +291,7 @@ def geocode(place_name: str) -> dict:
         return {
             "status": "error",
             "error_type": "invalid_query",
-            "message": "Yer ismi boÅŸ olamaz."
+            "message": "Yer ismi boş olamaz."
         }
 
     place_name = place_name.strip()
@@ -300,7 +300,7 @@ def geocode(place_name: str) -> dict:
         return {
             "status": "error",
             "error_type": "invalid_query",
-            "message": "Yer ismi Ã§ok kÄ±sa."
+            "message": "Yer ismi çok kısa."
         }
 
     # 1) Memory cache kontrol
@@ -313,7 +313,7 @@ def geocode(place_name: str) -> dict:
             "cached": True
         }
 
-    # 2) Local places (Ã¶nceden tanÄ±mlÄ± yerler â€” API'ye gitmeden)
+    # 2) Local places (önceden tanımlı yerler â€” API'ye gitmeden)
     from local_places import lookup as local_places_lookup
     local_result = local_places_lookup(place_name)
     if local_result:
@@ -337,7 +337,7 @@ def geocode(place_name: str) -> dict:
             "cached": True
         }
 
-    # 3) Nominatim API Ã§aÄŸrÄ±sÄ±
+    # 3) Nominatim API çağrısı
     _rate_limit()
 
     headers = {
@@ -353,7 +353,7 @@ def geocode(place_name: str) -> dict:
     }
 
     try:
-        print(f"[Geocoder] Nominatim API Ã§aÄŸrÄ±sÄ±: {place_name}")
+        print(f"[Geocoder] Nominatim API çağrısı: {place_name}")
         response = requests.get(
             NOMINATIM_SEARCH_URL,
             params=params,
@@ -365,7 +365,7 @@ def geocode(place_name: str) -> dict:
             return {
                 "status": "error",
                 "error_type": "rate_limit",
-                "message": "API limit aÅŸÄ±mÄ±. LÃ¼tfen birkaÃ§ saniye bekleyin."
+                "message": "API limit aşımı. Lütfen birkaç saniye bekleyin."
             }
 
         response.raise_for_status()
@@ -375,11 +375,11 @@ def geocode(place_name: str) -> dict:
             return {
                 "status": "error",
                 "error_type": "not_found",
-                "message": f"'{place_name}' bulunamadÄ±.",
+                "message": f"'{place_name}' bulunamadı.",
                 "suggestions": []
             }
 
-        # Ä°lk sonucu al
+        # İlk sonucu al
         result = data[0]
         lat = float(result.get("lat", 0))
         lon = float(result.get("lon", 0))
@@ -409,13 +409,13 @@ def geocode(place_name: str) -> dict:
         return {
             "status": "error",
             "error_type": "network",
-            "message": "API yanÄ±t vermedi (timeout)."
+            "message": "API yanıt vermedi (timeout)."
         }
     except requests.ConnectionError:
         return {
             "status": "error",
             "error_type": "network",
-            "message": "Ä°nternet baÄŸlantÄ±sÄ± yok."
+            "message": "İnternet bağlantısı yok."
         }
     except Exception as e:
         return {
@@ -427,11 +427,11 @@ def geocode(place_name: str) -> dict:
 
 def geocode_suggest(place_name: str, limit: int = 6) -> dict:
     """
-    Yazarken Ã¶neri iÃ§in: Yer ismine gÃ¶re Ã§oklu sonuÃ§ dÃ¶ner (autocomplete).
+    Yazarken öneri için: Yer ismine göre çoklu sonuç döner (autocomplete).
 
     Args:
-        place_name: KÄ±smi veya tam yer ismi (Ã¶rn: "KadÄ±kÃ¶y", "Taksim M")
-        limit: Maksimum Ã¶neri sayÄ±sÄ± (varsayÄ±lan 6)
+        place_name: Kısmi veya tam yer ismi (örn: "Kadıköy", "Taksim M")
+        limit: Maksimum öneri sayısı (varsayılan 6)
 
     Returns:
         dict: {"status": "success", "suggestions": [{"lat": 40.99, "lon": 29.03, "display_name": "..."}, ...]}
@@ -478,13 +478,13 @@ def geocode_suggest(place_name: str, limit: int = 6) -> dict:
             })
         return {"status": "success", "suggestions": suggestions}
     except Exception as e:
-        print(f"[Geocoder] Suggest hatasÄ±: {e}")
+        print(f"[Geocoder] Suggest hatası: {e}")
         return {"status": "success", "suggestions": []}
 
 
 def reverse_geocode(lat: float, lon: float) -> dict:
     """
-    KoordinatÄ± yer ismine Ã§evirir.
+    Koordinatı yer ismine çevirir.
 
     Args:
         lat: Enlem
@@ -502,14 +502,14 @@ def reverse_geocode(lat: float, lon: float) -> dict:
         return {
             "status": "error",
             "error_type": "invalid_query",
-            "message": "GeÃ§ersiz koordinat formatÄ±."
+            "message": "Geçersiz koordinat formatı."
         }
 
     if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
         return {
             "status": "error",
             "error_type": "invalid_query",
-            "message": "Koordinat aralÄ±ÄŸÄ± dÄ±ÅŸÄ±nda."
+            "message": "Koordinat aralığı dışında."
         }
 
     # 1) Memory cache kontrol
@@ -533,7 +533,7 @@ def reverse_geocode(lat: float, lon: float) -> dict:
             "cached": True
         }
 
-    # 3) Nominatim API Ã§aÄŸrÄ±sÄ±
+    # 3) Nominatim API çağrısı
     _rate_limit()
 
     headers = {
@@ -549,7 +549,7 @@ def reverse_geocode(lat: float, lon: float) -> dict:
     }
 
     try:
-        print(f"[Geocoder] Reverse geocode API Ã§aÄŸrÄ±sÄ±: ({lat:.6f}, {lon:.6f})")
+        print(f"[Geocoder] Reverse geocode API çağrısı: ({lat:.6f}, {lon:.6f})")
         response = requests.get(
             NOMINATIM_REVERSE_URL,
             params=params,
@@ -564,7 +564,7 @@ def reverse_geocode(lat: float, lon: float) -> dict:
             return {
                 "status": "error",
                 "error_type": "not_found",
-                "message": "Bu koordinat iÃ§in yer bilgisi bulunamadÄ±."
+                "message": "Bu koordinat için yer bilgisi bulunamadı."
             }
 
         display_name = data.get("display_name", "")
@@ -592,13 +592,13 @@ def reverse_geocode(lat: float, lon: float) -> dict:
         return {
             "status": "error",
             "error_type": "network",
-            "message": "API yanÄ±t vermedi (timeout)."
+            "message": "API yanıt vermedi (timeout)."
         }
     except requests.ConnectionError:
         return {
             "status": "error",
             "error_type": "network",
-            "message": "Ä°nternet baÄŸlantÄ±sÄ± yok."
+            "message": "İnternet bağlantısı yok."
         }
     except Exception as e:
         return {
@@ -610,20 +610,20 @@ def reverse_geocode(lat: float, lon: float) -> dict:
 
 def geocode_batch(place_names: List[str]) -> List[dict]:
     """
-    Toplu geocoding iÅŸlemi. Her sorgu arasÄ± rate limit uygular.
+    Toplu geocoding işlemi. Her sorgu arası rate limit uygular.
 
     Args:
         place_names: Yer isimleri listesi
 
     Returns:
-        list[dict]: Her bir sorgu iÃ§in response
+        list[dict]: Her bir sorgu için response
     """
     if not place_names:
         return []
 
     results = []
     for i, place_name in enumerate(place_names):
-        print(f"[Geocoder] Batch iÅŸleniyor: {i+1}/{len(place_names)} - {place_name}")
+        print(f"[Geocoder] Batch işleniyor: {i+1}/{len(place_names)} - {place_name}")
         result = geocode(place_name)
         results.append(result)
 

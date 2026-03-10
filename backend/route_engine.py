@@ -510,29 +510,36 @@ def dynamic_overlap_threshold_connectivity(distance_km: float, connectivity: int
     Returns:
         float: Maksimum izin verilen overlap oranı (0-1 arası)
     """
-    # Önce mesafe bazlı taban threshold
-    if distance_km < 1.0:
-        base_threshold = 0.90
-    elif distance_km < 3.0:
-        base_threshold = 0.80
-    elif distance_km < 7.0:
-        base_threshold = 0.75
+    # Önce mesafe bazlı taban threshold (ROUTE_CONFIG'den)
+    dist_very_short = ROUTE_CONFIG.get("DISTANCE_VERY_SHORT_KM", 1.0)
+    dist_short = ROUTE_CONFIG.get("DISTANCE_SHORT_KM", 3.0)
+    dist_long = ROUTE_CONFIG.get("DISTANCE_LONG_KM", 7.0)
+
+    if distance_km < dist_very_short:
+        base_threshold = ROUTE_CONFIG.get("OVERLAP_THRESHOLD_SHORT", 0.90)
+    elif distance_km < dist_short:
+        base_threshold = ROUTE_CONFIG.get("OVERLAP_THRESHOLD_MEDIUM", 0.80)
+    elif distance_km < dist_long:
+        base_threshold = ROUTE_CONFIG.get("OVERLAP_THRESHOLD_LONG", 0.75)
     else:
-        base_threshold = 0.70
+        base_threshold = ROUTE_CONFIG.get("OVERLAP_THRESHOLD_VERY_LONG", 0.70)
 
     # Connectivity varsa, buna göre ayarla (CONSERVATIVE çarpanlar)
     if connectivity is not None:
         if connectivity >= 3:
             # Yüksek connectivity → Biraz daha katı (ama abartma)
-            return base_threshold * 0.75  # %52-67 arası (eski: %35-45)
+            multiplier = ROUTE_CONFIG.get("CONNECTIVITY_HIGH_MULTIPLIER", 0.75)
+            return base_threshold * multiplier  # %52-67 arası (eski: %35-45)
 
         elif connectivity == 2:
             # Orta connectivity → Orta seviye
-            return base_threshold * 0.85  # %68-85 arası (eski: %50-60)
+            multiplier = ROUTE_CONFIG.get("CONNECTIVITY_MEDIUM_MULTIPLIER", 0.85)
+            return base_threshold * multiplier  # %68-85 arası (eski: %50-60)
 
         else:  # connectivity == 1
             # Düşük connectivity → Çok esnek (az alternatif var)
-            return base_threshold * 0.95  # %76-95 arası (eski: %60-80)
+            multiplier = ROUTE_CONFIG.get("CONNECTIVITY_LOW_MULTIPLIER", 0.95)
+            return base_threshold * multiplier  # %76-95 arası (eski: %60-80)
 
     return base_threshold
 
@@ -732,7 +739,25 @@ def get_body_edges(edges, skip_ratio=0.10):
 
 
 def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
-                         num_via_routes=2, max_distance_ratio=1.5):
+                         num_via_routes=None, max_distance_ratio=None):
+    """
+    Via-Node (Ara Nokta) yaklaşımı ile alternatif rotalar bulur.
+
+    Endüstri standardı: Google Maps / OSRM tarzı.
+    Ana rota geometrik olarak uzak büyük kavşakları bulur,
+    rotayı bu kavşaklardan geçmeye zorlar (A → C → B).
+
+    Algoritma:
+    1. Ana rota koordinatlarının bounding box'ını genişlet
+    2. Bounding box içindeki yüksek degree (kavşak) node'ları bul
+    3. Ana rotadan en uzak olanları via-node olarak seç
+    4. A → via → B rotası oluştur
+    5. Çok uzun rotaları reddet (max_distance_ratio)
+    """
+    if num_via_routes is None:
+        num_via_routes = ROUTE_CONFIG.get("VIA_NODE_DEFAULT_COUNT", 2)
+    if max_distance_ratio is None:
+        max_distance_ratio = ROUTE_CONFIG.get("VIA_NODE_MAX_DISTANCE_RATIO", 1.5)
     """
     Via-Node (Ara Nokta) yaklaşımı ile alternatif rotalar bulur.
 
@@ -771,9 +796,10 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
     lon_min, lon_max = min(lons), max(lons)
 
     # %30 genişlet + minimum ~200m garanti (çok kısa rotalar için)
-    MIN_MARGIN = 0.002
-    lat_margin = max(MIN_MARGIN, (lat_max - lat_min) * 0.3)
-    lon_margin = max(MIN_MARGIN, (lon_max - lon_min) * 0.3)
+    min_margin = ROUTE_CONFIG.get("VIA_NODE_BBOX_MIN_MARGIN", 0.002)
+    expand_ratio = ROUTE_CONFIG.get("VIA_NODE_BBOX_EXPAND_RATIO", 0.3)
+    lat_margin = max(min_margin, (lat_max - lat_min) * expand_ratio)
+    lon_margin = max(min_margin, (lon_max - lon_min) * expand_ratio)
     lat_min -= lat_margin
     lat_max += lat_margin
     lon_min -= lon_margin
@@ -781,22 +807,24 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
 
     main_node_set = set(main_route_nodes)
 
-    # Bounding box içindeki kavşak node'larını bul (degree >= 3)
+    # Bounding box içindeki kavşak node'larını bul (degree >= VIA_NODE_MIN_DEGREE)
     candidate_nodes = []
+    min_degree = ROUTE_CONFIG.get("VIA_NODE_MIN_DEGREE", 3)
     for node, data in G.nodes(data=True):
         lat, lon = data.get('y', 0), data.get('x', 0)
         if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
             if node not in main_node_set:
                 degree = G.degree(node)
-                if degree >= 3:
+                if degree >= min_degree:
                     candidate_nodes.append((node, lat, lon, degree))
 
     if not candidate_nodes:
         print(f"[RouteEngine] Via-Node: Bounding box'ta kavşak bulunamadı")
         return via_routes
 
-    # Rotanın her ~20. noktasını sample'la (performans için)
-    sampled_coords = main_coords[::max(1, len(main_coords) // 20)]
+    # Rotanın her ~VIA_NODE_ROUTE_SAMPLE_COUNT. noktasını sample'la (performans için)
+    sample_count = ROUTE_CONFIG.get("VIA_NODE_ROUTE_SAMPLE_COUNT", 20)
+    sampled_coords = main_coords[::max(1, len(main_coords) // sample_count)]
 
     def min_distance_to_route(lat, lon):
         """Noktanın rotaya olan minimum yaklaşık mesafesi (metre)"""
@@ -822,8 +850,10 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
     print(f"[RouteEngine] Via-Node: {len(scored)} kavşak aday bulundu")
 
     max_km = main_km * max_distance_ratio
+    max_candidates = ROUTE_CONFIG.get("VIA_NODE_MAX_CANDIDATES", 30)
+    self_overlap_limit = ROUTE_CONFIG.get("VIA_NODE_SELF_OVERLAP_LIMIT", 0.70)
 
-    for node, lat, lon, degree, dist, score in scored[:30]:
+    for node, lat, lon, degree, dist, score in scored[:max_candidates]:
         if len(via_routes) >= num_via_routes:
             break
         try:
@@ -843,7 +873,7 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
             too_similar = False
             for existing in via_routes:
                 overlap = count_edge_overlap(existing["edges"], new_edges)
-                if overlap > 0.70:
+                if overlap > self_overlap_limit:
                     too_similar = True
                     break
 
@@ -947,8 +977,7 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
 
         via_routes = find_via_node_routes(
             G, origin_node, dest_node, shortest_nodes,
-            num_via_routes=num_routes - 1,
-            max_distance_ratio=1.5
+            num_via_routes=num_routes - 1
         )
 
         MAX_OVERLAP = dynamic_overlap_threshold(shortest_km)
