@@ -1,21 +1,213 @@
 # Progress - OpenRoutePlanner
 
-## 2026-03-09 Guncel Not
+## 2026-03-11 Guncel Not (BERT + Weather + Semantic POI)
+
+Bu oturumda degisen dosyalar tek tek incelendi ve asagidaki durum netlestirildi.
+Bu bolum, GitHub commit notlarina temel olacak sekilde yazilmistir.
+
+### A) Dosya Bazli Inceleme (Teker Teker)
+
+| Dosya | Durum | Ozet |
+|---|---|---|
+| `backend/app.py` | Etkili degisiklik | Runtime init lazy hale getirildi, graph preload startup flag ile kontrol edildi, BERT parse trace ve runtime metric loglari eklendi, timeline/weather entegrasyonu genisletildi. |
+| `backend/bert_engine.py` | Etkili degisiklik | GPU zorunlu calisma politikasi netlestirildi (`ORP_BERT_FORCE_GPU`, `ORP_BERT_STRICT_GPU`), runtime GPU metrik ciktilari eklendi, similarity/index JSON tipleri native tipe cevrildi. |
+| `backend/bert_nlp_engine.py` | Etkili degisiklik | Query noise ve suffix normalizasyonu guclendirildi, span bazli trace uretimi eklendi, query-type score dagilimi loglanabilir hale getirildi, multi/single secim mantigi iyilestirildi. |
+| `backend/weather_service.py` | Etkili degisiklik | OpenMeteo cagrilarina retry + exponential backoff eklendi, route weather forecast modu gelistirildi, nokta bazli advice alanlari guclendirildi. |
+| `backend/weather_utils.py` | Etkili degisiklik | `get_weather_advice()` eklendi (alert_level + maddeli tavsiye cikisi). |
+| `frontend/js/app.js` | Etkili degisiklik | Haritaya nokta eklenince weather widget cagrisi, rota sonrasi weather banner, timeline icinde hava/advice gorunumu, NLP parse icin `debug: true` gonderimi. |
+| `frontend/index.html` | Etkili degisiklik | Weather widget ve weather banner container'lari eklendi. |
+| `frontend/css/style.css` | Etkili degisiklik | Weather widget/banner ve timeline weather/advice stilleri eklendi. |
+| `frontend/bert-test-lab.html` | Etkili degisiklik | Mod bazli BERT dogrulama paneli, fallback guard, ayrintili debug log paneli, tum modlari dogrulama aksiyonu eklendi. |
+| `requirements.txt` | Etkili degisiklik | `brotli` ve `zstandard` pinlendi; Flask-Compress codec uyumlulugu sabitlendi. |
+| `tests/test_core/test_bert_nlp_preprocessing.py` | Yeni dosya | BERT preprocessing/suffix/noise filtre testleri eklendi. |
+| `docs/planlar/poi-semantic-tag-grounding-plani.md` | Yeni dosya | Hardcoded sozluk olmadan semantik POI tag grounding tasarimi yazildi. |
+| `backend/tag_grounder.py` | Yeni dosya (PoC) | Overpass tabanli dinamik tag profiling + embedding matching prototipi. |
+| `PROJECT_INDEX.md` | Etkili degisiklik | Proje index'i canli mimari ve endpoint haritasi ile guncellendi. |
+| `CLAUDE.md` | Etkili degisiklik | Mimari, weather servis ve calisma komutlari guncellendi. |
+| `progress.md` | Etkili degisiklik | Onceki oturum notlari genisletildi (bu bolum dahil). |
+| `backend/geocoder.py` | Teknik olarak modified | Icerik farki yok (anlamsal degisiklik tespit edilmedi). |
+| `backend/storage_db.py` | Teknik olarak modified | Icerik farki yok (anlamsal degisiklik tespit edilmedi). |
+| `docs/ogretici/openmeteo-sifirdan-rehber.md` | Teknik olarak modified | Icerik farki yok (anlamsal degisiklik tespit edilmedi). |
+| `docs/planlar/weather-service-akis-diyagrami.md` | Teknik olarak modified | Icerik farki yok (anlamsal degisiklik tespit edilmedi). |
+| `backend/data/` | Untracked klasor | Yerel cache/graph ciktilari; repo commit kapsaminda olmamali. |
+| `.coverage` | Untracked dosya | Yerel test artifact'i; commit kapsaminda olmamali. |
+
+### B) Hava Durumu Entegrasyonu - Mevcut Durum
+
+- Haritada bir noktaya tiklandiginda artik o koordinatin hava durumu alinabiliyor.
+- UI tarafinda su an net ve aktif gorunen ana metrik sicaklik (ve temel emoji/aciklama) akisi.
+- Backend tarafinda diger alanlar (yagis, ruzgar, olasilik, advice) mevcut; ancak kullaniciya sunum kapsaminda genisletme gerektiren kisimlar var.
+- Sonraki adim: canli soru-cevap akisi veya detay panel ile diger hava metriklerinin kullaniciya kontrollu sunulmasi.
+
+### C) Semantic POI (Mekan) Cozum Yonu
+
+- Sorun: `cami`, `stadyum`, `okul`, `kantin` gibi kelimeler bazen yer ismi gibi algilanabiliyor.
+- Bu oturumda cozum dosyasi eklendi:
+  - `docs/planlar/poi-semantic-tag-grounding-plani.md`
+- Hedef yon:
+  - Lokasyon ve POI konseptini ayristir.
+  - Concept -> OSM tag grounding adimini BERT semantic eslesme ile yap.
+  - Overpass'i sadece final sonucu cekmekte kullan.
+
+### D) Arayuz ve Turkce Mekan Listesi Notu (Plan)
+
+- Arayuzde bir sonraki fazda POI kategori/etiketlerinin Turkceye cevrilmis ve net bir liste halinde sunulmasi planlandi.
+- Beklenen kullanim:
+  - Kullanici: "Kucukyali'da cami ariyorum"
+  - Sistem: lokasyonu ayristir + POI tipini dogru tag'a bagla + ilgili camileri getir.
+- Bu konu hem UX hem de semantic grounding implementasyonu ile birlikte ilerletilecek.
+
+### E) Commit Icın Onerilen Kapsamlar
+
+Bu degisiklikleri tek commit yerine asagidaki paketler halinde atmak daha saglikli:
+
+1. `feat(weather-ui-and-service-hardening)`
+   - `backend/weather_service.py`, `backend/weather_utils.py`, `frontend/index.html`, `frontend/css/style.css`, `frontend/js/app.js`
+2. `feat(bert-observability-and-parse-trace)`
+   - `backend/app.py`, `backend/bert_engine.py`, `backend/bert_nlp_engine.py`, `frontend/bert-test-lab.html`, `tests/test_core/test_bert_nlp_preprocessing.py`
+3. `docs(index-progress-semantic-poi-plan)`
+   - `PROJECT_INDEX.md`, `progress.md`, `docs/planlar/poi-semantic-tag-grounding-plani.md`, ilgili dokuman guncellemeleri
+4. `chore(deps-compression-codec-fix)`
+   - `requirements.txt`
+
+Not: `.coverage` ve `backend/data/` commit disi tutulmali.
+
+## 2026-03-10 Guncel Not
+
+**Hava Durumu Servisi Faz 1 TAMAMLANDI!** ✅
+
+### 2026-03-10 Oturumu - Hava Durumu Faz 1 Tamamlandi
+
+| # | Degisiklik | Dosya | Durum |
+|---|-----------|-------|-------|
+| 1 | **Hava durumu tasarim belgesi** | `docs/planlar/weather-service-design.md` | ✅ Yeni dosya |
+| 2 | **weather_utils.py modulu** | `backend/weather_utils.py` | ✅ Yeni dosya |
+| 3 | **weather_service.py modulu** | `backend/weather_service.py` | ✅ Yeni dosya |
+| 4 | **API endpoint'leri eklendi** | `backend/app.py` | ✅ Guncellendi |
+| 5 | **Test script'i yazildi** | `backend/test_weather_service.py` | ✅ Yeni dosya |
+| 6 | **Tum testler gecti** | Test Suite | ✅ 11/11 PASS |
+
+### Yeni Dosyalar
+- `docs/planlar/weather-service-design.md` - Kapsamli tasarim belgesi
+- `backend/weather_utils.py` - WMO kodlari, validasyon, cache utilities
+- `backend/weather_service.py` - OpenMeteo API entegrasyonu
+- `backend/test_weather_service.py` - Unit + integration test suite
+
+### Yeni Endpoint'ler
+- `GET /api/weather?lat={lat}&lon={lon}` - Guencel hava durumu
+- `GET /api/weather/forecast?lat={lat}&lon={lon}&hours={hours}` - Saatlik forecast
+- `POST /api/weather/check-route` - Rota boyunca hava kontrolu
+- `GET /api/weather/status` - Servis durumu
+- `GET /api/weather/health` - Saglik kontrolu
+- `POST /api/weather/clear-cache` - Cache temizleme
+
+### Test Sonuclari
+```
+[PASS] Coordinate Validation (8/8)
+[PASS] Hours Validation (6/6)
+[PASS] Weather Code Parsing (7/7)
+[PASS] Weather Emoji (5/5)
+[PASS] Cache Key Building (3/3)
+[PASS] Temperature Formatting (3/3)
+[PASS] Weather Alerts (4/4)
+[PASS] Activity Suggestions (3/3)
+[PASS] Service Import (1/1)
+[PASS] Service Status (3/3)
+[PASS] Cache Operations (4/4)
+---
+TOTAL: 11/11 tests passed
+```
+
+### Ozellikler
+- OpenMeteo API entegrasyonu (API key gerektirmiyor)
+- Memory cache (900 saniye TTL)
+- WMO weather code parsing (0-99 arasi 46 kod)
+- Hava durumu uyarilari (yagmur, sicaklik, ruzgar, sis)
+- Aktivite onerileri (hava durumuna bagli)
+- Heat index ve wind chill hesaplamalari
+
+### Bir Sonraki Adimlar (Faz 2)
+- Timeline entegrasyonu (`time_planner.py`)
+- Frontend hava widget'i
+- Rota kararlarina hava etkisini baglama
+
+### Ogreti Dosyalari (2026-03-10)
+- `docs/ogretici/openmeteo_ornek_kullanim.py` - OpenMeteo API ornek kullanim (baslangic seviyesi)
+- `docs/ogretici/openmeteo-sifirdan-rehber.md` - Sifirdan baglanti rehberi
+- **Ogreti sablonu:** progress.md icinde "Ogreti Yazim Sablonu" bolumu - yeni ogretiler bu formatta yazilacak
+
+---
+
+## 2026-03-09 Arsiv Not
 
 - Hava durumu entegrasyon plani gecici oturum kaydindan geri alindi ve repo icine tasindi: `docs/planlar/hava-durumu-entegrasyon-plani.md`
 - BERT gelistirme akisi ayri plan dokumani olarak eklendi: `docs/planlar/bert-gelistirme-akisi.md`
 - BERT tarafinda yeni yon: `normalize -> mention detection -> candidate retrieval -> place linking -> slot filling -> intent merge`
 - Regex ana cozum degil; sadece dar fallback olarak kalacak.
-- Hava durumu tarafinda planlanan ilk teknik adim: `OpenMeteo tabanli weather_service + weather_utils + temel endpointler`
 
 ### Guncel Odak
 
-1. BERT mention/linking/slot filling kalitesini artirmak
-2. Hava durumu servisinin Faz 1 temel altyapisini kurmak
+1. Hava durumu Faz 2: Timeline entegrasyonu
+2. BERT mention/linking/slot filling kalitesini artirmak
 3. OSM-first ve local cache mantigini kontrollu sekilde genisletmek
 
-> 📂 Aylık ilerleme dosyaları için `progress/` klasörüne bakın
-> 📝 Güncel ay: **[2026-02.md](progress/2026-02.md)**
+> 📂 Detayli planlar: `docs/planlar/`
+> 📝 Son oturum raporu: `günlük-rapor/09.03.2026/09.03.2026.txt`
+
+---
+
+## 📚 Öğretici Yazım Şablonu
+
+**Kullanıcı için öğretici yazıldığında aşağıdaki şablon aynen uygulanmalıdır.**
+
+### Şablon Kuralları
+
+1. **Dosya başlığı:** Konu adı + "(Başlangıç Seviyesi)" veya uygun seviye
+2. **Docstring:** Ne yaptığını, nasıl çalıştırılacağını, gereksinimleri açıkla
+3. **Adım numaraları:** `# ADIM 1:`, `# ADIM 2:` vb. ile bölümler
+4. **Ayırıcı çizgiler:** `# =============================================================================` ile her bölümü ayır
+5. **Her satırın yanında Türkçe açıklama:** Ne yaptığını, neden yaptığını yaz
+6. **Değişken seçimi:** Kullanıcı hangi verileri görecek, önce belirle
+7. **Konum/parametre:** Koordinatlar ve parametreler açıklamalı olsun
+8. **Bağlantı kısmı:** `requests.get()` ne yapıyor, timeout neden var
+9. **Cevap kontrolü:** `status_code` ne anlama geliyor
+10. **Veri çıkarma:** Hangi alan nereden alınıyor
+11. **Hata yakalama:** `try/except` ile ConnectionError, Timeout, Exception açıklamalı
+
+### Örnek Format (Referans)
+
+```
+# =============================================================================
+# ADIM 1: Hangi verileri istediğimizi belirliyoruz (3 değişken)
+# =============================================================================
+# OpenMeteo'dan 3 farklı veri isteyeceğiz:
+# 1. Sıcaklık (temperature_2m) - Kaç derece?
+# 2. Nem (relative_humidity_2m) - Hava ne kadar nemli? (%)
+# 3. Hava durumu kodu (weather_code) - Açık mı, yağmurlu mu?
+
+istek_edilen_veriler = "temperature_2m,relative_humidity_2m,weather_code"
+
+# =============================================================================
+# ADIM 2: Hangi konum için veri istiyoruz? (Koordinatlar)
+# =============================================================================
+# Enlem ve boylam = Dünya üzerinde bir noktanın adresi (sayılarla)
+
+enlem = 41.0      # latitude  - Kuzey/güney konumu
+boylam = 29.0     # longitude - Doğu/batı konumu
+
+# =============================================================================
+# ADIM 4: Bağlantı kuruyoruz ve istek atıyoruz
+# =============================================================================
+# requests.get() = İnternet üzerinden sunucuya "Bu verileri ver" diye sorar
+# timeout=10 = 10 saniye içinde cevap gelmezse vazgeç
+
+cevap = requests.get(api_adresi, params=parametreler, timeout=10)
+```
+
+### Referans Dosyalar
+
+- **Örnek:** `docs/ogretici/openmeteo_ornek_kullanim.py`
+- **Rehber:** `docs/ogretici/openmeteo-sifirdan-rehber.md`
 
 ---
 
@@ -30,9 +222,6 @@ openroute/
 │   └── ...
 │
 ├── progress.md                   ← Bu dosya (giriş noktası)
-├── progress/
-│   └── 2026-02.md                ← Şubat 2026 ilerlemesi
-│
 ├── PROJECT_INDEX.md              ← Projenin tüm bileşenleri için indeks dosyası
 ├── docs/                         ← Dokümantasyon (OSM, raporlar, planlar, referans)
 │   ├── osm/                      ← OSM API rehberleri
@@ -158,10 +347,10 @@ openroute/
    - **OSM API Entegrasyonu** (hazır, test bekliyor):
      - Bilinmeyen yerler için otomatik Nominatim sorgusu
      - Rate limiting (1 sn) ve cache sistemi
-   - ⚠️ Eksikler:
-     - /api/nlp/parse endpoint'i app.py'ye eklenmeli
-     - Frontend entegrasyonu yapılmadı
-     - False positive azaltma iyileştirme gerekli
+   - ⚠️ Guncel eksikler:
+     - `normalize -> mention detection -> candidate retrieval -> place linking -> slot filling` ayristirma refactor'u tamamlanmadi
+     - Origin/destination role atama kalitesi ve false positive azaltma iyilestirmesi gerekli
+     - OSM dynamic retrieval + local cache dengesinin davranis testleri eksik
    - Commitler: 951d0db, 5dcbc85
 
 8. 🌍 **OSM POI Sözlüğü** ✅ YENİ
@@ -186,7 +375,7 @@ openroute/
 - **Overpass API:** OSM veritabanında arama motoru (internetten canlı veri çeker)
 - **Embedding:** Kelimelerin 768 boyutlu matematiksel temsilci vektörleri
 
-## 📅 Son Güncelleme: 08.03.2026 - Alternatif Rota Motoru v3.0 Edge Case Testleri (Uçtan Uca)
+## 📅 Arsiv Kaydi: 08.03.2026 - Alternatif Rota Motoru v3.0 Edge Case Testleri (Uçtan Uca)
 
 ---
 
@@ -255,7 +444,7 @@ openroute/
 
 ---
 
-## 📅 Son Güncelleme: 08.03.2026 - Arama UX, Route Engine Düzeltmeleri ve Dokümantasyon
+## 📅 Arsiv Kaydi: 08.03.2026 - Arama UX, Route Engine Düzeltmeleri ve Dokümantasyon
 
 ---
 
@@ -378,8 +567,8 @@ openroute/
 |---|------|-----------------|---------|
 | 1 | route_config.py'den okuma | Sabitleri taşıdık ama route_engine henüz config'den okumuyor (referans dosyası) | 🟡 Orta |
 | 2 | Uçtan uca test | Backend başlatılamıyor (`torch` versiyon uyumsuzluğu) | 🔴 Yüksek |
-| 3 | BERT `/api/nlp/parse` endpoint | app.py'ye eklenmedi | 🔴 Yüksek |
-| 4 | Frontend BERT entegrasyonu | Endpoint olmadan yapılamaz | 🔴 Yüksek |
+| 3 | BERT `/api/nlp/parse` endpoint | 07.03 oturumunda eklenmemisti (09.03 itibariyla eklendi) | 🔴 Yüksek |
+| 4 | Frontend BERT entegrasyonu | 07.03 oturumunda bagli degildi (09.03 itibariyla temel entegrasyon var) | 🔴 Yüksek |
 | 5 | torch kurulumu düzeltme | `torch==2.5.1` Python 3.13 ile uyumsuz, 2.6.0+ gerekebilir | 🟡 Orta |
 
 ---
@@ -480,13 +669,13 @@ openroute/
 | Frontend eşleşmesi belirsiz | OSM endpoint'leri backend'de var ama frontend'te gerçekten doğru eşleşip eşleşmediği test edilmedi | 🟡 Orta |
 | Entegrasyon planı gerekli | Mekan verilerinin frontend'e nasıl aktarılacağı ve gösterileceği planlanmalı | 🟡 Orta |
 
-### 6. BERT NLP Motoru - ⏳ Yapılacak
+### 6. BERT NLP Motoru - ⚠️ Temel Entegrasyon Var, Kalite Refactor Bekliyor
 | Sorun | Detay | Önem |
 |-------|-------|------|
-| API endpoint yok | `/api/nlp/parse` app.py'ye eklenmedi | 🔴 Yüksek |
-| Frontend bağlantısı yok | Hiçbir arayüz BERT'e bağlı değil | 🔴 Yüksek |
-| False positive | Bazı kelimeleri yanlış yer ismi olarak algılıyor | 🟡 Orta |
-| Öncelik notu | Alternatif rota algoritması netleştikten sonra **bir sonraki büyük adım BERT entegrasyonunu tamamlamak** (unutulmaması için not) | 🟡 Orta |
+| Pipeline ayrıştırma eksik | `normalize -> mention detection -> candidate retrieval -> place linking -> slot filling` tam ayri katmanlara gecmedi | 🔴 Yüksek |
+| Slot atama hatalari | Origin/destination rol atamasi bazi sorgularda yanlis eslesebiliyor | 🔴 Yüksek |
+| False positive | Bazi kelimeleri yanlis yer ismi olarak algiliyor | 🟡 Orta |
+| Oncelik notu | Sonraki buyuk adim BERT kalite/refactor fazini tamamlamak | 🟡 Orta |
 
 ---
 
@@ -503,7 +692,7 @@ openroute/
 | Geocoding | ✅ Evet | Çalışıyor |
 | Geocode Autocomplete | ✅ Evet | Yazarken öneri geliyor, temel akış çalışıyor |
 | BERT Typo Tolerance | ✅ Evet | Kadikoy→Kadıköy %95 |
-| NLP→Frontend Entegrasyon | ❌ Hayır | Henüz yapılmadı |
+| NLP→Frontend Entegrasyon | ✅ Evet | AI panel + parse akisi bagli; kalite ve pipeline refactor calismasi bekliyor |
 
 ---
 
@@ -629,4 +818,3 @@ openroute/
 ### Commit Plani Icin Not
 - Bu envanter, commitleri alanlara bolmek icin hazirlandi.
 - Ayrim onerisi: `db+storage`, `routing`, `nlp+ui`, `docs+scripts`, `encoding cleanup`.
-

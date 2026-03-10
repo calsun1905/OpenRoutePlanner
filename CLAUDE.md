@@ -7,10 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 OpenRoutePlanner is a Turkish-optimized, AI-powered route planning application built with Flask/Python backend and vanilla JavaScript frontend. It uses OpenStreetMap data via OSMnx/NetworkX for routing, and BERT (Transformers/PyTorch) for Turkish natural language query processing.
 
 **Key Architecture Points:**
-- Backend: Flask API in `OpenRoutePlanner/backend/app.py` (~1300 lines)
-- Route Engine: Dijkstra, TSP, via-node alternative routes in `route_engine.py`
+- Backend: Flask API in `backend/app.py` (~1300 lines) with 25+ endpoints
+- Route Engine: Dijkstra, TSP, via-node alternative routes in `route_engine.py` (v3.0)
 - NLP: Dual engine - BERT (`bert_nlp_engine.py`) + regex fallback (`nlp_engine.py`)
 - Graph Management: OSMnx graph caching with LRU + TTL in `graph_manager.py`
+- Weather: OpenMeteo integration in `weather_service.py` (v1.0)
 - Storage: SQLite for routes/locations with `route_storage.py` and `location_storage.py`
 
 ## Common Commands
@@ -40,6 +41,10 @@ python -c "from bert_nlp_engine import test_bert_nlp; test_bert_nlp()"
 
 # Gold dataset evaluation
 python scripts/tools/evaluate_bert_gold.py --limit 10
+
+# Weather service testing
+cd backend
+python test_weather_service.py    # Run all weather tests (11 tests)
 ```
 
 ## Route Engine Architecture (v3.0)
@@ -141,6 +146,31 @@ Control BERT behavior at runtime:
 - `ORP_BERT_SEED_DYNAMIC=1/0` - Load cached OSM places from local_places
 - `ORP_BERT_SEED_USER_LOCATIONS=1/0` - Load user's saved locations
 
+Control logging output:
+- `ORP_LOG_FORCE_PRINT_FLUSH=1/0` - Force print() to flush immediately (default: 1)
+
+## Weather Service (v1.0)
+
+OpenMeteo API integration ([`weather_service.py`](backend/weather_service.py)):
+
+**Features:**
+- No API key required (OpenMeteo is free)
+- Memory cache with 900s TTL
+- WMO weather code parsing (0-99 codes)
+- Weather alerts (rain, temperature, wind, fog)
+- Activity suggestions based on conditions
+- Heat index and wind chill calculations
+
+**Endpoints:**
+- `GET /api/weather?lat={lat}&lon={lon}` - Current weather
+- `GET /api/weather/forecast?lat={lat}&lon={lon}&hours={hours}` - Hourly forecast
+- `POST /api/weather/check-route` - Weather check along route
+- `GET /api/weather/status` - Service status
+- `GET /api/weather/health` - Health check
+- `POST /api/weather/clear-cache` - Clear cache
+
+**Utilities:** [`weather_utils.py`](backend/weather_utils.py) - WMO codes, validation, cache functions
+
 ## Testing Conventions
 
 Tests are in `tests/test_api/` and `tests/test_core/`. Test files:
@@ -154,9 +184,11 @@ Tests are in `tests/test_api/` and `tests/test_core/`. Test files:
 - `backend/` - All Python code, Flask app lives here
 - `frontend/` - Vanilla JS, no build step required
 - `docs/osm/` - OpenStreetMap API guides (Nominatim, Overpass)
-- `docs/planlar/` - Design documents, database schema
+- `docs/ogretici/` - Turkish tutorials (e.g., OpenMeteo API usage)
+- `docs/planlar/` - Design documents, database schema, weather service plans
 - `scripts/tools/` - Utility scripts (BERT evaluation, OSM downloads)
 - `progress.md` - Primary source for development status, work log
+- `günlük-rapor/` - Daily session notes and reports
 
 ## Important Gotchas
 

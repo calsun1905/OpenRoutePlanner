@@ -1,170 +1,270 @@
-# 📑 OpenRoutePlanner — Proje İndeksi
+# OpenRoutePlanner - Live Project Index
 
-> Bu dosya projenin tüm bileşenlerini, dosya yapısını ve API endpoint'lerini tek bir yerden görmenizi sağlar.  
-> **Son güncelleme:** 07.03.2026
+Last updated: 2026-03-10
 
----
+This index reflects the current codebase state in `OpenRoutePlanner` and is intended as a working map for future feature add/remove/refactor tasks.
 
-## 📂 Proje Kök Yapısı
+## 1) Top-Level Structure
 
-```
-routeplanner/
-├── OpenRoutePlanner/          ← Ana proje klasörü
-│   ├── backend/               ← Python Flask API
-│   ├── frontend/              ← HTML/CSS/JS arayüz
-│   ├── progress.md            ← İlerleme takibi (ana kaynak)
-│   ├── PROJECT_INDEX.md       ← Bu dosya (proje indeksi)
-│   ├── docs/                  ← Dokümantasyon (OSM, raporlar, planlar)
-│   │   ├── osm/               ← OSM_API_REHBERI.md, nominatim-osm-basit.md vb.
-│   │   ├── raporlar/          ← Test ve fix raporları
-│   │   ├── planlar/           ← VERITABANI_DOKUMANTASYONU.md, PERFORMANS vb.
-│   │   └── DOSYA_YAPISI.md    ← Dosya yapısı rehberi
-│   ├── scripts/               ← Fix ve yardımcı scriptler
-│   │   ├── fix/               ← Encoding fix scriptleri
-│   │   └── tools/             ← download_istanbul.py, test_*.py vb.
-│   └── günlük-rapor/          ← Günlük notlar
-│
-├── cache/                     ← API cache dosyaları (JSON)
-├── .claude/                   ← Cursor/Claude ayarları
-└── .vscode/                   ← VS Code ayarları
-```
+- `backend/`: Flask API, route engine, NLP/BERT, weather, storage, caching.
+- `frontend/`: Main web UI (`index.html`) + JS/CSS + BERT test lab.
+- `tests/`: Pytest suites (`test_api`, `test_core`) + BERT gold data.
+- `scripts/`: Utility scripts (`tools`, `fix`, debugging helpers).
+- `docs/`: Design notes, plans, reports, OSM references.
+- `backend/data/`: SQLite app DB + GraphML map caches.
+- `backend/cache/`: geocode + district DB + hashed API/cache artifacts.
 
----
+## 2) Runtime Architecture (High Level)
 
-## 🗂️ Backend Dosyaları (Python)
+1. `backend/app.py` boots Flask and runs startup init (`ensure_db`, sqlite maintenance, geocode purge, graph preload).
+2. Frontend calls API endpoints for route, geocode, NLP, storage, timeline.
+3. Route calculations use `graph_manager.py` + `route_engine.py` (OSMnx + NetworkX).
+4. NLP parse path uses BERT stack (`bert_engine.py` + `bert_nlp_engine.py`).
+5. Weather endpoints call `weather_service.py` (Open-Meteo) + `weather_utils.py`.
+6. Persistence is SQLite via `storage_db.py`, `route_storage.py`, `location_storage.py`.
 
-| Dosya | Satır | Açıklama |
-|-------|-------|----------|
-| **app.py** | ~994 | Flask API sunucusu — tüm endpoint'ler burada tanımlı |
-| **graph_manager.py** | ~193 | OSMnx ile OSM harita verisi indirme, cache, POI arama |
-| **route_engine.py** | ~1150 | Rota hesaplama çekirdeği v3.0 — Dijkstra, TSP, alternatif rotalar |
-| **route_config.py** | 133 | Rota motoru konfigürasyon sabitleri (31 anahtar) |
-| **route_storage.py** | — | Rota kaydetme, yükleme, silme, favorileme |
-| **location_storage.py** | — | Kayıtlı yerler (CRUD), favorileme |
+## 3) Backend Module Index
 
-### Backend Bağımlılıkları (app.py import'ları)
+### Core Entry + Service Files
 
-- `graph_manager`: `get_graph`, `get_graph_for_points`, `search_pois`
-- `geocoder`: `geocode`, `reverse_geocode`, `geocode_batch` *(dosya mevcut değilse oluşturulmalı)*
-- `geocoder`: `geocode`, `reverse_geocode`, `geocode_batch`
-- `route_engine`: `solve_tsp`, `build_full_route`, `build_alternative_routes`, `build_all_alternative_routes_batch`, `nodes_to_coords`, `calculate_route_stats`, `generate_google_maps_link`
-- `route_storage`: `save_route`, `get_route`, `get_all_routes`, `update_route`, `delete_route`, `toggle_favorite`, `search_routes`, `get_statistics`
-- `time_planner`: `create_timeline`, `format_duration`, `check_time_conflicts`, `optimize_schedule` *(dosya mevcut değilse oluşturulmalı)*
-- `location_storage`: `save_location`, `get_all_locations`, `update_location`, `delete_location`, `toggle_location_favorite`
+| File | Lines | Responsibility |
+|---|---:|---|
+| `backend/app.py` | 1520 | Flask app, endpoint registry, startup lifecycle, API wiring |
+| `backend/route_engine.py` | 1030 | Shortest path, TSP, alternative routes, overlap/penalty/via-node logic |
+| `backend/graph_manager.py` | 227 | Graph download/load/cache, nearest node, POI search, preload regions |
+| `backend/geocoder.py` | 523 | Forward/reverse/suggest geocoding + sqlite cache + rate limit |
+| `backend/route_storage.py` | 330 | Route CRUD/statistics/favorite/search |
+| `backend/location_storage.py` | 221 | Saved location CRUD/favorite/search/usage |
+| `backend/time_planner.py` | 269 | Timeline generation/conflict check/schedule optimize |
+| `backend/storage_db.py` | 239 | SQLite pooled connection + schema + maintenance |
+| `backend/cache_manager.py` | 228 | In-memory LRU caches (graph + POI) |
 
----
+### NLP / BERT / Weather Focus Files
 
-## 🌐 API Endpoint'leri (app.py)
+| File | Lines | Responsibility |
+|---|---:|---|
+| `backend/bert_engine.py` | 310 | BERT model load/encode/similarity + runtime metrics |
+| `backend/bert_nlp_engine.py` | 1062 | Query classification, place extraction, OSM-backed place DB, parse orchestration |
+| `backend/nlp_engine.py` | 373 | Legacy regex parser (still present, not active primary parse path) |
+| `backend/weather_service.py` | 981 | Open-Meteo current/forecast/route weather, cache, health/status |
+| `backend/weather_utils.py` | 923 | Weather code maps, validation, formatting, alerts/suggestions |
 
-### Rota ve Harita
+### Support / Schema / Utilities
 
-| Endpoint | Metod | Açıklama |
-|----------|-------|----------|
-| `/api/get-route` | POST | Koordinat listesi → optimize rota (TSP), mesafe, süre, Google Maps linki |
-| `/api/get-alternative-routes` | POST | Alternatif rotalar (v3.0: Dijkstra + Via-Node + Gövde-only Penalty) |
-| `/api/search-pois` | POST | POI arama (kategori + bölge) — Overpass API |
-| `/api/geocode` | POST | Yer ismi → koordinat (Nominatim) |
-| `/api/reverse-geocode` | POST | Koordinat → yer ismi |
-| `/api/geocode/batch` | POST | Toplu geocoding |
-| `/api/health` | GET | Sağlık kontrolü |
+| File | Lines | Responsibility |
+|---|---:|---|
+| `backend/models.py` | 372 | Pydantic request/response/domain schemas |
+| `backend/response_utils.py` | 514 | Standardized API responses and helpers |
+| `backend/spatial_index.py` | 415 | POI spatial indexing/cache helpers |
+| `backend/route_config.py` | 117 | Route and cache tuning constants |
+| `backend/local_places.py` | 201 | Seed + dynamic local place store |
+| `backend/turkey_places.py` | 105 | Static Turkey places dataset helper |
+| `backend/osm_poi_dictionary.py` | 225 | Turkish keyword -> OSM tag mapping |
+| `backend/districts_db.py` | 193 | District sqlite helper + search |
 
-### Rota Kaydetme/Yükleme
+## 4) Actual API Endpoint Index (`backend/app.py`)
 
-| Endpoint | Metod | Açıklama |
-|----------|-------|----------|
-| `/api/routes/save` | POST | Rota kaydet |
-| `/api/routes` | GET | Tüm rotaları listele |
-| `/api/routes/<id>` | GET | Tek rota getir |
-| `/api/routes/<id>` | PUT | Rota güncelle |
-| `/api/routes/<id>` | DELETE | Rota sil |
-| `/api/routes/<id>/favorite` | POST | Favori aç/kapa |
-| `/api/routes/search` | GET | Rota ara |
-| `/api/routes/statistics` | GET | İstatistikler |
+### Route + POI
 
-### Zaman Planlama
+- `POST /api/get-route`
+- `POST /api/get-alternative-routes`
+- `POST /api/search-pois`
 
-| Endpoint | Metod | Açıklama |
-|----------|-------|----------|
-| `/api/timeline/create` | POST | Zaman çizelgesi oluştur |
-| `/api/timeline/check-conflicts` | POST | Çakışma kontrolü |
-| `/api/timeline/optimize` | POST | Zamanlama optimizasyonu |
+### Health + Geocode
 
-### Kayıtlı Yerler
+- `GET /api/health`
+- `GET /api/geocode/suggest`
+- `POST /api/geocode`
+- `POST /api/reverse-geocode`
+- `POST /api/geocode/batch`
 
-| Endpoint | Metod | Açıklama |
-|----------|-------|----------|
-| `/api/locations` | GET | Tüm kayıtlı yerler |
-| `/api/locations` | POST | Yer ekle |
-| `/api/locations/<id>` | PUT | Yer güncelle |
-| `/api/locations/<id>` | DELETE | Yer sil |
-| `/api/locations/<id>/favorite` | POST | Favori aç/kapa |
+### Frontend Serving
 
-### Statik
+- `GET /`
+- `GET /<path:filepath>`
 
-| Endpoint | Metod | Açıklama |
-|----------|-------|----------|
-| `/` | GET | Ana sayfa (frontend) |
+### Routes Storage
 
----
+- `POST /api/routes/save`
+- `GET /api/routes`
+- `GET /api/routes/<route_id>`
+- `PUT /api/routes/<route_id>`
+- `DELETE /api/routes/<route_id>`
+- `POST /api/routes/<route_id>/favorite`
+- `GET /api/routes/search`
+- `GET /api/routes/statistics`
 
-## 🖥️ Frontend Dosyaları
+### Timeline
 
-| Dosya | Açıklama |
-|-------|----------|
-| **index.html** | Ana sayfa — OpenTrip arayüzü |
-| **css/style.css** | Stil dosyası |
-| **js/app.js** | Ana JavaScript — harita, rota, POI, kayıtlı yerler |
+- `POST /api/timeline/create`
+- `POST /api/timeline/check-conflicts`
+- `POST /api/timeline/optimize`
 
-### Frontend Ana Bileşenler (index.html)
+### Locations Storage
 
-- **Sidebar:** Seçilen noktalar, yer arama, bölge seçimi, POI butonları
-- **Harita:** Leaflet tabanlı interaktif harita
-- **Rota butonları:** Hesapla, Alternatif Rotalar, Zaman Planla, Kaydet
-- **Kayıtlı yerler:** İkon seçimi, favorileme
+- `GET /api/locations`
+- `POST /api/locations`
+- `DELETE /api/locations/<location_id>`
+- `PUT /api/locations/<location_id>`
+- `POST /api/locations/<location_id>/favorite`
 
----
+### NLP / BERT
 
-## 📚 Dokümantasyon Dosyaları
+- `POST /api/nlp/parse`
+- `GET /api/nlp/status`
+- `POST /api/nlp/similarity`
+- `POST /api/nlp/best-match`
 
-| Dosya | İçerik |
-|-------|--------|
-| **progress.md** | İlerleme takibi, özellik listesi, bilinen sorunlar, TODO |
-| **docs/DOSYA_YAPISI.md** | Dosya yapısı rehberi — tüm docs ve scripts konumları |
-| **docs/osm/OSM_API_REHBERI.md** | Nominatim, Overpass, Taginfo — OSM tag sistemi |
-| **docs/planlar/VERITABANI_DOKUMANTASYONU.md** | Veritabanı yapısı ve kullanım |
-| **PROJECT_INDEX.md** | Bu dosya — proje indeksi |
+### Weather
 
----
+- `GET /api/weather`
+- `GET /api/weather/forecast`
+- `POST /api/weather/check-route`
+- `GET /api/weather/status`
+- `GET /api/weather/health`
+- `POST /api/weather/clear-cache`
 
-## 🔧 route_engine.py v3.0 Özeti
+## 5) BERT-Focused Deep Index
 
-| Özellik | Açıklama |
-|---------|----------|
-| **Dijkstra** | Ana rota (en kısa yol) |
-| **Via-Node** | Ana rotadan uzak kavşaklardan geçen alternatif rotalar |
-| **Gövde-only Penalty** | Baş/son %10'a dokunmadan sadece gövdeye ceza |
-| **Asimetrik Overlap** | "Yeni rotanın % kaçı eskiyle aynı?" (Jaccard yerine) |
+### Main BERT files
 
----
+- `backend/bert_engine.py`: model lifecycle, embedding generation, similarity API, runtime GPU metrics.
+- `backend/bert_nlp_engine.py`: end-to-end NLP parsing with semantic templates and place matching.
+- `frontend/bert-test-lab.html`: dedicated BERT test UI hitting `/api/nlp/*`.
+- `tests/data/bert_gold_tr_v1.jsonl`: gold dataset for BERT evaluation scripts.
+- `scripts/tools/evaluate_bert_gold.py`: BERT gold evaluation utility.
 
-## 📦 Harici Bağımlılıklar (Tahmini)
+### BERT runtime behavior (current)
 
-- **Python:** Flask, flask-cors, osmnx, networkx
-- **Frontend:** Leaflet, Google Fonts (Inter)
-- **API'ler:** Nominatim (geocoding), Overpass (POI)
+- Model: `dbmdz/bert-base-turkish-uncased`.
+- Default policy: GPU required (`ORP_BERT_FORCE_GPU=1` by default).
+- If GPU is not available and force mode is on, engine raises runtime error.
+- Runtime metrics available via `BERTEngine.get_runtime_metrics()`.
 
----
+### BERT parse pipeline (current)
 
-## 🚀 Hızlı Başlangıç
+1. Query type classification via semantic template embeddings (`route/poi/multi/single`).
+2. Candidate span extraction with Turkish suffix role hints (`from/to/loc`).
+3. Place matching against in-memory place DB embeddings.
+4. Optional OSM-backed dynamic enrichment and local dynamic cache write.
+5. Intent refinement based on role hints and cue words.
+6. Structured response assembly (`type`, `confidence`, entities, parse_time).
 
-1. Backend: `cd OpenRoutePlanner/backend && python app.py`
-2. Tarayıcı: `http://localhost:5000`
-3. Haritaya tıklayarak nokta ekleyin → "Rota Hesapla" → Alternatif rotaları inceleyin
+### BERT place data sources (ordered by config)
 
----
+- dynamic OSM cache (`local_places` dynamic entries),
+- local seed places (`local_places`),
+- user-saved locations (`location_storage`),
+- static Turkey places (`turkey_places`).
 
-## 📌 Önemli Notlar
+### BERT-related env flags
 
-- **Cache:** `backend/data/*.graphml` — OSM grafları
-- **Rota/Location storage:** JSON veya SQLite (dosya yapısına göre)
-- **BERT NLP:** progress.md'de bahsediliyor; `app.py`'de endpoint yok (TODO)
+- `ORP_BERT_FORCE_GPU`
+- `ORP_BERT_LOG_METRICS`
+- `ORP_BERT_METRICS_INTERVAL_SEC`
+- `ORP_BERT_USE_OSM`
+- `ORP_BERT_PREFER_OSM_FIRST`
+- `ORP_BERT_SEED_DYNAMIC`
+- `ORP_BERT_SEED_LOCAL`
+- `ORP_BERT_SEED_STATIC`
+- `ORP_BERT_SEED_USER_LOCATIONS`
+
+### Important note
+
+- `POST /api/nlp/parse` currently requires BERT availability and returns `503` if unavailable.
+- Legacy regex parser still exists (`backend/nlp_engine.py`) but is not the active parse path.
+
+## 6) Weather-Focused Deep Index
+
+### Main weather files
+
+- `backend/weather_service.py`: API client + parser + cache + service status/health.
+- `backend/weather_utils.py`: weather code parsing, data checks, helper formatting/alerts.
+- `backend/app.py`: weather endpoint surface under `/api/weather*`.
+- `backend/test_weather_service.py`: standalone weather test script (not in `tests/` package).
+
+### Weather service behavior
+
+- Provider: Open-Meteo (`https://api.open-meteo.com/v1/forecast`).
+- In-memory cache TTL: `900s` (15 minutes).
+- Request timeout: `10s`.
+- Supported operations:
+  - current weather by coordinates,
+  - hourly forecast (`1..168` hours),
+  - route weather checks for multiple points,
+  - service status and health,
+  - cache clear.
+
+### Route weather output model
+
+- `route_weather`: per-point weather records.
+- `warnings`: weather alerts synthesized from utility rules.
+- `overall_conditions`: aggregate route condition label.
+
+### Important note
+
+- Weather endpoints exist in backend, but main frontend (`frontend/js/app.js`) currently has no direct weather fetch calls. UI integration is pending if weather should be visible in primary UX.
+
+## 7) Frontend Index
+
+### Files
+
+- `frontend/index.html` (435): main app shell.
+- `frontend/js/app.js` (1616): app logic for map, routes, POI, saved entities, NLP.
+- `frontend/css/style.css` (1613): style system including NLP block styles.
+- `frontend/bert-test-lab.html` (829): BERT diagnostic playground.
+
+### Main frontend modules in `app.js`
+
+- Point management + drag/sort.
+- Route calculation + rendering.
+- Alternative routes UI.
+- POI search/render.
+- Geocode search + suggestions.
+- NLP query flow (`/api/nlp/parse`) + apply/focus actions.
+- Saved routes and saved locations CRUD UI.
+- Timeline generation UI.
+
+### Current frontend integration snapshot
+
+- NLP integrated in main UI.
+- Weather not wired into main UI (backend-only endpoint surface).
+
+## 8) Data and Persistence Map
+
+- Main app DB: `backend/data/app_data.db`
+- Graph caches: `backend/data/*.graphml`
+- Geocode/district caches: `backend/cache/geocodes.db`, `backend/cache/districts_turkey.db`
+- Weather cache: in-memory process cache (not persisted to disk by default)
+
+## 9) Test and Quality Snapshot (2026-03-10)
+
+Command run:
+
+`.\.venv\Scripts\python.exe -m pytest -q`
+
+Result:
+
+- 25 tests collected
+- 18 passed
+- 7 failed
+
+Observed drift points:
+
+- `tests/test_api/test_routes.py` uses Flask test client with unsupported `query=` argument.
+- Tests still target old geocode shape (`/api/geocode/forward`, `/api/geocode/reverse`) while app uses `POST /api/geocode` and `POST /api/reverse-geocode`.
+- `tests/test_core/test_route_engine.py` imports `get_overlap_threshold` which does not exist in current `route_engine.py` (current function: `dynamic_overlap_threshold`).
+- One overlap expectation does not match current asymmetric overlap logic (`count_edge_overlap` behavior changed).
+
+## 10) Change Entry Points (for next tasks)
+
+If a change request is about:
+
+- **BERT parse behavior**: start from `backend/bert_nlp_engine.py` (`classify_query_type`, `extract_places`, `parse`).
+- **BERT model/runtime policy**: `backend/bert_engine.py` (`__init__`, `get_runtime_metrics`).
+- **Weather data and alerts**: `backend/weather_service.py` + `backend/weather_utils.py`.
+- **Weather endpoint contracts**: `backend/app.py` weather routes (`/api/weather*`).
+- **Main UI behavior**: `frontend/js/app.js` + `frontend/index.html`.
+- **Route algorithm changes**: `backend/route_engine.py` + `backend/route_config.py`.
+- **Storage behavior**: `backend/route_storage.py`, `backend/location_storage.py`, `backend/storage_db.py`.
+

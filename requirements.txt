@@ -1,6 +1,10 @@
 flask==3.1.0
 flask-cors==5.0.1
 flask-compress==1.17
+# Flask-Compress codec backend'lerini sabit tutuyoruz.
+# brotlicffi yerine brotli kullanimi hedeflenir (urllib3 uyumlulugu).
+brotli==1.2.0
+zstandard==0.25.0
 osmnx==2.0.1
 networkx==3.4.2
 scikit-learn==1.6.1

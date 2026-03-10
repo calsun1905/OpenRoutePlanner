@@ -1,0 +1,113 @@
+OTURUM NOTU
+Tarih: 11.03.2026
+Konu: BERT + Weather + Semantic POI + Commit Hazirligi
+
+1) Oturum Amaci
+- Degisen dosyalari tek tek incelemek
+- Son durumu GitHub commit acisindan netlestirmek
+- progress.md ve gunluk raporu, gercek teknik duruma gore guncellemek
+
+2) Dosya Bazli Teknik Inceleme
+
+2.1 Etkili Degisiklik Olan Dosyalar
+- backend/app.py
+  - Runtime init akisi duzenlendi (lazy init + startup preload kontrolu).
+  - BERT parse trace loglamasi eklendi.
+  - BERT runtime metric loglamasi parse/similarity/best-match adimlarina eklendi.
+  - Timeline olusturmada include_weather akisi ve weather alanlari genisletildi.
+
+- backend/bert_engine.py
+  - GPU zorunlu mod politikasi netlestirildi.
+  - `ORP_BERT_FORCE_GPU` ve `ORP_BERT_STRICT_GPU` ile davranis ayrildi.
+  - Runtime GPU metrik raporlama eklendi.
+  - Best match return tipleri JSON-safe hale getirildi (float/int cast).
+
+- backend/bert_nlp_engine.py
+  - Query noise listesi ve suffix soyma kurallari iyilestirildi.
+  - Trace odakli parse altyapisi eklendi:
+    - query-type score dagilimi
+    - span bazli kabul/ret detaylari
+    - secilen final alanlarin ozet logu
+  - multi/single secim davranisinda kalite artisi.
+
+- backend/weather_service.py
+  - OpenMeteo cagrilarina retry + exponential backoff eklendi.
+  - Saat bazli hedef zamanda hava secimi (`get_weather_at_time`) eklendi.
+  - Route weather sonucuna advice alanlari eklendi.
+
+- backend/weather_utils.py
+  - `get_weather_advice()` eklendi (alert_level + maddeli tavsiye).
+
+- frontend/index.html
+  - Weather widget ve weather banner container'lari eklendi.
+
+- frontend/css/style.css
+  - Weather widget / banner / timeline weather-advice stilleri eklendi.
+
+- frontend/js/app.js
+  - Nokta ekle/sil/temizle akislarina weather widget baglandi.
+  - Rota hesaplama sonrasi weather banner kontrolu eklendi.
+  - Timeline kartlarinda weather + advice gosterimi eklendi.
+  - NLP parse istegine `debug: true` parametresi eklendi.
+
+- frontend/bert-test-lab.html
+  - Mod bazli dogrulama paneli.
+  - fallback guard ve detayli debug log paneli.
+  - tum modlari tek tusla dogrulama.
+
+- requirements.txt
+  - `brotli==1.2.0`, `zstandard==0.25.0` pinlendi.
+
+- tests/test_core/test_bert_nlp_preprocessing.py
+  - BERT preprocessing/suffix/noise filtre unit testleri eklendi.
+
+- docs/planlar/poi-semantic-tag-grounding-plani.md
+  - Hardcoded kelime sozlugu olmadan semantic POI grounding tasarimi eklendi.
+
+- backend/tag_grounder.py
+  - Dinamik OSM profile + embedding matching PoC dosyasi eklendi.
+
+- PROJECT_INDEX.md
+  - Proje mimarisi ve endpoint haritasi canli duruma gore guncellendi.
+
+- CLAUDE.md
+  - Mimari/komut/notlar weather ve runtime basliklariyla guncellendi.
+
+2.2 Teknik Olarak Modified Ama Icerik Farki Olmayanlar
+- backend/geocoder.py
+- backend/storage_db.py
+- docs/ogretici/openmeteo-sifirdan-rehber.md
+- docs/planlar/weather-service-akis-diyagrami.md
+
+2.3 Commit Disi Kalmasi Gerekenler
+- .coverage
+- backend/data/
+
+3) Hava Durumu Durumu (Kullaniciya Gore Kritik Not)
+- Mevcut durumda haritada bir noktaya basinca o noktanin hava durumu alinabiliyor.
+- UI tarafinda sicaklik ve temel ozet aktif.
+- Diger metrikler backend'de mevcut; kullaniciya daha zengin sunum icin UI/genisletme gerekiyor.
+- Canli soru-cevap benzeri bir panelle bu metrikler adim adim acilabilir.
+
+4) Semantic POI Durumu ve Yol Haritasi
+- Problem: "cami" gibi kavramlarin yer adi gibi eslesmesi.
+- Cozum dosyasi: docs/planlar/poi-semantic-tag-grounding-plani.md
+- Sonraki teknik adim:
+  - lokasyon + concept ayrimi
+  - concept -> OSM tag semantic grounding
+  - Overpass sadece final sonuclar icin
+
+5) Arayuz Plan Notu (Yeni Talep)
+- Mekan isimleri/kategorileri Turkce liste olarak arayuze alinacak.
+- Hedef ornek:
+  - "Kucukyali'da cami ariyorum"
+  - sistem lokasyonu ayiracak, cami konseptini tag'e cevirip ilgili camileri getirecek.
+
+6) Commit Plani (GitHub icin Oneri)
+- Commit-1: weather service + weather UI
+- Commit-2: BERT trace/metrics + NLP kalite iyilestirmeleri + test
+- Commit-3: docs/index/progress + semantic POI plan dosyasi
+- Commit-4: dependency/ortam sabitleme (requirements)
+
+Toplam onerilen commit sayisi: 4
+
