@@ -846,13 +846,14 @@ function setNlpLoading(isLoading) {
 
 function buildNlpSummary(result) {
     if (result.type === "route") {
-        return `${escapeHtml(result.origin || "?" )} → ${escapeHtml(result.destination || "?")}`;
+        return `${escapeHtml(result.origin || "?")} → ${escapeHtml(result.destination || "?")}`;
     }
     if (result.type === "multi") {
         return (result.locations || []).map(escapeHtml).join(" → ");
     }
     if (result.type === "poi") {
-        return `${escapeHtml(result.location || "Bilinmeyen konum")} için mekan araması`;
+        const concept = result.poi_concept ? ` (${escapeHtml(result.poi_concept)})` : "";
+        return `${escapeHtml(result.location || "Bilinmeyen konum")} için mekan araması${concept}`;
     }
     if (result.type === "single") {
         return `${escapeHtml(result.destination || "Bilinmeyen hedef")} hedef olarak algılandı`;
@@ -995,10 +996,48 @@ async function focusNlpLocation() {
         const place = await geocodePlaceName(placeName);
         map.setView([place.lat, place.lon], 16);
         addPoint(place.lat, place.lon);
-        showToast(`"${placeName}" haritada gösterildi`, "success");
+
+        if (currentNlpResult.type === "poi" && currentNlpResult.poi_tags) {
+            await searchPoisFromNlp(currentNlpResult);
+        } else {
+            showToast(`"${placeName}" haritada gösterildi`, "success");
+        }
     } catch (error) {
         console.error("NLP konum gösterme hatası:", error);
         showToast(`Hata: ${error.message}`, "error");
+    } finally {
+        hideLoading();
+    }
+}
+
+async function searchPoisFromNlp(nlpResult) {
+    const location = nlpResult.location;
+    const tags = nlpResult.poi_tags;
+    const category = nlpResult.poi_category || nlpResult.poi_concept || "semantic";
+
+    if (!location || !tags) {
+        return;
+    }
+
+    const place = `${location}, Turkey`;
+    showLoading(`"${category}" mekanları aranıyor...`);
+    try {
+        const response = await fetch(`${API_BASE}/search-pois`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ place, category, tags }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || "POI araması başarısız");
+        }
+
+        displayPois(data.pois || [], category);
+        showToast(`${(data.pois || []).length} adet "${category}" bulundu`, "success");
+    } catch (error) {
+        console.error("NLP POI arama hatası:", error);
+        showToast(`POI arama hatası: ${error.message}`, "error");
     } finally {
         hideLoading();
     }
@@ -1052,7 +1091,7 @@ async function showAlternativeRoutes() {
  */
 function displayAlternativeRoutes(alternatives) {
     elAlternativesPanel.style.display = "block";
-    
+
     // Cache'i doldur (BUG FIX: 07.03.2026 - alternativeRoutesCache init)
     alternativeRoutesCache = {};
     alternatives.forEach(alt => {
@@ -1551,6 +1590,13 @@ function displayTimeline(timeline) {
             </div>
         </div>
         
+        ${timeline.weather_summary ? `
+        <div class="weather-alert-banner ${timeline.weather_summary.alert_level}">
+            <span class="weather-banner-emoji">${timeline.weather_summary.emoji}</span>
+            <span class="weather-banner-text">${escapeHtml(timeline.weather_summary.summary_text)}</span>
+        </div>
+        ` : ''}
+        
         <div class="timeline-items">
     `;
 
@@ -1584,8 +1630,8 @@ function displayTimeline(timeline) {
                     ${item.weather.advice && item.weather.advice.items && item.weather.advice.items.length > 0 ? `
                     <div class="timeline-advice timeline-advice-${item.weather.advice.alert_level}">
                         ${item.weather.advice.items.map(a =>
-                            `<span class="tl-advice-item"><span class="tl-advice-emoji">${a.emoji}</span><span class="tl-advice-text">${escapeHtml(a.text)}</span></span>`
-                        ).join('')}
+            `<span class="tl-advice-item"><span class="tl-advice-emoji">${a.emoji}</span><span class="tl-advice-text">${escapeHtml(a.text)}</span></span>`
+        ).join('')}
                     </div>` : ''}
                     ` : ''}
                     ${!isLast ? `
@@ -1881,7 +1927,7 @@ function toggleSavedLocationsVisibility() {
 // Tüm inline onclick handlers yerine tek bir event listener kullanılır
 // Bu, XSS saldırılarını önler ve daha iyi performans sağlar
 
-document.addEventListener("click", function(e) {
+document.addEventListener("click", function (e) {
     // Find closest element with data attribute (handles nested clicks)
     const target = e.target.closest("[data-action-remove-point]");
     if (target) {
@@ -1963,7 +2009,7 @@ document.addEventListener("click", function(e) {
 });
 
 // Handle stopPropagation for action buttons inside cards
-document.addEventListener("click", function(e) {
+document.addEventListener("click", function (e) {
     if (e.target.closest("[data-stop-propagation]")) {
         e.stopPropagation();
     }

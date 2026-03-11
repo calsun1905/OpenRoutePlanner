@@ -47,7 +47,8 @@ def create_timeline(
     start_time: str = "09:00",
     visit_duration: int = 30,
     transport_mode: str = "walking",
-    custom_durations: Dict[int, int] = None
+    custom_durations: Dict[int, int] = None,
+    include_weather: bool = False
 ) -> Dict:
     """
     Rota için zaman çizelgesi oluşturur.
@@ -59,6 +60,7 @@ def create_timeline(
         visit_duration: Varsayılan ziyaret süresi (dakika)
         transport_mode: Ulaşım modu
         custom_durations: Özel ziyaret süreleri {point_index: duration_minutes}
+        include_weather: True ise her noktaya varış saatindeki hava durumu eklenir
     
     Returns:
         dict: Zaman çizelgesi
@@ -68,6 +70,7 @@ def create_timeline(
             "total_duration_minutes": 330,
             "total_travel_time_minutes": 90,
             "total_visit_time_minutes": 240,
+            "weather_summary": {...},   # include_weather=True ise
             "schedule": [
                 {
                     "point_index": 0,
@@ -75,7 +78,8 @@ def create_timeline(
                     "arrival_time": "09:00",
                     "departure_time": "09:30",
                     "visit_duration_minutes": 30,
-                    "next_travel_time_minutes": 15
+                    "next_travel_time_minutes": 15,
+                    "weather": {...}    # include_weather=True ise
                 },
                 ...
             ]
@@ -93,6 +97,18 @@ def create_timeline(
         return {
             "error": "Geçersiz saat formatı. HH:MM kullanın (örn: 09:00)"
         }
+    
+    # Hava durumu modülünü lazy import et (circular import ve opsiyonel bağımlılık)
+    _get_weather_at_time = None
+    _get_weather_advice = None
+    if include_weather:
+        try:
+            from weather_service import get_weather_at_time as _gwat
+            from weather_utils import get_weather_advice as _gwa
+            _get_weather_at_time = _gwat
+            _get_weather_advice = _gwa
+        except ImportError:
+            include_weather = False
     
     schedule = []
     total_travel_time = 0
@@ -121,7 +137,7 @@ def create_timeline(
         
         total_visit_time += duration
         
-        schedule.append({
+        entry = {
             "point_index": i,
             "point_name": point.get("name", f"Nokta {i + 1}"),
             "arrival_time": arrival_time,
@@ -129,7 +145,35 @@ def create_timeline(
             "visit_duration_minutes": duration,
             "next_travel_time_minutes": next_travel_time,
             "coordinates": [point.get("lat"), point.get("lon")]
-        })
+        }
+        
+        # Hava durumu bilgisi ekle
+        if include_weather and _get_weather_at_time:
+            lat = point.get("lat")
+            lon = point.get("lon")
+            if lat is not None and lon is not None:
+                try:
+                    w = _get_weather_at_time(lat, lon, arrival_time)
+                    if w:
+                        advice = {}
+                        if _get_weather_advice:
+                            try:
+                                advice = _get_weather_advice(w)
+                            except Exception:
+                                pass
+                        entry["weather"] = {
+                            "temperature": w.get("temperature"),
+                            "weather_emoji": w.get("weather_emoji", "🌤️"),
+                            "weather_tr": w.get("weather_tr", ""),
+                            "weather_description": w.get("weather_description", ""),
+                            "precipitation_probability": w.get("precipitation_probability"),
+                            "wind_speed": w.get("wind_speed"),
+                            "advice": advice
+                        }
+                except Exception:
+                    entry["weather"] = None
+        
+        schedule.append(entry)
         
         # Bir sonraki noktaya geçiş
         current_time += timedelta(minutes=duration + next_travel_time)
@@ -142,7 +186,7 @@ def create_timeline(
     end_dt = current_time
     total_duration = int((end_dt - start_dt).total_seconds() / 60)
     
-    return {
+    result = {
         "start_time": start_time,
         "end_time": end_time,
         "total_duration_minutes": total_duration,
@@ -150,6 +194,85 @@ def create_timeline(
         "total_visit_time_minutes": total_visit_time,
         "transport_mode": transport_mode,
         "schedule": schedule
+    }
+    
+    # Genel rota hava özeti
+    if include_weather:
+        result["weather_summary"] = generate_route_weather_summary(schedule)
+    
+    return result
+
+
+def generate_route_weather_summary(schedule: List[Dict]) -> Dict:
+    """
+    Tüm timeline noktalarından genel rota hava özeti çıkarır.
+    
+    Returns:
+        dict: {
+            "alert_level": "none" | "low" | "medium" | "high",
+            "summary_text": "Bu rotada yağmur riski yüksek...",
+            "emoji": "⚠️",
+            "max_temp": 28.0,
+            "min_temp": 14.0,
+            "max_precip_prob": 70,
+            "max_wind": 35.0
+        }
+    """
+    weather_entries = [
+        entry["weather"]
+        for entry in schedule
+        if entry.get("weather")
+    ]
+    
+    if not weather_entries:
+        return {
+            "alert_level": "none",
+            "summary_text": "Hava durumu bilgisi alınamadı.",
+            "emoji": "❓"
+        }
+    
+    temps = [w["temperature"] for w in weather_entries if w.get("temperature") is not None]
+    precip_probs = [w["precipitation_probability"] for w in weather_entries if w.get("precipitation_probability") is not None]
+    winds = [w["wind_speed"] for w in weather_entries if w.get("wind_speed") is not None]
+    alert_levels = [w.get("advice", {}).get("alert_level", "none") for w in weather_entries]
+    
+    max_precip = max(precip_probs) if precip_probs else 0
+    max_wind = max(winds) if winds else 0
+    max_temp = max(temps) if temps else None
+    min_temp = min(temps) if temps else None
+    
+    # En yüksek alert seviyesini belirle
+    level_order = {"none": 0, "low": 1, "medium": 2, "high": 3}
+    overall_level = max(alert_levels, key=lambda x: level_order.get(x, 0))
+    
+    # Özet metin ve emoji üret
+    messages = []
+    if max_precip >= 70:
+        messages.append(f"Yağmur riski yüksek (%{int(max_precip)})")
+    elif max_precip >= 40:
+        messages.append(f"Hafif yağmur ihtimali (%{int(max_precip)})")
+    
+    if max_wind >= 40:
+        messages.append(f"Kuvvetli rüzgar ({int(max_wind)} km/s)")
+    elif max_wind >= 25:
+        messages.append(f"Orta rüzgar ({int(max_wind)} km/s)")
+    
+    if max_temp is not None and max_temp >= 35:
+        messages.append(f"Öğle sıcağına dikkat ({int(max_temp)}°C)")
+    
+    if not messages and min_temp is not None:
+        messages.append(f"Genel hava iyi ({int(min_temp)}-{int(max_temp)}°C)")
+    
+    emoji_map = {"none": "✅", "low": "🌤️", "medium": "⚠️", "high": "🚨"}
+    
+    return {
+        "alert_level": overall_level,
+        "summary_text": " · ".join(messages) if messages else "Hava koşulları uygun.",
+        "emoji": emoji_map.get(overall_level, "🌤️"),
+        "max_temp": max_temp,
+        "min_temp": min_temp,
+        "max_precip_prob": int(max_precip) if max_precip else 0,
+        "max_wind": max_wind
     }
 
 

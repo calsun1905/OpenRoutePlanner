@@ -1974,6 +1974,48 @@ body {
 .tl-advice-emoji { font-size: 0.9rem; }
 .tl-advice-text  { color: var(--text-secondary); }
 
+/* Timeline hava özeti banner (weather_summary) */
+.weather-alert-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    font-size: 0.82rem;
+    border-left: 4px solid;
+    transition: background 0.2s;
+}
+.weather-alert-banner.none,
+.weather-alert-banner.low {
+    background: rgba(0, 206, 201, 0.10);
+    border-color: #00cec9;
+    color: var(--text-primary);
+}
+.weather-alert-banner.medium {
+    background: rgba(249, 202, 36, 0.13);
+    border-color: #f9ca24;
+    color: var(--text-primary);
+}
+.weather-alert-banner.high {
+    background: rgba(225, 112, 85, 0.13);
+    border-color: #e17055;
+    color: var(--text-primary);
+}
+.weather-banner-emoji { font-size: 1.15rem; }
+.weather-banner-text  { flex: 1; }
+.weather-banner-temp  {
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--accent-primary);
+}
+
+/* timeline-advice için alert_level class'ları (yeni format) */
+.timeline-advice-none   { border-color: #74b9ff; background: rgba(116,185,255,0.07); }
+.timeline-advice-low    { border-color: var(--accent-secondary); background: rgba(0,206,201,0.07); }
+.timeline-advice-medium { border-color: #f9ca24; background: rgba(249,202,36,0.08); }
+.timeline-advice-high   { border-color: #e17055; background: rgba(225,112,85,0.10); }
+
 /* ===== Weather Banner ===== */
 .weather-banner {
     position: absolute;

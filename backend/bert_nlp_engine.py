@@ -60,6 +60,17 @@ except ImportError:
         def get_dynamic_place_names(limit=500): return []
         def get_all_local_place_names(limit=2000, include_dynamic=True): return []
 
+try:
+    from osm_poi_dictionary import POI_MAPPING as OSM_POI_MAPPING
+except ImportError:
+    try:
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from osm_poi_dictionary import POI_MAPPING as OSM_POI_MAPPING
+    except ImportError:
+        OSM_POI_MAPPING = {}
+
 
 
 # =============================================================================
@@ -136,6 +147,12 @@ COMMON_ALIASES = {
     "bakirkoy": "bakırköy",
 }
 
+ACTION_WORD_SUFFIXES = (
+    "yorum", "iyorum", "ıyorum", "uyorum",
+    "yoruz", "iyoruz", "ıyoruz", "uyoruz",
+    "mek", "mak",
+)
+
 
 def _env_flag(name: str, default: bool) -> bool:
     """ENV'den bool değer okur."""
@@ -159,10 +176,124 @@ _TR_FOLD_TABLE = str.maketrans(
 
 def normalize_place_key(value: str) -> str:
     """Yer adı karşılaştırmaları için normalize anahtar üretir."""
-    text = normalize_query_text(value or "").casefold()
+    text = (value or "").replace("’", "'").replace("`", "'")
+    text = re.sub(r"\s+", " ", text).strip().casefold()
     text = re.sub(r"[^a-z0-9çğıöşü\s]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return COMMON_ALIASES.get(text, text)
+
+
+def is_likely_action_token(token: str) -> bool:
+    """
+    Kelimenin eylem/niyet belirten bir token olma olasılığını döner.
+    Bu tür token'lar tek başına lokasyon adayı olarak alınmamalıdır.
+    """
+    normalized = normalize_place_key(token)
+    if not normalized:
+        return True
+    if normalized in QUERY_NOISE_WORDS:
+        return True
+    return len(normalized) >= 5 and normalized.endswith(ACTION_WORD_SUFFIXES)
+
+
+def _singularize_tr_token(token: str) -> str:
+    """Basit çoğul eklerini budar (mekanlar -> mekan)."""
+    lowered = normalize_place_key(token)
+    for suffix in ("lar", "ler"):
+        if lowered.endswith(suffix) and len(lowered) > len(suffix) + 2:
+            return lowered[:-len(suffix)]
+    return lowered
+
+
+def _normalize_poi_mapping(raw_mapping: Dict[str, Dict[str, str]]) -> Dict[str, Dict[str, str]]:
+    normalized: Dict[str, Dict[str, str]] = {}
+    for phrase, tags in (raw_mapping or {}).items():
+        norm_phrase = normalize_place_key(phrase)
+        if not norm_phrase:
+            continue
+        if isinstance(tags, dict):
+            normalized[norm_phrase] = {str(k): str(v) for k, v in tags.items() if k and v}
+    return normalized
+
+
+NORMALIZED_POI_MAPPING = _normalize_poi_mapping(OSM_POI_MAPPING)
+POI_CONCEPT_TERMS = frozenset(NORMALIZED_POI_MAPPING.keys())
+POI_CONCEPT_TOKENS = frozenset(
+    _singularize_tr_token(token)
+    for term in POI_CONCEPT_TERMS
+    for token in term.split()
+    if len(token) >= 3
+)
+
+
+def is_poi_concept_term(value: str) -> bool:
+    """
+    Değerin POI tipi ifade edip etmediğini döner.
+    Sözlük bazlıdır, fakat tek bir anahtar listesine bağlı kalmak yerine
+    normalize + token tabanlı değerlendirme yapar.
+    """
+    normalized = normalize_place_key(value)
+    if not normalized:
+        return False
+    if normalized in POI_CONCEPT_TERMS:
+        return True
+    singular = _singularize_tr_token(normalized)
+    if singular in POI_CONCEPT_TERMS:
+        return True
+    return any(_singularize_tr_token(token) in POI_CONCEPT_TOKENS for token in normalized.split())
+
+
+def extract_poi_concept(query: str, detected_places: Optional[List[Dict[str, Any]]] = None) -> str:
+    """
+    POI sorgusundan lokasyon dışı kavramı çıkarır.
+    Örnek: "maltepe'de cami arıyorum" -> "cami"
+    """
+    normalized_query = normalize_query_text(query or "")
+    if not normalized_query:
+        return ""
+
+    occupied_ranges: List[Tuple[int, int]] = []
+    for place in detected_places or []:
+        start = int(place.get("start", -1))
+        end = int(place.get("end", -1))
+        if start >= 0 and end > start:
+            occupied_ranges.append((start, end))
+
+    concept_tokens: List[str] = []
+    seen = set()
+
+    def in_occupied_range(start: int, end: int) -> bool:
+        for occ_start, occ_end in occupied_ranges:
+            if start >= occ_start and end <= occ_end:
+                return True
+        return False
+
+    for match in TOKEN_PATTERN.finditer(normalized_query):
+        if in_occupied_range(match.start(), match.end()):
+            continue
+
+        token_surface = match.group(0)
+        token_normalized, role_hint = normalize_token_with_role(token_surface)
+        token_normalized = _singularize_tr_token(token_normalized)
+
+        if len(token_normalized) < 2:
+            continue
+        if role_hint in {"from", "to", "loc"}:
+            continue
+        if token_normalized in QUERY_NOISE_WORDS:
+            continue
+        if is_likely_action_token(token_normalized):
+            continue
+        if token_normalized in seen:
+            continue
+        seen.add(token_normalized)
+        concept_tokens.append(token_normalized)
+
+    # Önce sözlükteki kavram token'larını önceliklendir.
+    prioritized = [t for t in concept_tokens if is_poi_concept_term(t)]
+    remaining = [t for t in concept_tokens if t not in prioritized]
+    ordered = prioritized + remaining
+    return " ".join(ordered[:4]).strip()
 
 
 def build_place_lookup_keys(value: str) -> List[str]:
@@ -256,6 +387,9 @@ def extract_candidate_spans(query: str, max_ngram: int = 3) -> List[Dict[str, An
         normalized, role_hint = normalize_token_with_role(surface)
 
         if len(normalized) < 2 or normalized in QUERY_NOISE_WORDS:
+            continue
+
+        if role_hint is None and is_likely_action_token(normalized):
             continue
 
         token_matches.append({
@@ -486,6 +620,16 @@ class PlaceDatabase:
 
         return self._embeddings
 
+    def resolve_lookup(self, query: str) -> Optional[str]:
+        """
+        Normalize lookup tabloları üzerinden canonical yer adını döner.
+        """
+        for lookup_key in build_place_lookup_keys(query):
+            canonical_name = self._normalized_place_lookup.get(lookup_key)
+            if canonical_name:
+                return canonical_name
+        return None
+
     def find_best_match(
         self,
         query: str,
@@ -513,10 +657,8 @@ class PlaceDatabase:
         if not self._place_names:
             return None
 
-        for lookup_key in build_place_lookup_keys(query):
-            canonical_name = self._normalized_place_lookup.get(lookup_key)
-            if not canonical_name:
-                continue
+        canonical_name = self.resolve_lookup(query)
+        if canonical_name:
             return {
                 "place": canonical_name,
                 "similarity": 1.0,
@@ -904,6 +1046,55 @@ class BertNLPEngine:
         query_type, confidence, _ = self.classify_query_type_with_scores(query)
         return query_type, confidence
 
+    def _is_location_like_match(self, span: Dict[str, Any], match: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        False-positive azaltmak için aday span'in gerçekten lokasyon olup olmadığını kontrol eder.
+        """
+        normalized = (span.get("normalized") or "").strip()
+        if not normalized:
+            return False, "empty-span"
+
+        role_hint = span.get("role_hint")
+        token_count = int(span.get("token_count", 1))
+        similarity = float(match.get("similarity", 0.0))
+        source = str(match.get("source", ""))
+
+        if source == "lookup-exact":
+            return True, "lookup-exact"
+
+        tokens = [t for t in normalized.split() if t]
+        has_poi_concept = any(is_poi_concept_term(token) for token in tokens)
+
+        # Yön ekleri olan span'leri daha toleranslı kabul et.
+        if role_hint in {"from", "to"}:
+            return (similarity >= 0.72), ("direction-accepted" if similarity >= 0.72 else "direction-low-similarity")
+
+        if role_hint == "loc":
+            # "maltepe'de cami" gibi karışık span'lerde POI konsepti varsa reddet.
+            if token_count > 1 and has_poi_concept:
+                has_lookup_token = any(self.places.resolve_lookup(token) for token in tokens)
+                if not has_lookup_token:
+                    return False, "loc-span-has-poi-concept"
+            return (similarity >= 0.76), ("loc-accepted" if similarity >= 0.76 else "loc-low-similarity")
+
+        # Role hint yoksa daha sıkı filtre uygula.
+        if token_count == 1:
+            token = tokens[0] if tokens else normalized
+            if is_likely_action_token(token):
+                return False, "action-token"
+            if is_poi_concept_term(token):
+                return False, "poi-concept-token"
+            if similarity < 0.90:
+                return False, "single-low-similarity"
+            return True, "single-accepted"
+
+        # Multi-token role_hint yoksa POI konsept içeren span'leri dışarıda bırak.
+        if has_poi_concept:
+            return False, "multi-has-poi-concept"
+        if similarity < 0.84:
+            return False, "multi-low-similarity"
+        return True, "multi-accepted"
+
     def extract_places(self, query: str, trace: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
         Sorgudan yer isimlerini çıkarır.
@@ -953,7 +1144,15 @@ class BertNLPEngine:
                     })
                 continue
 
-            accepted = float(match.get("similarity", 0.0)) >= float(threshold)
+            threshold_accepted = float(match.get("similarity", 0.0)) >= float(threshold)
+            location_like, location_reason = self._is_location_like_match(span, match)
+            accepted = threshold_accepted and location_like
+            reason = "accepted"
+            if not threshold_accepted:
+                reason = "below-threshold"
+            elif not location_like:
+                reason = location_reason
+
             if span_trace_rows is not None:
                 span_trace_rows.append({
                     "surface": span["surface"],
@@ -966,7 +1165,7 @@ class BertNLPEngine:
                     "best_similarity_percent": round(float(match.get("similarity", 0.0)) * 100.0, 2),
                     "accepted": accepted,
                     "match_source": match.get("source"),
-                    "reason": "accepted" if accepted else "below-threshold",
+                    "reason": reason,
                 })
 
             if not accepted:
@@ -1195,6 +1394,10 @@ class BertNLPEngine:
             query_type = "route"
             type_confidence = max(float(type_confidence), 0.78)
 
+        poi_concept = ""
+        if query_type == "poi" or has_poi_cue:
+            poi_concept = extract_poi_concept(query, ordered_places)
+
         if trace_data is not None:
             trace_data["query"] = query
             trace_data["query_type_initial"] = initial_query_type
@@ -1207,6 +1410,7 @@ class BertNLPEngine:
                 "has_multi_cue": has_multi_cue,
                 "role_hints": sorted(role_hints),
                 "detected_place_names": place_names,
+                "poi_concept": poi_concept,
             }
 
         # 3. Numpy değerlerini Python native türlere çevir (JSON için)
@@ -1246,6 +1450,10 @@ class BertNLPEngine:
 
         elif query_type == "poi":
             result["location"] = self._choose_best_poi_location(ordered_places)
+            result["poi_concept"] = poi_concept or None
+            concept_key = normalize_place_key(poi_concept) if poi_concept else ""
+            if concept_key and concept_key in NORMALIZED_POI_MAPPING:
+                result["poi_tags_hint"] = dict(NORMALIZED_POI_MAPPING[concept_key])
             result["query_type"] = "search"
             if not result["location"]:
                 result["type"] = "unknown"
@@ -1324,6 +1532,8 @@ class BertNLPEngine:
                 "destination": result.get("destination"),
                 "location": result.get("location"),
                 "locations": result.get("locations"),
+                "poi_concept": result.get("poi_concept"),
+                "poi_tags_hint": result.get("poi_tags_hint"),
             }
             result["trace"] = trace_data
 

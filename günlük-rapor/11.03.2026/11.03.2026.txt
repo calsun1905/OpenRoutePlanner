@@ -111,3 +111,33 @@ Konu: BERT + Weather + Semantic POI + Commit Hazirligi
 
 Toplam onerilen commit sayisi: 4
 
+
+7) BERT Gelisim Icin Iki Yaklasim (Kalici Karar Notu)
+
+Tarih: 11.03.2026
+Amac: Bir sonraki oturumda dogrudan uygulanacak teknik yolun netlestirilmesi.
+
+Yaklasim-1: Sablon Veri Setini Buyutme (Kisa Vade)
+- Intent sablonlari koddan ayri bir veri dosyasina alinacak (JSONL/YAML).
+- 4 ana kategori icin (poi/route/single/multi) genis ornek havuzu tutulacak.
+- Karar sadece tek en yakin ornekle degil, kategori bazli ortalama/centroid + margin ile verilecek.
+- Hard negative ornekler eklenecek (benzer ama farkli intent cümleleri).
+- Artisi: hizli uygulanir, az veriyle guvenli iyilesme saglar.
+- Eksisi: tek basina uzun vadede bakim maliyeti artar.
+
+Yaklasim-2: Egitimli ML/NLP Katmani (Orta-Uzun Vade)
+- BERT embedding uzerine intent classifier (ilk adim) egitilecek.
+- Sonraki fazda slot extraction (BIO etiketleme) ile lokasyon ve POI tipi birlikte ogrenilecek.
+- Sablon sistemi tamamen atilmayacak; fallback/debug olarak minimum seviyede tutulacak.
+- Artisi: olceklenebilir, yeni ifade cesitlerinde daha dayanikli.
+- Eksisi: etiketli veri, egitim ve degerlendirme pipeline'i gerekir.
+
+Proje Icin Karar (Hibrit Gecis)
+1. Simdi: Yaklasim-1 ile dosya tabanli sablon ve olculebilir karar mantigi.
+2. Paralelde: Gercek kullanici sorgularindan etiketli veri havuzu biriktirme.
+3. Sonra: Yaklasim-2 ile intent modeline gecis, ardindan slot modeli.
+
+Baslangic KPI Onerisi
+- Intent accuracy: >= %90 (ilk hedef)
+- Yanlis POI/location eslesmesi: kademeli olarak dusurulecek
+- Fallback kullanimi: her sprintte azaltilacak

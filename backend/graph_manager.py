@@ -130,6 +130,65 @@ def find_nearest_node(G, lat: float, lon: float) -> int:
         return ox.nearest_nodes(G, X=lon, Y=lat)
 
 
+def _rows_to_poi_list(gdf, category_label: str) -> list:
+    """OSMnx dataframe satırlarını API POI listesine dönüştürür."""
+    pois = []
+    for _, row in gdf.iterrows():
+        try:
+            centroid = row.geometry.centroid
+            name = row.get("name", "İsimsiz")
+            if name is None or (hasattr(name, "__len__") and len(str(name)) == 0):
+                name = "İsimsiz"
+
+            website = row.get("website", "") or ""
+            wikipedia = row.get("wikipedia", "") or ""
+            opening_hours = row.get("opening_hours", "") or ""
+            description = row.get("description", "") or ""
+            image = row.get("image", "") or ""
+
+            wiki_url = ""
+            if wikipedia and isinstance(wikipedia, str) and ":" in wikipedia:
+                lang, title = wikipedia.split(":", 1)
+                wiki_url = f"https://{lang}.wikipedia.org/wiki/{title.replace(' ', '_')}"
+
+            pois.append({
+                "name": str(name),
+                "lat": centroid.y,
+                "lon": centroid.x,
+                "category": category_label,
+                "website": str(website) if website else "",
+                "wikipedia_url": wiki_url,
+                "opening_hours": str(opening_hours) if opening_hours else "",
+                "description": str(description) if description else "",
+                "image": str(image) if image else "",
+            })
+        except Exception as e:
+            print(f"[POI] POI verisi hatası (atlanıyor): {e}")
+            continue
+    return pois
+
+
+def search_pois_by_tags(place_name: str, tags: dict, category_hint: str = "semantic") -> list:
+    """
+    Belirtilen bölgede doğrudan OSM tag filtresi ile POI arar.
+    """
+    normalized_tags = {str(k): str(v) for k, v in (tags or {}).items() if k and v}
+    if not normalized_tags:
+        return []
+
+    print(f"[POI] Arama baslatildi (tags): {place_name}, tags={normalized_tags}, hint={category_hint}")
+
+    try:
+        gdf = ox.features_from_place(place_name, tags=normalized_tags)
+    except Exception as e:
+        print(f"[GraphManager] POI arama hatası (tags): {e}")
+        return []
+
+    pois = _rows_to_poi_list(gdf, category_hint or "semantic")
+    print(f"[POI] {len(pois)} POI bulundu: {place_name} (tags={normalized_tags})")
+    return pois
+
+
 def search_pois(place_name: str, category: str) -> list:
     """
     Belirtilen bölgede POI (Points of Interest) arar.
@@ -142,64 +201,15 @@ def search_pois(place_name: str, category: str) -> list:
         list of dict: [{"name": "...", "lat": ..., "lon": ...}, ...]
     """
     print(f"[POI] Arama baslatildi: {place_name}, kategori={category}")
-
     from osm_poi_dictionary import POI_MAPPING
 
-    category = category.lower().strip()
-
-    # Eğer category sözlükte varsa onun tag'ini kullan, yoksa tourism veya amenity varsay
-    if category in POI_MAPPING:
-        tags = POI_MAPPING[category]
+    normalized_category = category.lower().strip()
+    if normalized_category in POI_MAPPING:
+        tags = POI_MAPPING[normalized_category]
     else:
-        tags = {"tourism": category} # Fallback
+        tags = {"tourism": normalized_category}
 
-    try:
-        gdf = ox.features_from_place(place_name, tags=tags)
-    except Exception as e:
-        print(f"[GraphManager] POI arama hatası: {e}")
-        return []
-
-    pois = []
-    for _, row in gdf.iterrows():
-        # Geometriden merkez koordinatı al
-        try:
-            centroid = row.geometry.centroid
-            name = row.get("name", "İsimsiz")
-            if name is None or (hasattr(name, '__len__') and len(str(name)) == 0):
-                name = "İsimsiz"
-
-            # Ek bilgileri OSM verisinden al
-            website = row.get("website", "") or ""
-            wikipedia = row.get("wikipedia", "") or ""
-            opening_hours = row.get("opening_hours", "") or ""
-            description = row.get("description", "") or ""
-            image = row.get("image", "") or ""
-
-            # Wikipedia linkini oluştur
-            wiki_url = ""
-            if wikipedia and isinstance(wikipedia, str) and ":" in wikipedia:
-                lang, title = wikipedia.split(":", 1)
-                wiki_url = f"https://{lang}.wikipedia.org/wiki/{title.replace(' ', '_')}"
-
-            poi_data = {
-                "name": str(name),
-                "lat": centroid.y,
-                "lon": centroid.x,
-                "category": category,
-                "website": str(website) if website else "",
-                "wikipedia_url": wiki_url,
-                "opening_hours": str(opening_hours) if opening_hours else "",
-                "description": str(description) if description else "",
-                "image": str(image) if image else "",
-            }
-            pois.append(poi_data)
-        except Exception as e:
-            # Tek bir POI'nin hatası tüm aramayı bozmasın
-            print(f"[POI] POI verisi hatası (atlanıyor): {e}")
-            continue
-
-    print(f"[POI] {len(pois)} POI bulundu: {place_name} ({category})")
-    return pois
+    return search_pois_by_tags(place_name, tags, category_hint=normalized_category)
 
 
 # =============================================================================

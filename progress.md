@@ -1,13 +1,3 @@
-# Progress - OpenRoutePlanner
-
-## 2026-03-11 Guncel Not (BERT + Weather + Semantic POI)
-
-Bu oturumda degisen dosyalar tek tek incelendi ve asagidaki durum netlestirildi.
-Bu bolum, GitHub commit notlarina temel olacak sekilde yazilmistir.
-
-### A) Dosya Bazli Inceleme (Teker Teker)
-
-| Dosya | Durum | Ozet |
 |---|---|---|
 | `backend/app.py` | Etkili degisiklik | Runtime init lazy hale getirildi, graph preload startup flag ile kontrol edildi, BERT parse trace ve runtime metric loglari eklendi, timeline/weather entegrasyonu genisletildi. |
 | `backend/bert_engine.py` | Etkili degisiklik | GPU zorunlu calisma politikasi netlestirildi (`ORP_BERT_FORCE_GPU`, `ORP_BERT_STRICT_GPU`), runtime GPU metrik ciktilari eklendi, similarity/index JSON tipleri native tipe cevrildi. |
@@ -29,8 +19,8 @@ Bu bolum, GitHub commit notlarina temel olacak sekilde yazilmistir.
 | `backend/storage_db.py` | Teknik olarak modified | Icerik farki yok (anlamsal degisiklik tespit edilmedi). |
 | `docs/ogretici/openmeteo-sifirdan-rehber.md` | Teknik olarak modified | Icerik farki yok (anlamsal degisiklik tespit edilmedi). |
 | `docs/planlar/weather-service-akis-diyagrami.md` | Teknik olarak modified | Icerik farki yok (anlamsal degisiklik tespit edilmedi). |
-| `backend/data/` | Untracked klasor | Yerel cache/graph ciktilari; repo commit kapsaminda olmamali. |
-| `.coverage` | Untracked dosya | Yerel test artifact'i; commit kapsaminda olmamali. |
+| `backend/data/` | Commite dahil edildi (istenmeyen) | `app_data.db-shm` ve `app_data.db-wal` son committe repoya girdi; cleanup commit ile kaldirilmasi gerekiyor. |
+| `.coverage` | Commite dahil edildi (istenmeyen) | Yerel test artifact'i son committe repoya girdi; cleanup commit ile kaldirilmasi gerekiyor. |
 
 ### B) Hava Durumu Entegrasyonu - Mevcut Durum
 
@@ -57,20 +47,18 @@ Bu bolum, GitHub commit notlarina temel olacak sekilde yazilmistir.
   - Sistem: lokasyonu ayristir + POI tipini dogru tag'a bagla + ilgili camileri getir.
 - Bu konu hem UX hem de semantic grounding implementasyonu ile birlikte ilerletilecek.
 
-### E) Commit Icın Onerilen Kapsamlar
+### E) Gerceklesen Commitler (2026-03-11)
 
-Bu degisiklikleri tek commit yerine asagidaki paketler halinde atmak daha saglikli:
+Planlanan paketleme uygulanmistir. Bu oturumda atilan commitler:
 
-1. `feat(weather-ui-and-service-hardening)`
+1. `8124fdf` - `feat: BERT gozlemlenebilirlik ve parse akisi guclendirildi`
+   - `backend/app.py`, `backend/bert_engine.py`, `backend/bert_nlp_engine.py`, `frontend/bert-test-lab.html`, `tests/test_core/test_bert_nlp_preprocessing.py`, `backend/tag_grounder.py`
+2. `2659fea` - `feat: weather servis dayanikliligi ve arayuz entegrasyonu gelistirildi`
    - `backend/weather_service.py`, `backend/weather_utils.py`, `frontend/index.html`, `frontend/css/style.css`, `frontend/js/app.js`
-2. `feat(bert-observability-and-parse-trace)`
-   - `backend/app.py`, `backend/bert_engine.py`, `backend/bert_nlp_engine.py`, `frontend/bert-test-lab.html`, `tests/test_core/test_bert_nlp_preprocessing.py`
-3. `docs(index-progress-semantic-poi-plan)`
-   - `PROJECT_INDEX.md`, `progress.md`, `docs/planlar/poi-semantic-tag-grounding-plani.md`, ilgili dokuman guncellemeleri
-4. `chore(deps-compression-codec-fix)`
-   - `requirements.txt`
+3. `51ee5bf` - `chore: docs ve kalan workspace degisiklikleri tek committe toplandi`
+   - `PROJECT_INDEX.md`, `progress.md`, `docs/planlar/poi-semantic-tag-grounding-plani.md`, `gunluk-rapor/11.03.2026/11.03.2026.txt`, `CLAUDE.md`, `requirements.txt`, `.coverage`, `backend/data/app_data.db-shm`, `backend/data/app_data.db-wal`
 
-Not: `.coverage` ve `backend/data/` commit disi tutulmali.
+Not: Son committe gecici artifact dosyalari (.coverage, db-shm, db-wal) da girdigi icin bir sonraki adimda repo cleanup commit'i planlanmali.
 
 ## 2026-03-10 Guncel Not
 
@@ -126,10 +114,8 @@ TOTAL: 11/11 tests passed
 - Aktivite onerileri (hava durumuna bagli)
 - Heat index ve wind chill hesaplamalari
 
-### Bir Sonraki Adimlar (Faz 2)
-- Timeline entegrasyonu (`time_planner.py`)
-- Frontend hava widget'i
-- Rota kararlarina hava etkisini baglama
+### Bir Sonraki Adimlar- **Hava Durumu & Senkronizasyon:** Backend veri şeması (`temperature`, `weather_emoji`, `weather_tr`, `advice`) frontend ile tam uyumlu hale getirildi. Zaman çizelgesi için genel rota özet banner'ı (`weather-alert-banner`) eklendi. Tavsiye (advice) sistemi zenginleştirildi. ✅detay metrik paneli acik.
+- Rota kararlarina hava etkisini baglama - ilk seviyede uyarilar eklendi, karar skoru etkisi ileri fazda.
 
 ### Ogreti Dosyalari (2026-03-10)
 - `docs/ogretici/openmeteo_ornek_kullanim.py` - OpenMeteo API ornek kullanim (baslangic seviyesi)
@@ -716,10 +702,11 @@ openroute/
 - [x] BERT NLP motorunun frontend'e bağlanması (AI panel + parse akışı eklendi)
 - [x] `/api/nlp/parse` ve `/api/nlp/status` endpoint'lerinin app.py'ye eklenmesi
 - [ ] BERT pipeline'in `normalize -> mention detection -> candidate retrieval -> place linking -> slot filling` akışına tam ayrıştırılması
-- [ ] Hava durumu entegrasyonu Faz 1: `weather_service.py`, `weather_utils.py`, temel endpoint'ler
+- [x] Hava durumu entegrasyonu Faz 1: `weather_service.py`, `weather_utils.py`, temel endpoint'ler
 - [ ] False positive azaltma (threshold iyileştirme)
 - [ ] Arama önerileri için lokal cache / fallback iyileştirmesi
 - [ ] Rota kaydetme edge case'lerinin tam doğrulanması
+- [ ] Repo cleanup: `.coverage` ve `backend/data/*.db-shm`, `backend/data/*.db-wal` dosyalarini takipten cikar ve `.gitignore`a ekle
 
 ### 🟢 Gelecek
 - [ ] OSM API fallback mekanizmasının test edilmesi
@@ -818,3 +805,30 @@ openroute/
 ### Commit Plani Icin Not
 - Bu envanter, commitleri alanlara bolmek icin hazirlandi.
 - Ayrim onerisi: `db+storage`, `routing`, `nlp+ui`, `docs+scripts`, `encoding cleanup`.
+
+## 2026-03-11 - BERT Gelisim Yolu (Iki Yaklasim Karari)
+
+Bu oturumda BERT tarafi icin iki teknik yol netlestirildi ve hibrit gecis stratejisi kabul edildi.
+
+### Yaklasim-1 (Kisa Vade): Sablon Veri Setini Buyutme
+- Intent sablonlari koddan ayri bir veri dosyasina tasinacak (JSONL/YAML).
+- 4 intent (poi/route/single/multi) icin genis ornek havuzu tutulacak.
+- Karar tek sablona gore degil, kategori bazli ortalama/centroid + margin ile verilecek.
+- Hard negative ornekler eklenecek.
+
+### Yaklasim-2 (Orta-Uzun Vade): Egitimli Model
+- BERT embedding uzerine intent classifier egitilecek.
+- Sonraki fazda BIO tabanli slot extraction (LOC/POI_TYPE) eklenecek.
+- Sablon mekanizmasi fallback/debug amacli minimum seviyede tutulacak.
+
+### Kabul Edilen Yol: Hibrit Gecis
+1. Simdi Yaklasim-1 (hizli ve guvenli iyilesme)
+2. Paralelde etiketli veri biriktirme
+3. Esik asildiginda Yaklasim-2'ye kademeli gecis
+
+### Sonraki Oturum Icin Net Aksiyonlar
+- [ ] `backend/bert_nlp_engine.py` icindeki intent sablonlarini dosya tabanli hale getir
+- [ ] `docs/planlar/` altina intent dataset formati ve etiketleme kurali ekle
+- [ ] Kategori-centroid + margin skorlamasini implement et
+- [ ] Hard negative mini seti olustur ve testlere ekle
+- [ ] Intent accuracy / confusion matrix raporlamasini ekle
