@@ -196,12 +196,77 @@ def create_timeline(
         "schedule": schedule
     }
     
-    # Genel rota hava özeti
+    # Genel rota hava özeti ve akıllı çıkış saati
     if include_weather:
-        result["weather_summary"] = generate_route_weather_summary(schedule)
+        weather_summary = generate_route_weather_summary(schedule)
+        
+        # Eğer hava durumu kötüyse akıllı saat önerisi yap
+        if weather_summary.get("alert_level") in ["medium", "high"]:
+            lat = points[0].get("lat")
+            lon = points[0].get("lon")
+            if lat and lon and _get_weather_at_time:
+                suggestion = find_smart_departure_time(lat, lon, start_time, _get_weather_at_time)
+                if suggestion:
+                    weather_summary["smart_suggestion"] = suggestion
+                    
+        result["weather_summary"] = weather_summary
     
     return result
 
+
+def find_smart_departure_time(lat: float, lon: float, start_time: str, get_weather_func) -> Optional[str]:
+    """
+    Kötü hava koşullarında yakındaki saatlere bakarak daha iyi bir çıkış saati önerir.
+    +/- 3 saat aralığına bakar.
+    """
+    try:
+        base_dt = datetime.strptime(start_time, "%H:%M")
+        today = datetime.now().strftime("%Y-%m-%d")
+        base_dt_full = datetime.fromisoformat(f"{today}T{start_time}:00")
+    except ValueError:
+        return None
+
+    best_time = None
+    best_score = float('inf')  # Düşük skor daha iyidir (yağış ihtimali + rüzgar)
+
+    # İleriye ve geriye doğru saatleri kontrol et (-2, -1, 1, 2, 3)
+    offsets = [-2, -1, 1, 2, 3]
+    
+    for offset in offsets:
+        check_dt = base_dt_full + timedelta(hours=offset)
+        check_time_str = check_dt.strftime("%H:%M")
+        
+        # Sadece gelecekteki veya çok yakın geçmişteki makul saatleri öner
+        now = datetime.now()
+        if check_dt < now - timedelta(hours=1):
+            continue
+
+        weather = get_weather_func(lat, lon, check_time_str)
+        if not weather:
+            continue
+            
+        precip_prob = weather.get("precipitation_probability", 0) or 0
+        wind = weather.get("wind_speed", 0) or 0
+        
+        # Skorlama: Yağmur ihtimali çok daha ağırdır
+        score = precip_prob * 2 + wind
+        
+        # Eğer yağış ihtimali %20'nin altındaysa ve şu anki skordan iyiyse seç
+        if precip_prob < 20 and score < best_score:
+            best_score = score
+            best_time = {"time": check_time_str, "offset": offset, "precip": precip_prob}
+
+    if best_time:
+        direction = "önce" if best_time["offset"] < 0 else "sonra"
+        hours_str = f"{abs(best_time['offset'])} saat"
+        
+        return {
+            "suggested_time": best_time["time"],
+            "message": f"💡 {hours_str} {direction} çıkarsanız yağış ihtimali %{best_time['precip']} civarında daha iyi bir hava sizi bekliyor.",
+            "offset_hours": best_time["offset"]
+        }
+        
+    return None
 
 def generate_route_weather_summary(schedule: List[Dict]) -> Dict:
     """
@@ -259,6 +324,29 @@ def generate_route_weather_summary(schedule: List[Dict]) -> Dict:
     
     if max_temp is not None and max_temp >= 35:
         messages.append(f"Öğle sıcağına dikkat ({int(max_temp)}°C)")
+
+    emoji = "✅"
+    summary_text = "Hava yolculuk için ideal."
+    
+    if overall_level == "high":
+        emoji = "🚨"
+    elif overall_level == "medium":
+        emoji = "⚠️"
+    elif overall_level == "low":
+        emoji = "ℹ️"
+        
+    if messages:
+        summary_text = " & ".join(messages)
+
+    return {
+        "alert_level": overall_level,
+        "summary_text": summary_text,
+        "emoji": emoji,
+        "max_temp": max_temp,
+        "min_temp": min_temp,
+        "max_precip_prob": max_precip,
+        "max_wind": max_wind
+    }
     
     if not messages and min_temp is not None:
         messages.append(f"Genel hava iyi ({int(min_temp)}-{int(max_temp)}°C)")

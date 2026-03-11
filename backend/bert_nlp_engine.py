@@ -108,27 +108,10 @@ QUERY_TEMPLATES = {
     ]
 }
 
-QUERY_NOISE_WORDS = {
-    "rota", "rotası", "yol", "güzergah", "git", "gidilir", "giderim",
-    "nasıl", "neler", "nereler", "var", "ne", "yapabilirim", "gez",
-    "gezdir", "göster", "çiz", "hesapla", "bir", "ve", "ile", "bu",
-    "yer", "nokta", "için", "yakında", "yakın", "istiyorum",
-    "gitmek", "gidelim", "gideyim", "gidelım",
-    "dolaş", "dolas", "dolaşalım", "dolasalim", "dolaşmak", "dolasmak",
-    "gezelim", "plani", "planı", "turu", "turu",
-    "merhaba", "selam", "nasılsın", "nasilsin", "bugün", "yarın", "yarin",
-    "hava", "durumu", "mı", "mi", "mu", "mü"
-}
-
-POI_CUE_WORDS = {
-    "neler", "nereler", "nerede", "civar", "civarinda", "çevre", "cevre",
-    "yakın", "yakin", "var", "kahve", "yemek", "müze", "muze",
-    "gezilecek", "göster", "goster", "mekan",
-}
-
-MULTI_CUE_WORDS = {
-    "ve", "gezi", "tur", "turu", "plan", "plani", "dolaş", "dolas", ",",
-}
+# Query intenti artik kelime listesiyle override edilmiyor.
+# BERT skor dagilimi + yapisal sinyaller (role_hint, yer sayisi, poi_concept)
+# birlesik sekilde kullaniliyor.
+INTENT_MARGIN_MIN = 0.03
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9ÇĞİÖŞÜçğıöşü]+(?:['’`][A-Za-z0-9ÇĞİÖŞÜçğıöşü]+)?")
 FROM_SUFFIXES = ("den", "dan", "ten", "tan", "nden", "ndan")
@@ -150,8 +133,14 @@ COMMON_ALIASES = {
 ACTION_WORD_SUFFIXES = (
     "yorum", "iyorum", "ıyorum", "uyorum",
     "yoruz", "iyoruz", "ıyoruz", "uyoruz",
+    "elim", "alım", "alim",
     "mek", "mak",
 )
+
+ACTION_ROOT_HINTS = {
+    "git", "gez", "ara", "goster", "göster", "planla", "hesapla",
+    "dolas", "dolaş", "ciz", "çiz",
+}
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -191,9 +180,9 @@ def is_likely_action_token(token: str) -> bool:
     normalized = normalize_place_key(token)
     if not normalized:
         return True
-    if normalized in QUERY_NOISE_WORDS:
+    if normalized in ACTION_ROOT_HINTS:
         return True
-    return len(normalized) >= 5 and normalized.endswith(ACTION_WORD_SUFFIXES)
+    return len(normalized) >= 4 and normalized.endswith(ACTION_WORD_SUFFIXES)
 
 
 def _singularize_tr_token(token: str) -> str:
@@ -279,8 +268,6 @@ def extract_poi_concept(query: str, detected_places: Optional[List[Dict[str, Any
         if len(token_normalized) < 2:
             continue
         if role_hint in {"from", "to", "loc"}:
-            continue
-        if token_normalized in QUERY_NOISE_WORDS:
             continue
         if is_likely_action_token(token_normalized):
             continue
@@ -386,7 +373,7 @@ def extract_candidate_spans(query: str, max_ngram: int = 3) -> List[Dict[str, An
         surface = match.group(0)
         normalized, role_hint = normalize_token_with_role(surface)
 
-        if len(normalized) < 2 or normalized in QUERY_NOISE_WORDS:
+        if len(normalized) < 2:
             continue
 
         if role_hint is None and is_likely_action_token(normalized):
@@ -1369,34 +1356,30 @@ class BertNLPEngine:
             key=lambda item: (item.get("start", 0), -item.get("token_count", 1), -item.get("similarity", 0.0))
         )
         place_names = [p["place"] for p in ordered_places]
+        unique_place_names = list(dict.fromkeys(place_names))
         role_hints = {p.get("role_hint") for p in ordered_places if p.get("role_hint")}
-        normalized_query = normalize_place_key(query)
-        query_tokens = set(normalized_query.split())
-        has_poi_cue = bool(query_tokens & POI_CUE_WORDS)
-        has_multi_cue = bool(query_tokens & MULTI_CUE_WORDS) or ("," in query)
+        direction_hints = bool({"from", "to"} & role_hints)
+        score_ranking = sorted(type_scores.items(), key=lambda item: item[1], reverse=True)
+        score_margin = (
+            float(score_ranking[0][1] - score_ranking[1][1])
+            if len(score_ranking) >= 2
+            else float(score_ranking[0][1]) if score_ranking else 0.0
+        )
+        low_margin = score_margin < INTENT_MARGIN_MIN
+        poi_concept = extract_poi_concept(query, ordered_places)
+        has_poi_cue = bool(poi_concept)
+        has_multi_cue = len(unique_place_names) >= 3 and not direction_hints
 
-        # Intent'i span tabanlı sinyallerle rafine et.
-        if (
-            len(place_names) >= 3
-            and ("from" not in role_hints and "to" not in role_hints)
-            and has_multi_cue
-            and not has_poi_cue
-        ):
-            query_type = "multi"
-            type_confidence = max(float(type_confidence), 0.78)
-        elif query_type == "route" and has_poi_cue and ("from" not in role_hints and "to" not in role_hints):
-            query_type = "poi"
-            type_confidence = max(float(type_confidence), 0.75)
-        if len(place_names) >= 2 and ("from" in role_hints):
+        # Intent rafinesi: kelime listesi yerine skor marji + yapisal sinyal.
+        if len(unique_place_names) >= 2 and direction_hints:
             query_type = "route"
             type_confidence = max(float(type_confidence), 0.80)
-        elif len(place_names) >= 2 and {"from", "to"}.issubset(role_hints):
-            query_type = "route"
+        elif has_poi_cue and not direction_hints and (query_type in {"poi", "unknown"} or low_margin):
+            query_type = "poi"
+            type_confidence = max(float(type_confidence), 0.75)
+        elif has_multi_cue and (query_type in {"multi", "unknown"} or low_margin):
+            query_type = "multi"
             type_confidence = max(float(type_confidence), 0.78)
-
-        poi_concept = ""
-        if query_type == "poi" or has_poi_cue:
-            poi_concept = extract_poi_concept(query, ordered_places)
 
         if trace_data is not None:
             trace_data["query"] = query
@@ -1408,6 +1391,8 @@ class BertNLPEngine:
             trace_data["intent_signals"] = {
                 "has_poi_cue": has_poi_cue,
                 "has_multi_cue": has_multi_cue,
+                "direction_hints": direction_hints,
+                "score_margin": round(float(score_margin), 4),
                 "role_hints": sorted(role_hints),
                 "detected_place_names": place_names,
                 "poi_concept": poi_concept,

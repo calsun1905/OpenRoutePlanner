@@ -6,6 +6,8 @@ ve POI (Points of Interest) aramalarını gerçekleştirir.
 """
 
 import os
+import sqlite3
+import json
 import osmnx as ox
 import networkx as nx
 from route_config import ROUTE_CONFIG
@@ -13,6 +15,25 @@ from route_config import ROUTE_CONFIG
 # Cache dizini
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
+POI_DB_PATH = os.path.join(DATA_DIR, "pois.db")
+
+
+def _init_poi_db():
+    conn = sqlite3.connect(POI_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pois (
+            place_name TEXT,
+            category TEXT,
+            data_json TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (place_name, category)
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+_init_poi_db()
 
 
 def _cache_path(place_name: str) -> str:
@@ -171,12 +192,29 @@ def _rows_to_poi_list(gdf, category_label: str) -> list:
 def search_pois_by_tags(place_name: str, tags: dict, category_hint: str = "semantic") -> list:
     """
     Belirtilen bölgede doğrudan OSM tag filtresi ile POI arar.
+    Önce yerel SQLite veritabanından, yoksa internetten arar.
     """
     normalized_tags = {str(k): str(v) for k, v in (tags or {}).items() if k and v}
     if not normalized_tags:
         return []
 
     print(f"[POI] Arama baslatildi (tags): {place_name}, tags={normalized_tags}, hint={category_hint}")
+
+    # Yerel veritabanında ara
+    try:
+        conn = sqlite3.connect(POI_DB_PATH)
+        cursor = conn.cursor()
+        # Normalde tag bazlı kompleks arama için yerel DB yapısı detaylandırılabilir.
+        # Basitlik için place_name ve category_hint kullanıyoruz.
+        cursor.execute('SELECT data_json FROM pois WHERE place_name = ? AND category = ?', (place_name.lower(), category_hint.lower()))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            print(f"[POI] Cache'den getiriliyor: {place_name} ({category_hint})")
+            return json.loads(row[0])
+    except Exception as e:
+        print(f"[POI] Yerel veritabanı okuma hatası: {e}")
 
     try:
         gdf = ox.features_from_place(place_name, tags=normalized_tags)
@@ -186,6 +224,22 @@ def search_pois_by_tags(place_name: str, tags: dict, category_hint: str = "seman
 
     pois = _rows_to_poi_list(gdf, category_hint or "semantic")
     print(f"[POI] {len(pois)} POI bulundu: {place_name} (tags={normalized_tags})")
+    
+    # Yerel veritabanına kaydet (sadece başarılıysa)
+    if pois:
+        try:
+            conn = sqlite3.connect(POI_DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO pois (place_name, category, data_json)
+                VALUES (?, ?, ?)
+            ''', (place_name.lower(), category_hint.lower(), json.dumps(pois)))
+            conn.commit()
+            conn.close()
+            print(f"[POI] Cache'e kaydedildi: {place_name} ({category_hint})")
+        except Exception as e:
+            print(f"[POI] Yerel veritabanı yazma hatası: {e}")
+            
     return pois
 
 
@@ -210,6 +264,67 @@ def search_pois(place_name: str, category: str) -> list:
         tags = {"tourism": normalized_category}
 
     return search_pois_by_tags(place_name, tags, category_hint=normalized_category)
+
+
+def search_poi_by_name_fuzzy(query_name: str, place_name: str = None) -> list:
+    """
+    Yerel POI veritabanında 'query_name' (Örn: "Fener Stadyumu") değerini
+    yaklaşık (fuzzy) olarak arar. Bulunursa döndürür.
+    """
+    import sqlite3
+    import json
+    import difflib
+
+    query_name_lower = query_name.lower().strip()
+    results = []
+
+    try:
+        conn = sqlite3.connect(POI_DB_PATH)
+        cursor = conn.cursor()
+        
+        if place_name:
+            cursor.execute('SELECT data_json FROM pois WHERE place_name = ?', (place_name.lower(),))
+        else:
+            cursor.execute('SELECT data_json FROM pois')
+            
+        rows = cursor.fetchall()
+        conn.close()
+        
+        for row in rows:
+            pois_list = json.loads(row[0])
+            for poi in pois_list:
+                name = poi.get("name", "").lower()
+                if not name or name == "isimsiz": continue
+                
+                # Basit kapsama (substring)
+                if query_name_lower in name:
+                    results.append((1.0, poi))
+                    continue
+                    
+                # Fuzzy matching (benzerlik oranı)
+                ratio = difflib.SequenceMatcher(None, query_name_lower, name).ratio()
+                if ratio > 0.65:  # %65 benzerlik sınırı
+                    results.append((ratio, poi))
+                    
+        # Benzerliğe göre sırala
+        results.sort(key=lambda x: x[0], reverse=True)
+        
+        unique_pois = []
+        seen = set()
+        for _, poi in results:
+            key = (poi["lat"], poi["lon"])
+            if key not in seen:
+                seen.add(key)
+                unique_pois.append(poi)
+                
+        if unique_pois:
+            print(f"[POI] Fuzzy match başarılı. '{query_name}' için {len(unique_pois)} sonuç.")
+            return unique_pois
+    except Exception as e:
+        print(f"[POI] Fuzzy arama hatası: {e}")
+        
+    print(f"[POI] Fuzzy match bulunamadı: '{query_name}'.")
+    return []
 
 
 # =============================================================================

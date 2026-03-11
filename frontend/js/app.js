@@ -1595,6 +1595,12 @@ function displayTimeline(timeline) {
             <span class="weather-banner-emoji">${timeline.weather_summary.emoji}</span>
             <span class="weather-banner-text">${escapeHtml(timeline.weather_summary.summary_text)}</span>
         </div>
+        ${timeline.weather_summary.smart_suggestion ? `
+        <div class="weather-alert-banner low" style="margin-top: 5px; background: rgba(0, 206, 201, 0.1); border-color: rgba(0, 206, 201, 0.4);">
+            <span class="weather-banner-emoji">💡</span>
+            <span class="weather-banner-text"><strong>Akıllı Öneri:</strong> ${timeline.weather_summary.smart_suggestion.message} (Önerilen Çıkış: ${timeline.weather_summary.smart_suggestion.suggested_time})</span>
+        </div>
+        ` : ''}
         ` : ''}
         
         <div class="timeline-items">
