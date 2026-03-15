@@ -56,7 +56,7 @@ def geocode(place):
         print(f"    Geocode error for {place}: {e}")
     return None
 
-def test_route(route_points, route_id):
+def run_route(route_points, route_id):
     print(f"\n[{route_id:02d}] {' -> '.join(route_points)}")
 
     # Geocode
@@ -138,7 +138,7 @@ def main():
 
     results = []
     for i, route in enumerate(TEST_ROUTES, 1):
-        result = test_route(route, i)
+        result = run_route(route, i)
         if result:
             results.append(result)
 
