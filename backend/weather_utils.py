@@ -9,6 +9,7 @@ Created: 2026-03-10
 """
 
 from typing import Any, Dict, Optional, Tuple
+from datetime import datetime
 import math
 
 
@@ -1060,18 +1061,63 @@ def get_weather_color_code(weather_code: int) -> str:
         return "#CCCCCC"
 
 
-def get_weather_advice(weather_data: Dict) -> Dict:
+def _extract_hhmm(context_time: Optional[str]) -> Optional[str]:
+    """Verilen zaman bilgisinden HH:MM formatını çıkarır."""
+    if not context_time:
+        return None
+
+    raw = str(context_time).strip()
+    if not raw:
+        return None
+
+    # "09:30" veya "09:30:00" formatı
+    if len(raw) >= 5 and raw[2] == ":":
+        return raw[:5]
+
+    # ISO datetime formatları (örn: 2026-03-15T09:30:00)
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", ""))
+        return dt.strftime("%H:%M")
+    except ValueError:
+        return None
+
+
+def _build_context_prefix(context_time: Optional[str], point_name: Optional[str]) -> Optional[str]:
+    """Öneri metinlerine eklenecek bağlam önekini üretir."""
+    hhmm = _extract_hhmm(context_time)
+    clean_point = (point_name or "").strip()
+
+    if hhmm and clean_point:
+        return f"{clean_point} için {hhmm} civarı"
+    if hhmm:
+        return f"{hhmm} civarı"
+    if clean_point:
+        return f"{clean_point} için"
+    return None
+
+
+def get_weather_advice(
+    weather_data: Dict,
+    context_time: Optional[str] = None,
+    point_name: Optional[str] = None
+) -> Dict:
     """
-    Hava durumuna gore akilli tavsiyeler uretir.
+    Hava durumuna göre akıllı ve zaman-bağlamlı tavsiyeler üretir.
+
+    Args:
+        weather_data: Hava verisi sözlüğü
+        context_time: Saat bağlamı ("09:30" veya ISO datetime)
+        point_name: Nokta adı (opsiyonel)
 
     Returns:
         dict: {
             "alert_level": "info" | "warning" | "danger",
-            "items": [{"emoji": str, "text": str, "type": str}, ...]
+            "items": [{"emoji": str, "text": str, "type": str}, ...],
+            "context_time": "HH:MM" | None
         }
     """
     if not weather_data:
-        return {"alert_level": "info", "items": []}
+        return {"alert_level": "info", "items": [], "context_time": _extract_hhmm(context_time)}
 
     temp = weather_data.get("temperature", 20)
     precipitation = weather_data.get("precipitation", 0) or 0
@@ -1142,7 +1188,18 @@ def get_weather_advice(weather_data: Dict) -> Dict:
     if len(items) >= 2 and alert_level == "info":
         alert_level = "warning"
 
-    return {"alert_level": alert_level, "items": items}
+    # Zaman/nokta bağlamı ekle (örn: "Kadıköy için 09:30 civarı ...")
+    context_prefix = _build_context_prefix(context_time, point_name)
+    context_hhmm = _extract_hhmm(context_time)
+    if context_prefix:
+        for item in items:
+            item["text"] = f"{context_prefix}: {item['text']}"
+            if context_hhmm:
+                item["time"] = context_hhmm
+            if point_name:
+                item["point"] = point_name
+
+    return {"alert_level": alert_level, "items": items, "context_time": context_hhmm}
 
 
 def get_weather_background_class(weather_code: int) -> str:

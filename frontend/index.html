@@ -19,6 +19,9 @@
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css?v=1.0.7">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 
 <body>
@@ -98,27 +101,8 @@
             </div>
         </div>
 
-        <!-- Place Selector -->
-        <div class="section">
-            <h2>🗺 Bölge</h2>
-            <select id="placeSelect" class="select-input">
-                <option value="Kadikoy, Istanbul, Turkey">Kadıköy, İstanbul</option>
-                <option value="Besiktas, Istanbul, Turkey">Beşiktaş, İstanbul</option>
-                <option value="Fatih, Istanbul, Turkey">Fatih, İstanbul</option>
-                <option value="Uskudar, Istanbul, Turkey">Üsküdar, İstanbul</option>
-                <option value="Beyoglu, Istanbul, Turkey">Beyoğlu, İstanbul</option>
-                <option value="Sisli, Istanbul, Turkey">Şişli, İstanbul</option>
-                <option value="Maltepe, Istanbul, Turkey">Maltepe, İstanbul</option>
-                <option value="Bakirkoy, Istanbul, Turkey">Bakırköy, İstanbul</option>
-            </select>
-        </div>
-
         <!-- Route Action -->
         <div class="section">
-            <label class="toggle-label">
-                <input type="checkbox" id="chkOptimize">
-                <span>🧠 TSP ile Sıra Optimize Et</span>
-            </label>
             <button class="btn btn-primary btn-lg" id="btnCalculateRoute" disabled>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 18l6-6-6-6" />
@@ -185,48 +169,18 @@
             </a>
         </div>
 
-        <!-- Saved Locations Section (Kayıtlı Yerler) -->
+        <!-- Place Selector & POI Search (yan yana) -->
         <div class="section">
-            <div class="section-header">
-                <h2>📍 Kayıtlı Yerlerim</h2>
-                <div class="header-actions">
-                    <button class="btn-icon" id="btnToggleSavedLocations" title="Haritada Gizle/Göster">
-                        <svg id="iconLocationVisible" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                            <circle cx="12" cy="12" r="3" />
-                        </svg>
-                    </button>
-                    <button class="btn-icon" id="btnRefreshLocations" title="Yenile">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div id="savedLocationsList" class="saved-locations-list">
-                <div class="empty-state">
-                    <p>Henüz kayıtlı yeriniz yok</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Saved Routes Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>💾 Kaydedilen Rotalar</h2>
-                <button class="btn-icon" id="btnRefreshRoutes" title="Yenile">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2" />
-                    </svg>
-                </button>
-            </div>
-            <div id="savedRoutesList" class="saved-routes-list">
-                <div class="empty-state">
-                    <p>Henüz kaydedilmiş rota yok</p>
-                </div>
-            </div>
+            <h2>🗺 Bölge Seçimi</h2>
+            <select id="regionSelect" class="select-input">
+                <option value="">Bölge Seçin</option>
+            </select>
+            <select id="provinceSelect" class="select-input" style="margin-top: 8px;" disabled>
+                <option value="">Önce Bölge Seçin</option>
+            </select>
+            <select id="districtSelect" class="select-input" style="margin-top: 8px;" disabled>
+                <option value="">Önce İl Seçin</option>
+            </select>
         </div>
 
         <!-- POI Search -->
@@ -348,6 +302,50 @@
 <button class="btn btn-poi btn-poi-dynamic" data-category="mağara" title="Mağara">🦇 Mağara</button>
             </div>
             <button class="btn btn-ghost" id="btnClearPois" style="display: none;">POI'leri Temizle</button>
+        </div>
+
+        <!-- Saved Locations Section (Kayıtlı Yerler) -->
+        <div class="section">
+            <div class="section-header">
+                <h2>📍 Kayıtlı Yerlerim</h2>
+                <div class="header-actions">
+                    <button class="btn-icon" id="btnToggleSavedLocations" title="Haritada Gizle/Göster">
+                        <svg id="iconLocationVisible" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                    </button>
+                    <button class="btn-icon" id="btnRefreshLocations" title="Yenile">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="savedLocationsList" class="saved-locations-list">
+                <div class="empty-state">
+                    <p>Henüz kayıtlı yeriniz yok</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Saved Routes Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>💾 Kaydedilen Rotalar</h2>
+                <button class="btn-icon" id="btnRefreshRoutes" title="Yenile">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2" />
+                    </svg>
+                </button>
+            </div>
+            <div id="savedRoutesList" class="saved-routes-list">
+                <div class="empty-state">
+                    <p>Henüz kaydedilmiş rota yok</p>
+                </div>
+            </div>
         </div>
 
         <!-- Footer -->

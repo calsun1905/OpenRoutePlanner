@@ -41,7 +41,9 @@ const elStatDistance = document.getElementById("statDistance");
 const elStatDuration = document.getElementById("statDuration");
 const elStatStops = document.getElementById("statStops");
 const elBtnGoogleMaps = document.getElementById("btnGoogleMaps");
-const elPlaceSelect = document.getElementById("placeSelect");
+const elRegionSelect = document.getElementById("regionSelect");
+const elProvinceSelect = document.getElementById("provinceSelect");
+const elDistrictSelect = document.getElementById("districtSelect");
 const elLoadingOverlay = document.getElementById("loadingOverlay");
 const elLoadingText = document.getElementById("loadingText");
 const elBtnClearPois = document.getElementById("btnClearPois");
@@ -107,8 +109,13 @@ function createPoiIcon(emoji) {
     });
 }
 
+// Helper: geçerli bir alan değeri mi? (undefined/null/''/'nan' ise geçersiz say)
+function isValidField(v) {
+    return v !== undefined && v !== null && String(v).trim() !== '' && String(v).toLowerCase() !== 'nan';
+}
+
 // ========== MAP CLICK HANDLER ==========
-map.on("click", function (e) {
+map.on("dblclick", function (e) {
     const { lat, lng } = e.latlng;
     addPoint(lat, lng);
 });
@@ -313,7 +320,7 @@ async function calculateRoute() {
 
     showLoading("Rota hesaplanıyor...\nHarita verisi ilk kez indiriliyorsa biraz zaman alabilir.");
 
-    const optimize = document.getElementById("chkOptimize").checked;
+    const optimize = false; // TSP optimizasyonu devre dışı
 
     try {
         const response = await fetch(`${API_BASE}/get-route`, {
@@ -403,7 +410,18 @@ function showRouteInfo(data) {
 
 // ========== POI SEARCH ==========
 async function searchPois(category) {
-    const place = elPlaceSelect.value;
+    // Yeni dropdown'lardan veri al
+    const province = elProvinceSelect.value;
+    const district = elDistrictSelect.value;
+    
+    // Eğer il seçilmemişse uyarı ver
+    if (!province) {
+        showToast('Lütfen önce bir il seçin', 'warning');
+        return;
+    }
+    
+    // İlçe seçilmişse ilçe, yoksa il kullan
+    const place = district ? `${district}, ${province}, Turkey` : `${province}, Turkey`;
 
     showLoading(`"${category}" mekanları aranıyor...`);
 
@@ -497,12 +515,12 @@ function buildPoiPopup(poi, emoji, label) {
     let hasDetails = false;
     html += `<div class="poi-card-details">`;
 
-    if (poi.opening_hours) {
+    if (isValidField(poi.opening_hours)) {
         html += `<div class="poi-detail"><span class="poi-detail-icon">🕐</span> ${poi.opening_hours}</div>`;
         hasDetails = true;
     }
 
-    if (poi.website) {
+    if (isValidField(poi.website)) {
         html += `<div class="poi-detail"><span class="poi-detail-icon">🌐</span> <a href="${poi.website}" target="_blank" rel="noopener">Web Sitesi</a></div>`;
         hasDetails = true;
     }
@@ -846,14 +864,13 @@ function setNlpLoading(isLoading) {
 
 function buildNlpSummary(result) {
     if (result.type === "route") {
-        return `${escapeHtml(result.origin || "?")} → ${escapeHtml(result.destination || "?")}`;
+        return `${escapeHtml(result.origin || "?" )} → ${escapeHtml(result.destination || "?")}`;
     }
     if (result.type === "multi") {
         return (result.locations || []).map(escapeHtml).join(" → ");
     }
     if (result.type === "poi") {
-        const concept = result.poi_concept ? ` (${escapeHtml(result.poi_concept)})` : "";
-        return `${escapeHtml(result.location || "Bilinmeyen konum")} için mekan araması${concept}`;
+        return `${escapeHtml(result.location || "Bilinmeyen konum")} için mekan araması`;
     }
     if (result.type === "single") {
         return `${escapeHtml(result.destination || "Bilinmeyen hedef")} hedef olarak algılandı`;
@@ -996,48 +1013,10 @@ async function focusNlpLocation() {
         const place = await geocodePlaceName(placeName);
         map.setView([place.lat, place.lon], 16);
         addPoint(place.lat, place.lon);
-
-        if (currentNlpResult.type === "poi" && currentNlpResult.poi_tags) {
-            await searchPoisFromNlp(currentNlpResult);
-        } else {
-            showToast(`"${placeName}" haritada gösterildi`, "success");
-        }
+        showToast(`"${placeName}" haritada gösterildi`, "success");
     } catch (error) {
         console.error("NLP konum gösterme hatası:", error);
         showToast(`Hata: ${error.message}`, "error");
-    } finally {
-        hideLoading();
-    }
-}
-
-async function searchPoisFromNlp(nlpResult) {
-    const location = nlpResult.location;
-    const tags = nlpResult.poi_tags;
-    const category = nlpResult.poi_category || nlpResult.poi_concept || "semantic";
-
-    if (!location || !tags) {
-        return;
-    }
-
-    const place = `${location}, Turkey`;
-    showLoading(`"${category}" mekanları aranıyor...`);
-    try {
-        const response = await fetch(`${API_BASE}/search-pois`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ place, category, tags }),
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || "POI araması başarısız");
-        }
-
-        displayPois(data.pois || [], category);
-        showToast(`${(data.pois || []).length} adet "${category}" bulundu`, "success");
-    } catch (error) {
-        console.error("NLP POI arama hatası:", error);
-        showToast(`POI arama hatası: ${error.message}`, "error");
     } finally {
         hideLoading();
     }
@@ -1057,7 +1036,7 @@ async function showAlternativeRoutes() {
 
     showLoading("Alternatif rotalar hesaplanıyor...");
 
-    const optimize = document.getElementById("chkOptimize").checked;
+    const optimize = false; // TSP optimizasyonu devre dışı
 
     try {
         const response = await fetch(`${API_BASE}/get-alternative-routes`, {
@@ -1091,7 +1070,7 @@ async function showAlternativeRoutes() {
  */
 function displayAlternativeRoutes(alternatives) {
     elAlternativesPanel.style.display = "block";
-
+    
     // Cache'i doldur (BUG FIX: 07.03.2026 - alternativeRoutesCache init)
     alternativeRoutesCache = {};
     alternatives.forEach(alt => {
@@ -1590,19 +1569,6 @@ function displayTimeline(timeline) {
             </div>
         </div>
         
-        ${timeline.weather_summary ? `
-        <div class="weather-alert-banner ${timeline.weather_summary.alert_level}">
-            <span class="weather-banner-emoji">${timeline.weather_summary.emoji}</span>
-            <span class="weather-banner-text">${escapeHtml(timeline.weather_summary.summary_text)}</span>
-        </div>
-        ${timeline.weather_summary.smart_suggestion ? `
-        <div class="weather-alert-banner low" style="margin-top: 5px; background: rgba(0, 206, 201, 0.1); border-color: rgba(0, 206, 201, 0.4);">
-            <span class="weather-banner-emoji">💡</span>
-            <span class="weather-banner-text"><strong>Akıllı Öneri:</strong> ${timeline.weather_summary.smart_suggestion.message} (Önerilen Çıkış: ${timeline.weather_summary.smart_suggestion.suggested_time})</span>
-        </div>
-        ` : ''}
-        ` : ''}
-        
         <div class="timeline-items">
     `;
 
@@ -1636,8 +1602,8 @@ function displayTimeline(timeline) {
                     ${item.weather.advice && item.weather.advice.items && item.weather.advice.items.length > 0 ? `
                     <div class="timeline-advice timeline-advice-${item.weather.advice.alert_level}">
                         ${item.weather.advice.items.map(a =>
-            `<span class="tl-advice-item"><span class="tl-advice-emoji">${a.emoji}</span><span class="tl-advice-text">${escapeHtml(a.text)}</span></span>`
-        ).join('')}
+                            `<span class="tl-advice-item"><span class="tl-advice-emoji">${a.emoji}</span><span class="tl-advice-text">${escapeHtml(a.text)}</span></span>`
+                        ).join('')}
                     </div>` : ''}
                     ` : ''}
                     ${!isLast ? `
@@ -1933,7 +1899,7 @@ function toggleSavedLocationsVisibility() {
 // Tüm inline onclick handlers yerine tek bir event listener kullanılır
 // Bu, XSS saldırılarını önler ve daha iyi performans sağlar
 
-document.addEventListener("click", function (e) {
+document.addEventListener("click", function(e) {
     // Find closest element with data attribute (handles nested clicks)
     const target = e.target.closest("[data-action-remove-point]");
     if (target) {
@@ -2015,7 +1981,7 @@ document.addEventListener("click", function (e) {
 });
 
 // Handle stopPropagation for action buttons inside cards
-document.addEventListener("click", function (e) {
+document.addEventListener("click", function(e) {
     if (e.target.closest("[data-stop-propagation]")) {
         e.stopPropagation();
     }
@@ -2063,6 +2029,31 @@ function initWeatherWidget() {
 // ========== WEATHER BANNER ==========
 
 let _weatherBannerTimer = null;
+let _weatherUseCustomStartTime = false;
+
+function formatLocalDateISO(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
+// Kullanıcı startTime alanını bilinçli değiştirdiyse forecast modunu aç
+(function initWeatherStartTimePreference() {
+    const startTimeInput = document.getElementById("startTime");
+    if (!startTimeInput) return;
+
+    const defaultValue = (startTimeInput.value || "09:00").trim();
+    startTimeInput.dataset.defaultValue = defaultValue;
+
+    const updatePreference = () => {
+        const value = (startTimeInput.value || "").trim();
+        _weatherUseCustomStartTime = /^\d{2}:\d{2}$/.test(value) && value !== defaultValue;
+    };
+
+    startTimeInput.addEventListener("input", updatePreference);
+    startTimeInput.addEventListener("change", updatePreference);
+})();
 
 async function checkRouteWeatherAndShowBanner(points) {
     if (!points || points.length < 1) return;
@@ -2070,23 +2061,52 @@ async function checkRouteWeatherAndShowBanner(points) {
         const pointsPayload = points.map((p, i) => ({
             lat: p[0], lon: p[1], name: `Nokta ${i + 1}`
         }));
+
+        // Kullanıcı özel saat seçtiyse, route-weather için forecast modunu aç
+        const startTimeInput = document.getElementById("startTime");
+        const startTimeValue = (startTimeInput?.value || "").trim();
+
+        let hasTime = _weatherUseCustomStartTime && /^\d{2}:\d{2}$/.test(startTimeValue);
+
+        // Geçmiş saat seçildiyse (bugün için), anlık moda düş
+        if (hasTime) {
+            const now = new Date();
+            const [hh, mm] = startTimeValue.split(":").map(Number);
+            const selected = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0);
+            if (selected <= now) {
+                hasTime = false;
+            }
+        }
+
+        const payload = {
+            points: pointsPayload,
+            transport_mode: "walking"
+        };
+
+        if (hasTime) {
+            const today = formatLocalDateISO(new Date());
+            payload.start_time = `${today}T${startTimeValue}:00`;
+            payload.segment_distances = calculateSegmentDistances();
+        }
+
         const resp = await fetch(`${API_BASE}/weather/check-route`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ points: pointsPayload })
+            body: JSON.stringify(payload)
         });
         if (!resp.ok) return;
         const data = await resp.json();
         if (!data.success) return;
 
         const routeWeather = data.data.route_weather || [];
-        showWeatherBanner(routeWeather);
+        const criticalAdvice = data.data.critical_advice || null;
+        showWeatherBanner(routeWeather, criticalAdvice);
     } catch (e) {
         // sessiz hata – banner olmadan devam
     }
 }
 
-function showWeatherBanner(routeWeather) {
+function showWeatherBanner(routeWeather, criticalAdvice = null) {
     // Tüm noktalardan tavsiye topla, tekrar edenleri filtrele
     const seenTypes = new Set();
     const allItems = [];
@@ -2125,8 +2145,17 @@ function showWeatherBanner(routeWeather) {
             <span class="weather-banner-title">${titleMap[topLevel]}</span>
             <button class="weather-banner-close" onclick="hideWeatherBanner()">✕</button>
         </div>
-        <div class="weather-banner-items">
     `;
+
+    if (criticalAdvice) {
+        html += `
+        <div class="weather-banner-critical">
+            <span class="wbc-icon">🕒</span>
+            <span class="wbc-text">${escapeHtml(criticalAdvice)}</span>
+        </div>`;
+    }
+
+    html += `<div class="weather-banner-items">`;
     allItems.forEach(item => {
         html += `<div class="weather-banner-item">
             <span class="wbi-emoji">${item.emoji}</span>
@@ -2147,3 +2176,107 @@ function hideWeatherBanner() {
     const banner = document.getElementById("weatherBanner");
     if (banner) banner.classList.remove("visible");
 }
+
+
+// ========== TÜRKİYE VERİSİ YÖNETİMİ ==========
+let turkiyeData = null;
+
+// Türkiye verisini yükle
+async function loadTurkiyeData() {
+    try {
+        const response = await fetch('data/turkiye-data.json');
+        turkiyeData = await response.json();
+        initializeRegionDropdown();
+    } catch (error) {
+        console.error('Türkiye verisi yüklenemedi:', error);
+        showToast('Bölge verileri yüklenemedi', 'error');
+    }
+}
+
+// Bölge dropdown'ını doldur
+function initializeRegionDropdown() {
+    if (!turkiyeData) return;
+    
+    elRegionSelect.innerHTML = '<option value="">Bölge Seçin</option>';
+    Object.keys(turkiyeData).forEach(region => {
+        const option = document.createElement('option');
+        option.value = region;
+        option.textContent = region;
+        elRegionSelect.appendChild(option);
+    });
+}
+
+// Bölge seçildiğinde illeri doldur
+elRegionSelect.addEventListener('change', function() {
+    const selectedRegion = this.value;
+    
+    if (!selectedRegion) {
+        elProvinceSelect.disabled = true;
+        elProvinceSelect.innerHTML = '<option value="">Önce Bölge Seçin</option>';
+        elDistrictSelect.disabled = true;
+        elDistrictSelect.innerHTML = '<option value="">Önce İl Seçin</option>';
+        return;
+    }
+    
+    const provinces = turkiyeData[selectedRegion];
+    elProvinceSelect.innerHTML = '<option value="">İl Seçin</option>';
+    
+    Object.keys(provinces).forEach(province => {
+        const option = document.createElement('option');
+        option.value = province;
+        option.textContent = province;
+        elProvinceSelect.appendChild(option);
+    });
+    
+    elProvinceSelect.disabled = false;
+    elDistrictSelect.disabled = true;
+    elDistrictSelect.innerHTML = '<option value="">Önce İl Seçin</option>';
+});
+
+// İl seçildiğinde ilçeleri doldur
+elProvinceSelect.addEventListener('change', function() {
+    const selectedRegion = elRegionSelect.value;
+    const selectedProvince = this.value;
+    
+    if (!selectedProvince) {
+        elDistrictSelect.disabled = true;
+        elDistrictSelect.innerHTML = '<option value="">Önce İl Seçin</option>';
+        return;
+    }
+    
+    const districts = turkiyeData[selectedRegion][selectedProvince];
+    elDistrictSelect.innerHTML = '<option value="">İlçe Seçin (Opsiyonel)</option>';
+    
+    districts.forEach(district => {
+        const option = document.createElement('option');
+        option.value = district;
+        option.textContent = district;
+        elDistrictSelect.appendChild(option);
+    });
+    
+    elDistrictSelect.disabled = false;
+});
+
+// İlçe seçildiğinde haritayı oraya odakla
+elDistrictSelect.addEventListener('change', async function() {
+    const selectedProvince = elProvinceSelect.value;
+    const selectedDistrict = this.value;
+    
+    if (selectedDistrict) {
+        // Geocoding ile konumu bul
+        const query = `${selectedDistrict}, ${selectedProvince}, Turkey`;
+        try {
+            const data = await geocodePlaceName(query);
+            if (data && data.length > 0) {
+                const { lat, lon } = data[0];
+                map.setView([lat, lon], 14);
+                showToast(`${selectedDistrict}, ${selectedProvince} konumuna odaklandı`, 'success');
+            }
+        } catch (error) {
+            console.error('Konum bulunamadı:', error);
+        }
+    }
+});
+
+// Sayfa yüklendiğinde Türkiye verisini yükle
+loadTurkiyeData();

@@ -64,7 +64,7 @@ try:
         onnx_path,
         input_names=input_names,
         output_names=["last_hidden_state"],
-        opset_version=11,
+        opset_version=18,
         dynamic_axes=dynamic_axes,
         do_constant_folding=True,
     )

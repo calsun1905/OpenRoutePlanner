@@ -10,7 +10,7 @@ Created: 2026-03-10
 
 import time
 import requests
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone, timedelta
 
 # Local imports
@@ -473,7 +473,7 @@ def _build_url_current(lat: float, lon: float) -> str:
     return f"{OPENMETEO_BASE_URL}?{params}"
 
 
-def _build_url_hourly(lat: float, lon: float, hours: int = 24) -> str:
+def _build_url_hourly(lat: float, lon: float, hours: int = 24, timezone_name: str = "auto") -> str:
     """
     Saatlik forecast URL'i olusturur.
 
@@ -509,7 +509,7 @@ def _build_url_hourly(lat: float, lon: float, hours: int = 24) -> str:
     params = f"latitude={lat}&longitude={lon}"
     params += f"&hourly={','.join(HOURLY_WEATHER_PARAMS)}"
     params += f"&forecast_hours={hours}"
-    params += "&timezone=auto"
+    params += f"&timezone={timezone_name}"
 
     return f"{OPENMETEO_BASE_URL}?{params}"
 
@@ -774,7 +774,8 @@ def get_hourly_forecast(
     lat: float,
     lon: float,
     hours: int = 24,
-    use_cache: bool = True
+    use_cache: bool = True,
+    timezone_name: str = "auto"
 ) -> dict:
     """
     Belirli bir konum için saatlik forecast getirir.
@@ -830,6 +831,7 @@ def get_hourly_forecast(
         lon: Boylam
         hours: Forecast saati (1-168 arasi, varsayilan 24)
         use_cache: Cache kullanilsin mi (varsayilan True)
+        timezone_name: OpenMeteo timezone parametresi (varsayilan "auto")
 
     Returns:
         dict: Basari durumu ve forecast verisi
@@ -847,8 +849,10 @@ def get_hourly_forecast(
     if not validate_hours(hours):
         raise ValueError(f"Invalid hours: {hours} (must be 1-168)")
 
+    timezone_name = str(timezone_name or "auto").strip() or "auto"
+
     # Cache kontrolu
-    cache_key = build_cache_key("hourly", lat, lon, hours=hours)
+    cache_key = build_cache_key("hourly", lat, lon, hours=hours, timezone=timezone_name)
     if use_cache:
         cached = _get_from_cache(cache_key)
         if cached:
@@ -860,7 +864,7 @@ def get_hourly_forecast(
 
     try:
         # API'den veri cek
-        url = _build_url_hourly(lat, lon, hours)
+        url = _build_url_hourly(lat, lon, hours, timezone_name=timezone_name)
         response = _fetch_from_openmeteo(url)
 
         # Parse response
@@ -882,8 +886,8 @@ def get_hourly_forecast(
             _save_to_cache(cache_key, result)
 
         logger.info(
-            "Hourly forecast fetched: lat=%s, lon=%s, hours=%s",
-            lat, lon, hours
+            "Hourly forecast fetched: lat=%s, lon=%s, hours=%s, timezone=%s",
+            lat, lon, hours, timezone_name
         )
 
         return {
@@ -964,10 +968,162 @@ def get_weather_at_time(
             "weather_emoji": get_weather_emoji(weather_code),
             "wind_speed": wind_list[best_idx] if best_idx < len(wind_list) else None,
         }
-        data["advice"] = get_weather_advice(data)
+        data["advice"] = get_weather_advice(data, context_time=data.get("forecast_time"))
         return data
     except Exception as e:
         logger.warning(f"get_weather_at_time başarısız ({lat},{lon}) {target_time_str!r}: {e}")
+        return None
+
+
+def _parse_context_time(context_time: Optional[str]) -> Optional[datetime]:
+    """HH:MM veya ISO zaman bilgisini datetime'a çevirir (naive)."""
+    if not context_time:
+        return None
+
+    raw = str(context_time).strip()
+    if not raw:
+        return None
+
+    try:
+        if "T" in raw:
+            return datetime.fromisoformat(raw.replace("Z", "")).replace(tzinfo=None)
+        today = datetime.now().strftime("%Y-%m-%d")
+        ts = raw if len(raw) > 5 else f"{raw}:00"
+        return datetime.fromisoformat(f"{today}T{ts}")
+    except (ValueError, TypeError):
+        return None
+
+
+def _precip_level(percent: float) -> str:
+    """Yağış olasılığı yüzdesini düşük/orta/yüksek seviyesine çevirir."""
+    p = float(percent or 0)
+    if p >= 60:
+        return "yüksek"
+    if p >= 30:
+        return "orta"
+    return "düşük"
+
+
+def _build_critical_advice(best: Dict[str, Any], window_start: Optional[str], window_end: Optional[str]) -> str:
+    """Önümüzdeki 2 saat için tek satırlık kritik öneri metni üretir."""
+    hhmm = best.get("time", "--:--")
+    precip_prob = int(round(float(best.get("precipitation_probability", 0) or 0)))
+    weather_code = int(best.get("weather_code", 0) or 0)
+    wind_speed = int(round(float(best.get("wind_speed", 0) or 0)))
+    level = _precip_level(precip_prob)
+
+    if weather_code >= 95:
+        core = f"{hhmm} civarı fırtına bekleniyor. Mümkünse rotayı erteleyin."
+    elif weather_code in [71, 73, 75, 77, 85, 86]:
+        core = f"{hhmm} civarı kar olasılığı var. Kaygan zemine dikkat edin."
+    elif precip_prob >= 30:
+        core = f"{hhmm} civarı yağış ihtimali %{precip_prob} ({level}). Şemsiye/yağmurluk almayı unutmayın."
+    elif wind_speed >= 35:
+        core = f"{hhmm} civarı rüzgar kuvvetli ({wind_speed} km/s). Açık alanlarda dikkatli olun."
+    else:
+        core = f"{hhmm} civarı yağış ihtimali düşük (%{precip_prob})."
+
+    if window_start and window_end:
+        return f"Önümüzdeki 2 saat ({window_start}-{window_end}): {core}"
+    return f"Önümüzdeki 2 saat: {core}"
+
+
+def get_two_hour_risk_window(
+    lat: float,
+    lon: float,
+    context_time: Optional[str] = None,
+    use_cache: bool = True
+) -> Optional[Dict[str, Any]]:
+    """
+    Önümüzdeki 2 saat için yağış olasılığı odaklı pencere analizi üretir.
+
+    Returns:
+        {
+          "window_start": "HH:MM",
+          "window_end": "HH:MM",
+          "best_time": "HH:MM",
+          "precipitation_probability": int,
+          "precipitation_level": "düşük|orta|yüksek",
+          "critical_advice": str
+        }
+    """
+    if not validate_coordinates(lat, lon):
+        return None
+
+    try:
+        forecast_result = get_hourly_forecast(lat, lon, hours=6, use_cache=use_cache)
+        if not forecast_result.get("success"):
+            return None
+
+        hourly = forecast_result["data"]["hourly"]
+        times = hourly.get("time", [])
+        if not times:
+            return None
+
+        base_dt = _parse_context_time(context_time) or datetime.now().replace(minute=0, second=0, microsecond=0)
+        end_dt = base_dt + timedelta(hours=2)
+
+        entries: List[Dict[str, Any]] = []
+        all_entries: List[Dict[str, Any]] = []
+        wc_list = hourly.get("weather_code", [])
+        pp_list = hourly.get("precipitation_probability", [])
+        pr_list = hourly.get("precipitation", [])
+        ws_list = hourly.get("wind_speed", [])
+        wg_list = hourly.get("wind_gusts", [])
+
+        for i, t in enumerate(times):
+            try:
+                dt = datetime.fromisoformat(str(t).replace("Z", "")).replace(tzinfo=None)
+            except (ValueError, TypeError):
+                continue
+
+            code = wc_list[i] if i < len(wc_list) else 0
+            pp = pp_list[i] if i < len(pp_list) else 0
+            pr = pr_list[i] if i < len(pr_list) else 0
+            ws = ws_list[i] if i < len(ws_list) else 0
+            wg = wg_list[i] if i < len(wg_list) else 0
+
+            row = {
+                "dt": dt,
+                "time": dt.strftime("%H:%M"),
+                "weather_code": code,
+                "precipitation_probability": pp,
+                "precipitation": pr,
+                "wind_speed": ws,
+                "wind_gusts": wg,
+                "rank": float(pp or 0),
+            }
+            all_entries.append(row)
+
+            if base_dt <= dt <= end_dt:
+                entries.append(row)
+
+        if not entries and all_entries:
+            now_dt = datetime.now().replace(tzinfo=None)
+            fallback = [e for e in all_entries if e["dt"] >= now_dt]
+            if not fallback:
+                fallback = all_entries
+            entries = fallback[:3]
+
+        if not entries:
+            return None
+
+        best = max(entries, key=lambda x: x["rank"])
+        precip_prob = int(round(float(best.get("precipitation_probability", 0) or 0)))
+        level = _precip_level(precip_prob)
+        window_start = entries[0]["time"]
+        window_end = entries[-1]["time"]
+
+        return {
+            "window_start": window_start,
+            "window_end": window_end,
+            "best_time": best["time"],
+            "precipitation_probability": precip_prob,
+            "precipitation_level": level,
+            "critical_advice": _build_critical_advice(best, window_start, window_end),
+        }
+    except Exception as e:
+        logger.warning(f"get_two_hour_risk_window başarısız ({lat},{lon}) {context_time!r}: {e}")
         return None
 
 
@@ -1039,6 +1195,9 @@ def check_route_weather(
 
     route_weather = []
     warnings = []
+    route_max_precip_prob = -1
+    route_precipitation_level = "düşük"
+    route_critical_advice = None
 
     # Forecast modu: start_time ISO datetime formatında (tarih + saat içeriyor)
     _speeds_kmh = {"walking": 5.0, "cycling": 15.0, "driving": 30.0}
@@ -1054,8 +1213,8 @@ def check_route_weather(
 
     for i, point in enumerate(points):
         # Support both "lat"/"lon" and "latitude"/"longitude" (common API conventions)
-        lat = point.get("lat") or point.get("latitude")
-        lon = point.get("lon") or point.get("longitude")
+        lat = point.get("lat") if point.get("lat") is not None else point.get("latitude")
+        lon = point.get("lon") if point.get("lon") is not None else point.get("longitude")
         name = point.get("name", point.get("label", "Bilinmeyen"))
 
         if lat is None or lon is None:
@@ -1082,14 +1241,37 @@ def check_route_weather(
                 warnings.append(f"{name}: {alert}")
 
             # Akıllı tavsiyeler
-            advice = get_weather_advice(current or {})
+            context_time = _arrival_dt.isoformat() if (_use_forecast and _arrival_dt is not None) else (current or {}).get("timestamp")
+            advice = get_weather_advice(current or {}, context_time=context_time, point_name=name)
+
+            risk_window_2h = get_two_hour_risk_window(lat, lon, context_time=context_time)
+            precip_prob_2h = (risk_window_2h or {}).get("precipitation_probability", 0)
+            precip_level_2h = (risk_window_2h or {}).get("precipitation_level", "düşük")
+
+            # Kullanıcıya yalnızca anlamlı eşiklerde (>= %30) kritik öneri göster
+            raw_critical_advice = (risk_window_2h or {}).get("critical_advice")
+            critical_advice = raw_critical_advice if precip_prob_2h >= 30 else None
+
+            if precip_prob_2h > route_max_precip_prob:
+                route_max_precip_prob = precip_prob_2h
+                route_precipitation_level = precip_level_2h
+
+            if risk_window_2h and critical_advice and precip_prob_2h >= route_max_precip_prob:
+                route_critical_advice = f"{name}: {critical_advice}"
+
+            if risk_window_2h and precip_level_2h in ["orta", "yüksek"] and critical_advice:
+                warnings.append(f"{name}: {critical_advice}")
 
             route_weather.append({
                 "point": name,
                 "lat": lat,
                 "lon": lon,
                 "weather": current,
-                "advice": advice
+                "advice": advice,
+                "risk_window_2h": risk_window_2h,
+                "precipitation_probability_2h": precip_prob_2h,
+                "precipitation_level_2h": precip_level_2h,
+                "critical_advice": critical_advice
             })
 
         except Exception as e:
@@ -1115,7 +1297,10 @@ def check_route_weather(
         "data": {
             "route_weather": route_weather,
             "warnings": warnings,
-            "overall_conditions": overall_conditions
+            "overall_conditions": overall_conditions,
+            "precipitation_level_2h": route_precipitation_level,
+            "max_precipitation_probability_2h": max(route_max_precip_prob, 0),
+            "critical_advice": route_critical_advice
         }
     }
 

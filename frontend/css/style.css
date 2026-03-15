@@ -1870,100 +1870,67 @@ body {
     font-size: 0.9rem;
 }
 
-/* --- Weather Widget (Premium Glassmorphism) --- */
+/* --- Weather Widget --- */
 .weather-widget {
     position: absolute;
-    bottom: 80px;
-    right: 20px;
+    bottom: 70px;
+    right: 10px;
     z-index: 1000;
-    
-    /* Premium Glassmorphism */
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-    
-    border-radius: 20px;
-    padding: 10px 16px;
+    background: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(108, 92, 231, 0.2);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    box-shadow: var(--shadow-card);
     cursor: default;
-    min-width: 150px;
+    min-width: 135px;
     opacity: 1;
-    transform: translateY(0);
-    transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+    transition: opacity 1.2s ease, border-color var(--transition-fast);
     pointer-events: auto;
-    display: flex;
-    align-items: center;
-}
-
-/* Dark mode fallback if applicable, using variable */
-[data-theme='dark'] .weather-widget,
-body.dark-mode .weather-widget {
-    background: rgba(30, 30, 40, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
 }
 
 .weather-widget.auto-hide {
     opacity: 0;
-    transform: translateY(20px);
     pointer-events: none;
 }
 
 .weather-widget:hover {
     opacity: 1 !important;
     pointer-events: auto;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(108, 92, 231, 0.2);
-    border-color: rgba(108, 92, 231, 0.5);
+    border-color: rgba(108, 92, 231, 0.4);
 }
 
 .weather-widget-content {
     display: flex;
     align-items: center;
-    gap: 12px;
-    width: 100%;
+    gap: 8px;
 }
 
 .weather-widget .weather-emoji {
-    font-size: 2rem;
+    font-size: 1.8rem;
     line-height: 1;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
-    animation: floating 3s ease-in-out infinite;
-}
-
-@keyframes floating {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-3px); }
-    100% { transform: translateY(0px); }
 }
 
 .weather-widget .weather-info {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: 0;
+    gap: 2px;
 }
 
 .weather-widget .weather-temp {
-    font-size: 1.3rem;
-    font-weight: 800;
+    font-size: 1.1rem;
+    font-weight: 700;
     color: var(--text-primary);
-    line-height: 1.1;
-    letter-spacing: -0.5px;
 }
 
 .weather-widget .weather-desc {
-    font-size: 0.8rem;
-    font-weight: 500;
+    font-size: 0.75rem;
     color: var(--text-secondary);
-    max-width: 120px;
+    max-width: 130px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-transform: capitalize;
 }
-
 
 /* Timeline weather badge */
 .timeline-weather {
@@ -2006,48 +1973,6 @@ body.dark-mode .weather-widget {
 }
 .tl-advice-emoji { font-size: 0.9rem; }
 .tl-advice-text  { color: var(--text-secondary); }
-
-/* Timeline hava özeti banner (weather_summary) */
-.weather-alert-banner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    border-radius: 10px;
-    margin-bottom: 12px;
-    font-size: 0.82rem;
-    border-left: 4px solid;
-    transition: background 0.2s;
-}
-.weather-alert-banner.none,
-.weather-alert-banner.low {
-    background: rgba(0, 206, 201, 0.10);
-    border-color: #00cec9;
-    color: var(--text-primary);
-}
-.weather-alert-banner.medium {
-    background: rgba(249, 202, 36, 0.13);
-    border-color: #f9ca24;
-    color: var(--text-primary);
-}
-.weather-alert-banner.high {
-    background: rgba(225, 112, 85, 0.13);
-    border-color: #e17055;
-    color: var(--text-primary);
-}
-.weather-banner-emoji { font-size: 1.15rem; }
-.weather-banner-text  { flex: 1; }
-.weather-banner-temp  {
-    font-weight: 600;
-    white-space: nowrap;
-    color: var(--accent-primary);
-}
-
-/* timeline-advice için alert_level class'ları (yeni format) */
-.timeline-advice-none   { border-color: #74b9ff; background: rgba(116,185,255,0.07); }
-.timeline-advice-low    { border-color: var(--accent-secondary); background: rgba(0,206,201,0.07); }
-.timeline-advice-medium { border-color: #f9ca24; background: rgba(249,202,36,0.08); }
-.timeline-advice-high   { border-color: #e17055; background: rgba(225,112,85,0.10); }
 
 /* ===== Weather Banner ===== */
 .weather-banner {
@@ -2102,6 +2027,24 @@ body.dark-mode .weather-widget {
     line-height: 1;
 }
 .weather-banner-close:hover { color: var(--text-primary); }
+
+.weather-banner-critical {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: rgba(108,92,231,0.10);
+    border: 1px solid rgba(108,92,231,0.28);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+}
+.wbc-icon { font-size: 0.95rem; flex-shrink: 0; margin-top: 1px; }
+.wbc-text {
+    font-size: 0.76rem;
+    line-height: 1.35;
+    color: var(--text-primary);
+    font-weight: 500;
+}
 
 .weather-banner-items {
     display: flex;

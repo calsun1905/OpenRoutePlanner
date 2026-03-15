@@ -172,6 +172,26 @@ ROUTE_CONFIG = {
 }
 ```
 
+## Çalışma Profilleri (NLP/OSM)
+
+NLP ve OSM davranışı için `.env.example` dosyasını baz alabilirsiniz.
+
+Önerilen profiller:
+
+- **Hız öncelikli (önerilen üretim)**
+  - `ORP_BERT_USE_OSM=0`
+  - `ORP_BERT_PREFER_OSM_FIRST=0`
+- **Dengeli OSM-first**
+  - `ORP_BERT_USE_OSM=1`
+  - `ORP_BERT_PREFER_OSM_FIRST=1`
+  - `ORP_BERT_OSM_TIMEOUT_SEC=2.5`
+  - `ORP_BERT_OSM_PREFETCH_BUDGET_SEC=2.0`
+  - `ORP_BERT_OSM_PREFETCH_MAX_QUERIES=2`
+
+Detaylar ve güncel benchmark notları:
+- `docs/raporlar/bert_osm_operasyon_profilleri.md`
+- `docs/raporlar/bert_calibration_phase2_latest.md`
+
 ## Geliştirme Durumu
 
 Detaylı geliştirme durumu için [progress.md](progress.md) dosyasına bakınız.

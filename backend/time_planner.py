@@ -158,7 +158,11 @@ def create_timeline(
                         advice = {}
                         if _get_weather_advice:
                             try:
-                                advice = _get_weather_advice(w)
+                                advice = _get_weather_advice(
+                                    w,
+                                    context_time=arrival_time,
+                                    point_name=point.get("name", f"Nokta {i + 1}")
+                                )
                             except Exception:
                                 pass
                         entry["weather"] = {
@@ -200,11 +204,11 @@ def create_timeline(
     if include_weather:
         weather_summary = generate_route_weather_summary(schedule)
         
-        # Eğer hava durumu kötüyse akıllı saat önerisi yap
-        if weather_summary.get("alert_level") in ["medium", "high"]:
+        # Eğer hava durumu riskli ise akıllı saat önerisi yap
+        if weather_summary.get("alert_level") in ["warning", "danger"]:
             lat = points[0].get("lat")
             lon = points[0].get("lon")
-            if lat and lon and _get_weather_at_time:
+            if lat is not None and lon is not None and _get_weather_at_time:
                 suggestion = find_smart_departure_time(lat, lon, start_time, _get_weather_at_time)
                 if suggestion:
                     weather_summary["smart_suggestion"] = suggestion
@@ -271,10 +275,10 @@ def find_smart_departure_time(lat: float, lon: float, start_time: str, get_weath
 def generate_route_weather_summary(schedule: List[Dict]) -> Dict:
     """
     Tüm timeline noktalarından genel rota hava özeti çıkarır.
-    
+
     Returns:
         dict: {
-            "alert_level": "none" | "low" | "medium" | "high",
+            "alert_level": "info" | "warning" | "danger",
             "summary_text": "Bu rotada yağmur riski yüksek...",
             "emoji": "⚠️",
             "max_temp": 28.0,
@@ -288,75 +292,51 @@ def generate_route_weather_summary(schedule: List[Dict]) -> Dict:
         for entry in schedule
         if entry.get("weather")
     ]
-    
+
     if not weather_entries:
         return {
-            "alert_level": "none",
+            "alert_level": "info",
             "summary_text": "Hava durumu bilgisi alınamadı.",
             "emoji": "❓"
         }
-    
+
     temps = [w["temperature"] for w in weather_entries if w.get("temperature") is not None]
     precip_probs = [w["precipitation_probability"] for w in weather_entries if w.get("precipitation_probability") is not None]
     winds = [w["wind_speed"] for w in weather_entries if w.get("wind_speed") is not None]
-    alert_levels = [w.get("advice", {}).get("alert_level", "none") for w in weather_entries]
-    
+    alert_levels = [w.get("advice", {}).get("alert_level", "info") for w in weather_entries]
+
     max_precip = max(precip_probs) if precip_probs else 0
     max_wind = max(winds) if winds else 0
     max_temp = max(temps) if temps else None
     min_temp = min(temps) if temps else None
-    
-    # En yüksek alert seviyesini belirle
-    level_order = {"none": 0, "low": 1, "medium": 2, "high": 3}
+
+    # En yüksek alert seviyesini belirle (info < warning < danger)
+    level_order = {"info": 0, "warning": 1, "danger": 2}
     overall_level = max(alert_levels, key=lambda x: level_order.get(x, 0))
-    
-    # Özet metin ve emoji üret
+
     messages = []
     if max_precip >= 70:
         messages.append(f"Yağmur riski yüksek (%{int(max_precip)})")
     elif max_precip >= 40:
         messages.append(f"Hafif yağmur ihtimali (%{int(max_precip)})")
-    
+
     if max_wind >= 40:
         messages.append(f"Kuvvetli rüzgar ({int(max_wind)} km/s)")
     elif max_wind >= 25:
         messages.append(f"Orta rüzgar ({int(max_wind)} km/s)")
-    
+
     if max_temp is not None and max_temp >= 35:
         messages.append(f"Öğle sıcağına dikkat ({int(max_temp)}°C)")
 
-    emoji = "✅"
-    summary_text = "Hava yolculuk için ideal."
-    
-    if overall_level == "high":
-        emoji = "🚨"
-    elif overall_level == "medium":
-        emoji = "⚠️"
-    elif overall_level == "low":
-        emoji = "ℹ️"
-        
-    if messages:
-        summary_text = " & ".join(messages)
+    if not messages and min_temp is not None and max_temp is not None:
+        messages.append(f"Genel hava iyi ({int(min_temp)}-{int(max_temp)}°C)")
+
+    emoji_map = {"info": "ℹ️", "warning": "⚠️", "danger": "🚨"}
 
     return {
         "alert_level": overall_level,
-        "summary_text": summary_text,
-        "emoji": emoji,
-        "max_temp": max_temp,
-        "min_temp": min_temp,
-        "max_precip_prob": max_precip,
-        "max_wind": max_wind
-    }
-    
-    if not messages and min_temp is not None:
-        messages.append(f"Genel hava iyi ({int(min_temp)}-{int(max_temp)}°C)")
-    
-    emoji_map = {"none": "✅", "low": "🌤️", "medium": "⚠️", "high": "🚨"}
-    
-    return {
-        "alert_level": overall_level,
         "summary_text": " · ".join(messages) if messages else "Hava koşulları uygun.",
-        "emoji": emoji_map.get(overall_level, "🌤️"),
+        "emoji": emoji_map.get(overall_level, "ℹ️"),
         "max_temp": max_temp,
         "min_temp": min_temp,
         "max_precip_prob": int(max_precip) if max_precip else 0,
