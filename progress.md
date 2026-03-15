@@ -832,3 +832,82 @@ Bu oturumda BERT tarafi icin iki teknik yol netlestirildi ve hibrit gecis strate
 - [ ] Kategori-centroid + margin skorlamasini implement et
 - [ ] Hard negative mini seti olustur ve testlere ekle
 - [ ] Intent accuracy / confusion matrix raporlamasini ekle
+
+## 2026-03-15 - NLP/POI Faz-1 + Faz-2 Uygulama, Kalibrasyon ve Canli Dogrulama
+
+### Bu Oturumda Tamamlanan Ana Isler
+
+1) POI Resolver (yeni modül)
+- `backend/nlp_concept_resolver.py` eklendi.
+- Turkce ek/çoğul soyma + sozluk dogrulama + fallback akisi kuruldu.
+- `pilavcılardan` gibi sorgular canonical concept'e (`pilavcı`) normalize edilir hale geldi.
+
+2) BERT parse karar motoru guclendirildi
+- `backend/bert_nlp_engine.py` icinde intent conflict matrix eklendi.
+- `route/poi/multi/unknown` cakismalari deterministic kurallarla ele alindi.
+- Chitchat guard eklendi (`merhaba`, `selam`, `nasılsın` -> `unknown`).
+- Multi tespiti explicit ve plain liste davranisiyla iyilestirildi.
+
+3) Regex fallback entegrasyonu
+- `backend/nlp_engine.py` icine yeni POI kaliplari eklendi.
+- Fallback response'larina `poi_concept` ve resolver meta alanlari eklendi.
+
+4) API operasyonel katman
+- `backend/app.py`:
+  - `X-Request-ID` / `X-Correlation-ID` middleware eklendi.
+  - Response header'larina trace id basiliyor.
+  - Basit PII redaction eklendi.
+  - `/api/nlp/parse` icin `trace_policy` response alani eklendi.
+
+5) Overpass/OSM guvenlik ve fallback
+- `backend/graph_manager.py`:
+  - Geo-bound zorunlulugu eklendi (merkez geocode ile cözülmeden global query yok).
+  - A/B/C fallback planı eklendi (strict point -> relaxed point -> place-boundary).
+  - Fallback adim limiti kontrollu hale getirildi.
+
+6) Cache version pinning
+- `backend/cache_manager.py`:
+  - POI cache key uretimine `version_token` destegi eklendi.
+- `backend/app.py` `/api/search-pois`:
+  - `dict_version + threshold_profile + plan_version` token ile cache izolasyonu saglandi.
+  - `version_profile` response alani eklendi.
+
+7) OSM-first latency korumasi
+- `backend/bert_nlp_engine.py` icine timeout-budget/degrade eklendi:
+  - `ORP_BERT_OSM_TIMEOUT_SEC`
+  - `ORP_BERT_OSM_PREFETCH_BUDGET_SEC`
+  - `ORP_BERT_OSM_PREFETCH_MAX_QUERIES`
+
+8) Dokumantasyon ve ortam profilleri
+- `.env.example` eklendi.
+- `README.md` profiller bolumu guncellendi.
+- `docs/raporlar/bert_osm_operasyon_profilleri.md` eklendi.
+- `docs/raporlar/bert_calibration_phase2_latest.md` eklendi.
+
+### Test ve Benchmark Ozeti (Final)
+
+- Secili test paketi: **38/38 PASS**
+- Gold benchmark (default / OSM off): **24/24 (%100)**
+  - p50: 38.9ms
+  - p95: 74.3ms
+- Gold benchmark (OSM-first): **24/24 (%100)**
+  - p50: 3440.9ms
+  - p95: 4878.7ms
+
+### Canli API Dogrulama (localhost:5000)
+
+- `/api/nlp/parse`
+  - "Üsküdarda gezilecek yerler göster" -> `poi`
+  - "Moda Bostancı Maltepe gezi planı" -> `multi`
+  - "Bugün hava nasıl" -> `unknown`
+  - "Merhaba nasılsın" -> `unknown`
+
+- `/api/search-pois`
+  - category canonicalization: `pilavcılardan` -> `pilavcı`
+  - `category_resolution.status = success`
+  - `version_profile` alanlari response'ta mevcut
+
+### Notlar
+- Arkaplandaki bazi crash alarmlari eski process id’lere ait stale kayitlar olarak goruldu.
+- Aktif backend process ile canli testler yapildi ve sonuc alindi.
+- Commit paketlemesi oncesi artifact temizligi (coverage/db-shm/wal/gecici db) gerekecek.

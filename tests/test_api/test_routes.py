@@ -28,6 +28,22 @@ def test_health_endpoint(client):
     assert rv.status_code == 200
     data = rv.get_json()
     assert data['status'] == 'ok'
+    assert rv.headers.get('X-Request-ID')
+    assert rv.headers.get('X-Correlation-ID')
+
+
+def test_trace_headers_preserve_incoming_request_id(client):
+    """Gelen X-Request-ID/X-Correlation-ID response'ta korunmalı"""
+    rv = client.get(
+        '/api/health',
+        headers={
+            'X-Request-ID': 'test-req-123',
+            'X-Correlation-ID': 'test-corr-999',
+        },
+    )
+    assert rv.status_code == 200
+    assert rv.headers.get('X-Request-ID') == 'test-req-123'
+    assert rv.headers.get('X-Correlation-ID') == 'test-corr-999'
 
 
 def test_nlp_status(client):
@@ -49,6 +65,10 @@ def test_nlp_parse_with_query(client):
     data = rv.get_json()
     assert 'type' in data
     assert 'confidence' in data
+    assert 'trace_policy' in data
+    assert data['trace_policy'].get('request_id')
+    assert data['trace_policy'].get('correlation_id')
+    assert data['trace_policy'].get('retention_days')
 
 
 def test_nlp_parse_empty_query(client):
