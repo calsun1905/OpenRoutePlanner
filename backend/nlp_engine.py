@@ -12,6 +12,7 @@ Desteklenen sorgu türleri:
 
 import re
 from typing import Dict, List, Optional, Any
+
 try:
     from location_storage import get_all_locations
 except ImportError:
@@ -22,6 +23,17 @@ except ImportError:
         from location_storage import get_all_locations
     except ImportError:
         def get_all_locations(): return []
+
+try:
+    from nlp_concept_resolver import resolve_poi_concept
+except ImportError:
+    try:
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from nlp_concept_resolver import resolve_poi_concept
+    except ImportError:
+        resolve_poi_concept = None
 
 
 
@@ -101,6 +113,12 @@ PATTERN_POI_QUERY_2 = re.compile(
 PATTERN_POI_QUERY_3 = re.compile(
     r"^(.+?)(?:'?\s*(?:de|da|te|ta))\s+(?:neler|nereleri|neleri|neyi|bir şey)\s+"
     r"(?:öner|önere|tavsiye|önerir|önerirsin|öneririm|tavsiye eder|tavsiye ederim)\s*\??\s*$",
+    re.IGNORECASE
+)
+# Pattern 4b: "X'da Y arıyorum" / "X'da Y önerir misin"
+PATTERN_POI_QUERY_4 = re.compile(
+    r"^(.+?)(?:'?\s*(?:de|da|te|ta))\s+(.+?)\s+"
+    r"(?:arıyorum|ararım|bul|bulur musun|önerir misin|öner|tavsiye et|tavsiye eder misin)\s*\??\s*$",
     re.IGNORECASE
 )
 
@@ -336,22 +354,41 @@ def parse_query(query: str) -> Dict[str, Any]:
 
     # Pattern 4: X'de neler var?
     match = PATTERN_POI_QUERY.match(query_clean)
+    poi_phrase = None
     if not match:
         match = PATTERN_POI_QUERY_2.match(query_clean)
     if not match:
         match = PATTERN_POI_QUERY_3.match(query_clean)
+    if not match:
+        match = PATTERN_POI_QUERY_4.match(query_clean)
+        if match:
+            poi_phrase = match.group(2).strip() if match.group(2) else None
 
     if match:
         location = match.group(1).strip() if match.group(1) else None
 
         if location:
             location = ' '.join([w for w in location.split() if w.lower() not in STOP_WORDS])
+            poi_concept = None
+            poi_source = None
+            poi_conf = 0.0
+            if resolve_poi_concept is not None:
+                # Mümkünse doğrudan POI ifadesinden, yoksa tüm sorgudan çıkar.
+                source_text = poi_phrase if poi_phrase else query_clean
+                resolved = resolve_poi_concept(source_text)
+                if resolved and getattr(resolved, "concept", None):
+                    poi_concept = resolved.concept
+                    poi_source = resolved.source
+                    poi_conf = float(resolved.confidence or 0.0)
 
             return {
                 "type": "poi",
                 "confidence": 0.88,
                 "location": location,
                 "query_type": "search",
+                "poi_concept": poi_concept,
+                "poi_resolution_source": poi_source,
+                "poi_resolution_confidence": poi_conf,
                 "raw_query": query,
                 "error": None
             }

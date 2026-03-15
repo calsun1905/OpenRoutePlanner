@@ -9,6 +9,8 @@ import sys
 import json
 import time
 import builtins
+import uuid
+import re
 from datetime import datetime
 from functools import partial
 
@@ -53,7 +55,7 @@ def _configure_live_console_output() -> None:
 
 _configure_live_console_output()
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, g
 # Compatibility: allow test client to pass 'query' kw -> map to 'query_string'
 try:
     from flask.testing import EnvironBuilder as _EnvironBuilder
@@ -112,6 +114,10 @@ from location_storage import (
 )
 from storage_db import ensure_db, run_sqlite_maintenance
 from nlp_engine import parse_query as regex_parse_query
+try:
+    from nlp_concept_resolver import resolve_poi_concept
+except ImportError:
+    resolve_poi_concept = None
 from cache_manager import get_graph_cache, get_poi_cache
 
 # Hava durumu servisi (OpenMeteo API entegrasyonu)
@@ -120,7 +126,6 @@ try:
         get_current_weather,
         get_hourly_forecast,
         check_route_weather,
-        get_weather_at_time,
         get_service_status,
         clear_cache as clear_weather_cache,
         health_check as weather_health_check
@@ -196,6 +201,16 @@ _BERT_METRICS_LOG_ENABLED = _env_flag("ORP_BERT_LOG_METRICS", True)
 _BERT_METRICS_INTERVAL_SEC = max(0.0, _env_float("ORP_BERT_METRICS_INTERVAL_SEC", 0.5))
 _PRELOAD_POPULAR_REGIONS_ON_STARTUP = _env_flag("ORP_PRELOAD_POPULAR_REGIONS_ON_STARTUP", True)
 _BERT_PARSE_TRACE_LOG_ENABLED = _env_flag("ORP_BERT_PARSE_TRACE", True)
+
+# POI resolver/caching version pinleri
+_POI_DICT_VERSION = os.getenv("ORP_POI_DICT_VERSION", "dict-v1").strip() or "dict-v1"
+_POI_THRESHOLD_PROFILE = os.getenv("ORP_POI_THRESHOLD_PROFILE", "default").strip() or "default"
+_POI_PLAN_VERSION = os.getenv("ORP_POI_PLAN_VERSION", "phase2").strip() or "phase2"
+_TRACE_RETENTION_DAYS = int(os.getenv("ORP_TRACE_RETENTION_DAYS", "14") or 14)
+
+
+def _poi_version_token() -> str:
+    return f"dict:{_POI_DICT_VERSION}|thr:{_POI_THRESHOLD_PROFILE}|plan:{_POI_PLAN_VERSION}"
 
 
 def _should_log_bert_metrics(force: bool = False) -> bool:
@@ -340,12 +355,50 @@ def _get_cached_graph(place_name: str):
     return graph
 
 
+def _redact_pii_text(value: str) -> str:
+    """Loglarda temel PII redaction uygular (telefon/e-posta/sayısal kimlik)."""
+    text = str(value or "")
+    text = re.sub(r"[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}", "[redacted-email]", text)
+    text = re.sub(r"\b(?:\+?90\s*)?(?:\d[\s-]?){10,}\b", "[redacted-phone]", text)
+    text = re.sub(r"\b\d{11}\b", "[redacted-id]", text)
+    return text
+
+
+def _request_trace_prefix() -> str:
+    req_id = getattr(g, "request_id", "-")
+    corr_id = getattr(g, "correlation_id", "-")
+    return f"[req:{req_id} corr:{corr_id}]"
+
+
 @app.before_request
 def _ensure_runtime_initialized():
     """
     WSGI/moduler import senaryolarinda runtime gorevlerini lazy baslatir.
+    Ayrica request/correlation id baglar.
     """
+    req_id = (request.headers.get("X-Request-ID") or "").strip()
+    corr_id = (request.headers.get("X-Correlation-ID") or "").strip()
+
+    if not req_id:
+        req_id = uuid.uuid4().hex[:12]
+    if not corr_id:
+        corr_id = req_id
+
+    g.request_id = req_id
+    g.correlation_id = corr_id
+
     initialize_runtime()
+
+
+@app.after_request
+def _attach_trace_headers(response):
+    """Trace header'larini tum response'lara ekler."""
+    try:
+        response.headers["X-Request-ID"] = getattr(g, "request_id", "")
+        response.headers["X-Correlation-ID"] = getattr(g, "correlation_id", "")
+    except Exception:
+        pass
+    return response
 
 
 def _disable_bert_runtime(exc: Exception) -> None:
@@ -609,25 +662,63 @@ def api_search_pois():
             return jsonify({"error": "'category' alanı gerekli."}), 400
 
         place = data.get("place", "Kadikoy, Istanbul, Turkey")
-        category = data["category"]
+        raw_category = data["category"]
 
-        print(f"[API] Search-pois: {place}, kategori={category}")
+        resolved_category = raw_category
+        category_resolution = {
+            "input": raw_category,
+            "resolved": raw_category,
+            "source": "raw",
+            "confidence": 0.0,
+            "status": "unknown",
+        }
+
+        # Faz-1: POI kategori canonicalization (morph+dict)
+        if resolve_poi_concept is not None and isinstance(raw_category, str):
+            resolved = resolve_poi_concept(raw_category)
+            if resolved and getattr(resolved, "concept", None):
+                resolved_category = resolved.concept
+                category_resolution = {
+                    "input": raw_category,
+                    "resolved": resolved.concept,
+                    "source": getattr(resolved, "source", "morph+dict"),
+                    "confidence": float(getattr(resolved, "confidence", 0.0) or 0.0),
+                    "status": getattr(resolved, "status", "success"),
+                }
+
+        print(
+            f"{_request_trace_prefix()} [API] Search-pois: "
+            f"place={_redact_pii_text(place)}, "
+            f"kategori={_redact_pii_text(raw_category)}, "
+            f"resolved={_redact_pii_text(resolved_category)}"
+        )
 
         from osm_poi_dictionary import POI_MAPPING
 
-        # Validasyon: Eğer kelime sözlükte yoksa ve önceden tanımlanmış bir ingilizce anahtar değilse hata verilebilir.
-        # Ancak esneklik için sadece sözlük kontrolü yapalım. Eğer backend'de yoksa, fallback tag ile çalışır.
-        if category.lower() not in POI_MAPPING and not category.isascii():
-            pass # We will allow any category phrase that could be matched, to avoid failing valid English OSM categories too.
+        # Validasyon: ASCII serbest, Türkçe sözlükten canonicalize edilen ifadeler de serbest.
+        if isinstance(resolved_category, str) and resolved_category.lower() not in POI_MAPPING and not resolved_category.isascii():
+            pass
 
-        # LRU cache kullan
-        pois = _poi_cache_manager.get(place, category)
+        cache_version_token = _poi_version_token()
+
+        # LRU cache kullan (canonical kategori + version pin)
+        pois = _poi_cache_manager.get(place, resolved_category, version_token=cache_version_token)
         if pois is None:
-            pois = search_pois(place, category)
-            _poi_cache_manager.put(place, category, pois)
+            pois = search_pois(place, resolved_category)
+            _poi_cache_manager.put(place, resolved_category, pois, version_token=cache_version_token)
 
         print(f"[API] {len(pois)} POI bulundu")
-        return jsonify({"pois": pois})
+        return jsonify({
+            "pois": pois,
+            "category": resolved_category,
+            "category_resolution": category_resolution,
+            "version_profile": {
+                "dict_version": _POI_DICT_VERSION,
+                "threshold_profile": _POI_THRESHOLD_PROFILE,
+                "plan_version": _POI_PLAN_VERSION,
+                "cache_token": cache_version_token,
+            },
+        })
 
     except Exception as e:
         # print(f"[API] POI arama hatası: {e}"))
@@ -1178,6 +1269,7 @@ def api_create_timeline():
         visit_duration = data.get("visit_duration", 30)
         transport_mode = data.get("transport_mode", "walking")
         custom_durations = data.get("custom_durations", {})
+        include_weather = bool(data.get("include_weather", False) and WEATHER_SERVICE_AVAILABLE)
         
         # String key'leri int'e çevir
         if custom_durations:
@@ -1189,30 +1281,14 @@ def api_create_timeline():
             start_time=start_time,
             visit_duration=visit_duration,
             transport_mode=transport_mode,
-            custom_durations=custom_durations
+            custom_durations=custom_durations,
+            include_weather=include_weather
         )
         
         if "error" in timeline:
             return jsonify(timeline), 400
 
-        # Hava durumu entegrasyonu (opsiyonel)
-        include_weather = data.get("include_weather", False)
-        if include_weather and WEATHER_SERVICE_AVAILABLE and "schedule" in timeline:
-            today = datetime.now().strftime("%Y-%m-%d")
-            for item in timeline["schedule"]:
-                coords = item.get("coordinates") or [None, None]
-                lat = coords[0] if len(coords) > 0 else None
-                lon = coords[1] if len(coords) > 1 else None
-                arrival_time = item.get("arrival_time", "")
-                if lat is not None and lon is not None and arrival_time:
-                    try:
-                        item["weather"] = get_weather_at_time(
-                            lat, lon, f"{today}T{arrival_time}:00"
-                        )
-                    except Exception:
-                        item["weather"] = None
-                else:
-                    item["weather"] = None
+        if include_weather:
             timeline["weather_included"] = True
 
         return jsonify(timeline)
@@ -1480,8 +1556,9 @@ def api_nlp_parse():
         }
     """
     try:
+        trace_prefix = _request_trace_prefix()
         print(f"\n{'='*60}")
-        print(f"[NLP API] Parse çağrısı alındı")
+        print(f"{trace_prefix} [NLP API] Parse çağrısı alındı")
         global BERT_NLP_AVAILABLE
         data = request.get_json(silent=True)
 
@@ -1501,8 +1578,8 @@ def api_nlp_parse():
             print(f"[NLP API] ❌ Sorgu çok kısa")
             return jsonify({"error": "Sorgu çok kısa"}), 400
 
-        print(f"[NLP API] 📥 Sorgu: '{query}'")
-        print(f"[NLP API] 🔧 BERT_NLP_AVAILABLE: {BERT_NLP_AVAILABLE}")
+        print(f"{trace_prefix} [NLP API] 📥 Sorgu: '{_redact_pii_text(query)}'")
+        print(f"{trace_prefix} [NLP API] 🔧 BERT_NLP_AVAILABLE: {BERT_NLP_AVAILABLE}")
 
         if not BERT_NLP_AVAILABLE:
             print(f"[NLP API] ❌ BERT motoru ZORUNLU! Regex fallback KALDIRILDI.")
@@ -1517,33 +1594,43 @@ def api_nlp_parse():
             )
             result = nlp_engine.parse(query, include_trace=debug_trace_requested)
             result["engine"] = "bert-nlp"
+            result["trace_policy"] = {
+                "request_id": getattr(g, "request_id", None),
+                "correlation_id": getattr(g, "correlation_id", None),
+                "pii_redaction": True,
+                "retention_days": _TRACE_RETENTION_DAYS,
+            }
             _log_bert_runtime_metrics(
                 stage="parse:after",
                 bert_engine_instance=getattr(nlp_engine, "bert", None)
             )
-            print(f"[NLP API] ✅ BERT parse başarılı")
+            print(f"{trace_prefix} [NLP API] ✅ BERT parse başarılı")
         except Exception as bert_exc:
-            print(f"[NLP API] ❌ BERT hatası: {bert_exc}")
+            print(f"{trace_prefix} [NLP API] ❌ BERT hatası: {bert_exc}")
             return jsonify({"error": f"BERT motoru hatası: {str(bert_exc)}"}), 500
 
         confidence = float(result.get("confidence", 0.0) or 0.0)
-        print(f"[NLP API] 📊 Sonuç:")
-        print(f"[NLP API]    - Tip: {result.get('type', 'unknown')}")
-        print(f"[NLP API]    - Confidence: {confidence:.2f}")
-        print(f"[NLP API]    - Engine: {result.get('engine', 'unknown')}")
+        print(f"{trace_prefix} [NLP API] 📊 Sonuç:")
+        print(f"{trace_prefix} [NLP API]    - Tip: {result.get('type', 'unknown')}")
+        print(f"{trace_prefix} [NLP API]    - Confidence: {confidence:.2f}")
+        print(f"{trace_prefix} [NLP API]    - Engine: {result.get('engine', 'unknown')}")
         if result.get('origin'):
-            print(f"[NLP API]    - Rota: {result['origin']} → {result.get('destination', '?')}")
+            print(f"{trace_prefix} [NLP API]    - Rota: {result['origin']} → {result.get('destination', '?')}")
         if result.get('detected_places'):
-            print(f"[NLP API]    - Tespit edilen yerler: {[p['place'] for p in result['detected_places']]}")
+            print(f"{trace_prefix} [NLP API]    - Tespit edilen yerler: {[p['place'] for p in result['detected_places']]}")
         if debug_trace_requested:
             _log_bert_parse_trace(result.get("trace") or {})
-        print(f"[NLP API] 📤 Dönen response: {result}")
+
+        safe_result = dict(result)
+        if "raw_query" in safe_result:
+            safe_result["raw_query"] = _redact_pii_text(safe_result.get("raw_query"))
+        print(f"{trace_prefix} [NLP API] 📤 Dönen response: {safe_result}")
         print(f"{'='*60}\n")
 
         return jsonify(result)
 
     except Exception as e:
-        print(f"[NLP ERROR] {str(e)}")
+        print(f"{_request_trace_prefix()} [NLP ERROR] {str(e)}")
         return jsonify({"error": f"NLP hatası: {str(e)}"}), 500
 
 
@@ -1814,7 +1901,7 @@ def api_get_weather_forecast():
 
         print(f"[Weather] Forecast request: lat={lat}, lon={lon}, hours={hours}")
 
-        result = get_hourly_forecast(lat, lon, hours)
+        result = get_hourly_forecast(lat, lon, hours, timezone_name=timezone)
 
         if result.get("success"):
             return jsonify(result)

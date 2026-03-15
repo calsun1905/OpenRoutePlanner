@@ -12,6 +12,17 @@ import osmnx as ox
 import networkx as nx
 from route_config import ROUTE_CONFIG
 
+try:
+    from geocoder import geocode
+except ImportError:
+    try:
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from geocoder import geocode
+    except ImportError:
+        geocode = None
+
 # Cache dizini
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -189,6 +200,72 @@ def _rows_to_poi_list(gdf, category_label: str) -> list:
     return pois
 
 
+def _resolve_search_center(place_name: str):
+    """Yer adını merkez koordinata çevirir (geo-bound zorunluluğu)."""
+    if not geocode or not place_name:
+        return None
+
+    try:
+        result = geocode(place_name)
+    except Exception as e:
+        print(f"[POI] Geocode hatası: {e}")
+        return None
+
+    if not isinstance(result, dict) or result.get("status") != "success":
+        return None
+
+    try:
+        lat = float(result.get("lat"))
+        lon = float(result.get("lon"))
+        return lat, lon
+    except (TypeError, ValueError):
+        return None
+
+
+def _fetch_pois_with_fallback(place_name: str, normalized_tags: dict):
+    """
+    Overpass sorgularını kontrollü fallback planı ile çalıştırır.
+
+    Plan:
+    - A: strict point-radius
+    - B: relaxed point-radius
+    - C: place-boundary query (hala bounded)
+    """
+    center = _resolve_search_center(place_name)
+    if center is None:
+        print(f"[POI] Geo-bound center bulunamadı, global sorgu iptal: {place_name}")
+        return None
+
+    strict_radius = int(ROUTE_CONFIG.get("POI_SEARCH_RADIUS_M", 2500))
+    relaxed_radius = int(ROUTE_CONFIG.get("POI_SEARCH_RELAXED_RADIUS_M", 5000))
+    max_steps = int(ROUTE_CONFIG.get("POI_FALLBACK_MAX_STEPS", 3))
+    max_steps = max(1, min(3, max_steps))
+
+    attempts = []
+    attempts.append(("A", "point", strict_radius))
+    if max_steps >= 2:
+        attempts.append(("B", "point", relaxed_radius))
+    if max_steps >= 3:
+        attempts.append(("C", "place", None))
+
+    for label, mode, dist in attempts:
+        try:
+            if mode == "point":
+                print(f"[POI] Fallback-{label}: point query dist={dist}m")
+                gdf = ox.features_from_point(center, tags=normalized_tags, dist=dist)
+            else:
+                print(f"[POI] Fallback-{label}: place-boundary query")
+                gdf = ox.features_from_place(place_name, tags=normalized_tags)
+
+            if gdf is not None and len(gdf) > 0:
+                return gdf
+        except Exception as e:
+            print(f"[POI] Fallback-{label} hatası: {e}")
+            continue
+
+    return None
+
+
 def search_pois_by_tags(place_name: str, tags: dict, category_hint: str = "semantic") -> list:
     """
     Belirtilen bölgede doğrudan OSM tag filtresi ile POI arar.
@@ -217,7 +294,10 @@ def search_pois_by_tags(place_name: str, tags: dict, category_hint: str = "seman
         print(f"[POI] Yerel veritabanı okuma hatası: {e}")
 
     try:
-        gdf = ox.features_from_place(place_name, tags=normalized_tags)
+        gdf = _fetch_pois_with_fallback(place_name, normalized_tags)
+        if gdf is None:
+            print(f"[GraphManager] POI arama: bounded fallback sonucu yok")
+            return []
     except Exception as e:
         print(f"[GraphManager] POI arama hatası (tags): {e}")
         return []

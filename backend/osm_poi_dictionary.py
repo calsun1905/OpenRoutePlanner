@@ -35,6 +35,9 @@ POI_MAPPING = {
     "çay bahçesi": {"amenity": "cafe"}, # OSM'de genellikle cafe veya fast_food olarak geçer
     "kebapçı": {"amenity": "restaurant", "cuisine": "kebab"},
     "balıkçı": {"amenity": "restaurant", "cuisine": "seafood"},
+    "pilavcı": {"amenity": "restaurant", "cuisine": "turkish"},
+    "pilav salonu": {"amenity": "restaurant", "cuisine": "turkish"},
+    "pilavci": {"amenity": "restaurant", "cuisine": "turkish"},
 
     # ==========================================
     # ALIŞVERİŞ & MARKET (SHOPPING - SHOP)

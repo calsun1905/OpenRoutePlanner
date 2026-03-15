@@ -216,25 +216,26 @@ class POICache:
         self.ttl = ROUTE_CONFIG.get("POI_CACHE_TTL", 1800)  # 30 dakika
         self.cache = LRUCache(maxsize=self.maxsize, ttl=self.ttl)
 
-    def _make_key(self, place: str, category: str) -> str:
-        """Cache key oluşturur."""
-        key = f"{place}::{category}"
+    def _make_key(self, place: str, category: str, version_token: Optional[str] = None) -> str:
+        """Cache key oluşturur (opsiyonel version pin ile)."""
+        token = (version_token or "v:default").strip()
+        key = f"{place}::{category}::{token}"
         # Key'i kısaltmak için hash kullan
         return hashlib.md5(key.encode()).hexdigest()[:16]
 
-    def get(self, place: str, category: str) -> Optional[Any]:
+    def get(self, place: str, category: str, version_token: Optional[str] = None) -> Optional[Any]:
         """POI cache'ten alır."""
-        key = self._make_key(place, category)
+        key = self._make_key(place, category, version_token=version_token)
         return self.cache.get(key)
 
-    def put(self, place: str, category: str, pois: Any) -> None:
+    def put(self, place: str, category: str, pois: Any, version_token: Optional[str] = None) -> None:
         """POI cache'e ekler."""
-        key = self._make_key(place, category)
+        key = self._make_key(place, category, version_token=version_token)
         self.cache.put(key, pois)
 
-    def remove(self, place: str, category: str) -> bool:
+    def remove(self, place: str, category: str, version_token: Optional[str] = None) -> bool:
         """POI cache'ten siler."""
-        key = self._make_key(place, category)
+        key = self._make_key(place, category, version_token=version_token)
         return self.cache.remove(key)
 
     def clear(self) -> None:
