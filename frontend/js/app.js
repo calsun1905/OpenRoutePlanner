@@ -341,6 +341,7 @@ async function calculateRoute() {
         currentRouteData = data;
         drawRoute(data);
         showRouteInfo(data);
+        await fetchRouteSteps();
         updateButtons();  // Buton durumlarını güncelle
         showToast("Rota başarıyla hesaplandı! ✨", "success");
 
@@ -2279,4 +2280,74 @@ elDistrictSelect.addEventListener('change', async function() {
 });
 
 // Sayfa yüklendiğinde Türkiye verisini yükle
+
+// ========== TURN-BY-TURN & TTS ==========
+const elTurnByTurnPanel = document.getElementById('turnByTurnPanel');
+const elTurnByTurnList = document.getElementById('turnByTurnList');
+const elBtnStartVoice = document.getElementById('btnStartVoice');
+const elBtnStopVoice = document.getElementById('btnStopVoice');
+
+let ttsQueue = [];
+let ttsUtterance = null;
+let ttsPlaying = false;
+
+async function fetchRouteSteps() {
+    if (!selectedPoints || selectedPoints.length < 2) return;
+    try {
+        const resp = await fetch(`${API_BASE}/get-route-steps`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ points: selectedPoints, optimize: false })
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data && data.steps && data.steps.length > 0) {
+            displayRouteSteps(data.steps);
+        } else {
+            if (elTurnByTurnPanel) elTurnByTurnPanel.style.display = 'none';
+        }
+    } catch (e) {
+        // silent
+    }
+}
+
+function displayRouteSteps(steps) {
+    if (!elTurnByTurnPanel || !elTurnByTurnList) return;
+    elTurnByTurnPanel.style.display = 'block';
+    elTurnByTurnList.innerHTML = steps.map((s,i)=>`<div class="turn-step"><strong>${i+1}.</strong> ${escapeHtml(s.instruction)} <span class="muted">(${s.distance_m} m, ${s.duration_min} dk)</span></div>`).join('');
+}
+
+function startVoicePlayback() {
+    if (!('speechSynthesis' in window)) { showToast('Tarayıcı TTS desteklemiyor','warning'); return; }
+    if (!elTurnByTurnList) return;
+    const items = Array.from(elTurnByTurnList.querySelectorAll('.turn-step')).map(el=> el.textContent.trim());
+    if (!items.length) { showToast('Adım yok','warning'); return; }
+    stopVoicePlayback();
+    ttsQueue = items;
+    ttsPlaying = true;
+    playNextTTS();
+}
+
+function playNextTTS() {
+    if (!ttsPlaying || ttsQueue.length===0) { ttsPlaying=false; return; }
+    const text = ttsQueue.shift();
+    ttsUtterance = new SpeechSynthesisUtterance(text);
+    ttsUtterance.lang = 'tr-TR';
+    ttsUtterance.rate = 1;
+    ttsUtterance.onend = ()=> { playNextTTS(); };
+    speechSynthesis.speak(ttsUtterance);
+}
+
+function stopVoicePlayback() {
+    ttsPlaying = false;
+    ttsQueue = [];
+    if (ttsUtterance) {
+        try { speechSynthesis.cancel(); } catch(e){}
+        ttsUtterance = null;
+    }
+}
+
+if (elBtnStartVoice) elBtnStartVoice.addEventListener('click', startVoicePlayback);
+if (elBtnStopVoice) elBtnStopVoice.addEventListener('click', stopVoicePlayback);
+
 loadTurkiyeData();

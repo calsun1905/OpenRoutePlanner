@@ -520,6 +520,102 @@ def api_get_route():
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 
+@app.route("/api/get-route-steps", methods=["POST"])
+def api_get_route_steps():
+    """
+    Verilen noktalar için adım adım yönlendirme (basitleştirilmiş).
+
+    Request Body:
+        { "points": [[lat, lon], ...], "optimize": true/false, "route_type": "route_1" }
+
+    Response:
+        { "steps": [{"instruction": str, "distance_m": int, "duration_min": int}, ...] }
+    """
+    try:
+        data = request.get_json(silent=True)
+        if not data or 'points' not in data:
+            return jsonify({"error": "'points' alanı gerekli."}), 400
+
+        points = data['points']
+        optimize = bool(data.get('optimize', False))
+        route_type = data.get('route_type', 'route_1')
+
+        if not isinstance(points, list) or len(points) < 2:
+            return jsonify({"error": "En az 2 nokta gerekli."}), 400
+
+        point_tuples = [(p[0], p[1]) for p in points]
+        G = get_graph_for_points(point_tuples)
+
+        if optimize and len(point_tuples) > 2:
+            optimized_order = solve_tsp(G, point_tuples)
+        else:
+            optimized_order = list(range(len(point_tuples)))
+
+        ordered_points = [point_tuples[i] for i in optimized_order]
+        route_index = {"route_1": 0, "route_2": 1, "route_3": 2}.get(route_type, 0)
+        route_nodes = build_alternative_routes(G, ordered_points, route_index)
+
+        if not route_nodes:
+            return jsonify({"error": "Rota hesaplanamadı."}), 400
+
+        # Basit step extractor: kenar üzerindeki 'name' veya 'ref' attribute'una göre adım oluştur
+        def build_turn_by_turn_steps(G, nodes):
+            steps = []
+            if not nodes or len(nodes) < 2:
+                return steps
+
+            current_name = None
+            current_dist = 0.0
+            for i in range(len(nodes)-1):
+                u = nodes[i]
+                v = nodes[i+1]
+                edge_data = G.get_edge_data(u, v) or {}
+                best = None
+                if edge_data:
+                    try:
+                        best = min(edge_data.values(), key=lambda d: d.get('length', float('inf')))
+                    except Exception:
+                        best = list(edge_data.values())[0]
+
+                length = 0.0
+                name = None
+                if best:
+                    length = float(best.get('length', 0) or 0)
+                    name = best.get('name') or best.get('ref') or best.get('highway')
+
+                if not name:
+                    name = 'yol'
+
+                if current_name is None:
+                    current_name = name
+                    current_dist = length
+                elif name == current_name:
+                    current_dist += length
+                else:
+                    # flush
+                    minutes = round((current_dist/1000) / float(ROUTE_CONFIG.get('WALK_SPEED_KMH', 5.0)) * 60)
+                    instr = f"{int(round(current_dist))} metre boyunca {current_name} üzerinde ilerleyin."
+                    steps.append({"instruction": instr, "distance_m": int(round(current_dist)), "duration_min": minutes})
+                    current_name = name
+                    current_dist = length
+
+            # flush last
+            if current_name is not None:
+                minutes = round((current_dist/1000) / float(ROUTE_CONFIG.get('WALK_SPEED_KMH', 5.0)) * 60)
+                instr = f"{int(round(current_dist))} metre boyunca {current_name} üzerinde ilerleyin."
+                steps.append({"instruction": instr, "distance_m": int(round(current_dist)), "duration_min": minutes})
+
+            return steps
+
+        steps = build_turn_by_turn_steps(G, route_nodes)
+        return jsonify({"steps": steps, "route_coords": nodes_to_coords(G, route_nodes)})
+
+    except Exception as e:
+        print(f"[API] get-route-steps hata: {e}")
+        return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
+
+
+
 @app.route("/api/get-alternative-routes", methods=["POST"])
 def api_get_alternative_routes():
     """
