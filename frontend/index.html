@@ -175,6 +175,30 @@
             <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
                 <button class="btn btn-primary btn-sm" id="btnStartVoice">🔊 Sesli Başlat</button>
                 <button class="btn btn-ghost btn-sm" id="btnStopVoice">⏹ Durdur</button>
+                <div style="display:flex; gap:6px; align-items:center; margin-left:8px;">
+                    <label for="ttsRate" style="font-size:0.85rem; color:var(--text-muted);">Hız:</label>
+                    <input id="ttsRate" type="range" min="0.6" max="1.6" step="0.1" value="1" style="width:120px;">
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+                <label for="ttsVoice" style="font-size:0.85rem; color:var(--text-muted);">Ses:</label>
+                <select id="ttsVoice" style="flex:1; max-width:220px;"></select>
+                <label style="font-size:0.8rem; color:var(--text-muted); margin-left:6px;">Otomatik duraklama</label>
+                <input id="ttsAutoPause" type="checkbox" style="margin-left:4px;">
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                <button class="btn btn-success btn-sm" id="btnStartNav">▶ Başlat Navigasyon</button>
+                <button class="btn btn-warning btn-sm" id="btnPauseNav">⏸ Duraklat</button>
+                <button class="btn btn-ghost btn-sm" id="btnPrevStep">⟸ Geri</button>
+                <button class="btn btn-ghost btn-sm" id="btnNextStep">İleri ⟹</button>
+                <button class="btn btn-ghost btn-sm" id="btnSkipStep">⤴️ Atla</button>
+                <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+                    <label for="navModeSelect" style="font-size:0.85rem; color:var(--text-muted); margin-right:6px;">Konum modu:</label>
+                    <select id="navModeSelect" style="font-size:0.85rem;">
+                        <option value="map_center">Harita merkezi (Simülasyon)</option>
+                        <option value="gps">Gerçek konum (Geolocation)</option>
+                    </select>
+                </div>
             </div>
             <div id="turnByTurnList" class="turn-by-turn-list" style="max-height:260px; overflow:auto; padding-right:6px;">
                 <!-- Steps will be injected here -->
