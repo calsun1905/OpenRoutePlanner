@@ -8,6 +8,7 @@ ve POI (Points of Interest) aramalarını gerçekleştirir.
 import os
 import sqlite3
 import json
+import hashlib
 import osmnx as ox
 import networkx as nx
 from route_config import ROUTE_CONFIG
@@ -45,6 +46,19 @@ def _init_poi_db():
     conn.close()
 
 _init_poi_db()
+
+
+def _build_tags_cache_suffix(tags: dict) -> str:
+    """
+    Tag sozlugunu deterministic bir cache suffix'ine cevirir.
+    Ayni tag kombinasyonu her zaman ayni anahtari uretir.
+    """
+    normalized = {str(k): str(v) for k, v in (tags or {}).items() if k and v}
+    if not normalized:
+        return "notags"
+    canonical = json.dumps(normalized, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    digest = hashlib.sha1(canonical.encode("utf-8")).hexdigest()[:12]
+    return digest
 
 
 def _cache_path(place_name: str) -> str:
@@ -275,20 +289,23 @@ def search_pois_by_tags(place_name: str, tags: dict, category_hint: str = "seman
     if not normalized_tags:
         return []
 
+    category_hint = (category_hint or "semantic").lower()
+    cache_category = f"{category_hint}|{_build_tags_cache_suffix(normalized_tags)}"
     print(f"[POI] Arama baslatildi (tags): {place_name}, tags={normalized_tags}, hint={category_hint}")
 
     # Yerel veritabanında ara
     try:
         conn = sqlite3.connect(POI_DB_PATH)
         cursor = conn.cursor()
-        # Normalde tag bazlı kompleks arama için yerel DB yapısı detaylandırılabilir.
-        # Basitlik için place_name ve category_hint kullanıyoruz.
-        cursor.execute('SELECT data_json FROM pois WHERE place_name = ? AND category = ?', (place_name.lower(), category_hint.lower()))
+        cursor.execute(
+            'SELECT data_json FROM pois WHERE place_name = ? AND category = ?',
+            (place_name.lower(), cache_category)
+        )
         row = cursor.fetchone()
         conn.close()
         
         if row:
-            print(f"[POI] Cache'den getiriliyor: {place_name} ({category_hint})")
+            print(f"[POI] Cache'den getiriliyor: {place_name} ({cache_category})")
             return json.loads(row[0])
     except Exception as e:
         print(f"[POI] Yerel veritabanı okuma hatası: {e}")
@@ -313,10 +330,10 @@ def search_pois_by_tags(place_name: str, tags: dict, category_hint: str = "seman
             cursor.execute('''
                 INSERT OR REPLACE INTO pois (place_name, category, data_json)
                 VALUES (?, ?, ?)
-            ''', (place_name.lower(), category_hint.lower(), json.dumps(pois)))
+            ''', (place_name.lower(), cache_category, json.dumps(pois)))
             conn.commit()
             conn.close()
-            print(f"[POI] Cache'e kaydedildi: {place_name} ({category_hint})")
+            print(f"[POI] Cache'e kaydedildi: {place_name} ({cache_category})")
         except Exception as e:
             print(f"[POI] Yerel veritabanı yazma hatası: {e}")
             

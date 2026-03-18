@@ -1,0 +1,38 @@
+{
+  "version": "intent-v1",
+  "updated_at": "2026-03-18",
+  "templates": {
+    "route": [
+      "Kadikoy'den Besiktas'a rota ciz",
+      "Ankara'dan Istanbul'a nasil giderim",
+      "A noktasindan B noktasina yol tarifi",
+      "Iki konum arasinda en hizli rota"
+    ],
+    "poi": [
+      "Kadikoy'de kahveci ara",
+      "Bu bolgede gezilecek mekanlar",
+      "Yakinda restoran var mi",
+      "Bana muzeler goster"
+    ],
+    "multi": [
+      "Kadikoy, Taksim ve Uskudar'i gez",
+      "Uc farkli noktali gezi plani yap",
+      "Birden fazla durakli rota olustur",
+      "Sirasiyla birkac yere gitmek istiyorum"
+    ],
+    "single": [
+      "Taksim'e git",
+      "Sadece bir hedefe gitmek istiyorum",
+      "Beni Kadikoy'e gotur",
+      "Tek bir konum belirle"
+    ]
+  },
+  "hard_negatives": [
+    "merhaba",
+    "selam nasilsin",
+    "tesekkur ederim",
+    "yardim eder misin",
+    "saat kac",
+    "hava bugun nasil"
+  ]
+}

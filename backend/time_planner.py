@@ -218,7 +218,7 @@ def create_timeline(
     return result
 
 
-def find_smart_departure_time(lat: float, lon: float, start_time: str, get_weather_func) -> Optional[str]:
+def find_smart_departure_time(lat: float, lon: float, start_time: str, get_weather_func) -> Optional[dict]:
     """
     Kötü hava koşullarında yakındaki saatlere bakarak daha iyi bir çıkış saati önerir.
     +/- 3 saat aralığına bakar.

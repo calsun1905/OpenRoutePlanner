@@ -1,0 +1,5 @@
+{"id":"hn_001","query":"Merhaba nasilsin","expected":{"type":"unknown"}}
+{"id":"hn_002","query":"Tesekkur ederim","expected":{"type":"unknown"}}
+{"id":"hn_003","query":"Saat kac","expected":{"type":"unknown"}}
+{"id":"hn_004","query":"Yardim eder misin","expected":{"type":"unknown"}}
+{"id":"hn_005","query":"Bugun hava nasil","expected":{"type":"unknown"}}

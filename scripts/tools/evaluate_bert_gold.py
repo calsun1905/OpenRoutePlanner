@@ -135,6 +135,15 @@ def evaluate_case(case: Dict[str, Any], result: Dict[str, Any]) -> Tuple[bool, D
     return all(field_status.values()), field_status
 
 
+def append_confusion_cell(
+    matrix: Dict[str, Dict[str, int]],
+    expected_type: str,
+    predicted_type: str,
+) -> None:
+    row = matrix.setdefault(expected_type, {})
+    row[predicted_type] = row.get(predicted_type, 0) + 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Evaluate BERT NLP with Turkish gold dataset")
     parser.add_argument(
@@ -205,6 +214,7 @@ def main() -> int:
     field_passed: Dict[str, int] = {}
     latencies_ms: List[float] = []
     failures: List[Dict[str, Any]] = []
+    type_confusion: Dict[str, Dict[str, int]] = {}
 
     for case in records:
         query = case["query"]
@@ -231,6 +241,15 @@ def main() -> int:
                     },
                     "field_status": fields,
                 }
+            )
+
+        expected_type = normalize_text(case.get("expected", {}).get("type"))
+        predicted_type = normalize_text(result.get("type"))
+        if expected_type:
+            append_confusion_cell(
+                type_confusion,
+                expected_type,
+                predicted_type or "unknown",
             )
 
         for field_name, ok in fields.items():
@@ -260,6 +279,19 @@ def main() -> int:
         score = passed / total_count if total_count else 0.0
         print(f"- {field_name}: {score:.2%} ({passed}/{total_count})")
 
+    if type_confusion:
+        labels = sorted(
+            set(type_confusion.keys())
+            | {pred for row in type_confusion.values() for pred in row.keys()}
+        )
+        print("\nType confusion matrix (expected -> predicted):")
+        header = "expected\\pred".ljust(14) + " ".join(label.ljust(10) for label in labels)
+        print(header)
+        for expected in labels:
+            row = type_confusion.get(expected, {})
+            row_values = " ".join(str(row.get(predicted, 0)).ljust(10) for predicted in labels)
+            print(expected.ljust(14) + row_values)
+
     if failures:
         print("\nTop failures:")
         for item in failures[:10]:
@@ -288,6 +320,18 @@ def main() -> int:
                 total_count = field_totals[field_name]
                 score = passed / total_count if total_count else 0.0
                 handle.write(f"- {field_name}: {score:.2%} ({passed}/{total_count})\n")
+            if type_confusion:
+                labels = sorted(
+                    set(type_confusion.keys())
+                    | {pred for row in type_confusion.values() for pred in row.keys()}
+                )
+                handle.write("\n## Type Confusion Matrix\n\n")
+                handle.write("| expected \\ predicted | " + " | ".join(labels) + " |\n")
+                handle.write("|---|" + "|".join(["---"] * len(labels)) + "|\n")
+                for expected in labels:
+                    row = type_confusion.get(expected, {})
+                    cells = [str(row.get(predicted, 0)) for predicted in labels]
+                    handle.write(f"| {expected} | " + " | ".join(cells) + " |\n")
             handle.write("\n## Failures (first 20)\n\n")
             if not failures:
                 handle.write("- None\n")

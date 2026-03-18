@@ -18,6 +18,8 @@ import re
 import time
 import threading
 import requests
+import json
+from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 import numpy as np
 
@@ -90,39 +92,120 @@ except ImportError:
 # Her sorgu tipi için "örnek cümle embedding'leri" tutuyoruz
 # Kullanıcı sorgusunu bu template'lerle karşılaştıracağız
 
-QUERY_TEMPLATES = {
+DEFAULT_QUERY_TEMPLATES = {
     "route": [
-        "Kadıköy'den Beşiktaş'a rota",
-        "Taksim'den Kadıköy'e gitmek istiyorum",
-        "Ankara'dan İstanbul'a nasıl giderim",
-        "Başlangıçtan varışa yol tarifi",
-        "İki nokta arası güzergah",
+        "Kadikoy'den Besiktas'a rota",
+        "Taksim'den Kadikoy'e gitmek istiyorum",
+        "Ankara'dan Istanbul'a nasil giderim",
+        "Baslangictan varisa yol tarifi",
+        "Iki nokta arasi guzergah",
     ],
     "poi": [
-        "Kadıköy'de neler var",
+        "Kadikoy'de neler var",
         "Taksim'de ne yapabilirim",
-        "Beşiktaş'ta nereler var",
-        "Bu bölgede mekan arıyorum",
-        "Yakında neleri gezebilirim",
+        "Besiktas'ta nereler var",
+        "Bu bolgede mekan ariyorum",
+        "Yakinda neleri gezebilirim",
     ],
     "multi": [
-        "Kadıköy, Taksim ve Beşiktaş'ı gez",
-        "Üç yer birden rota yap",
+        "Kadikoy, Taksim ve Besiktas'i gez",
+        "Uc yer birden rota yap",
         "Birden fazla nokta ziyaret",
-        "Çoklu duraklı gezi",
+        "Coklu durakli gezi",
     ],
     "single": [
         "Taksim'e git",
-        "Kadıköy'e nasıl giderim",
+        "Kadikoy'e nasil giderim",
         "Bu yere varmak istiyorum",
         "Tek bir hedef belirle",
     ]
 }
 
+DEFAULT_HARD_NEGATIVE_TEMPLATES = [
+    "merhaba",
+    "selam",
+    "nasilsin",
+    "tesekkur ederim",
+    "yardim eder misin",
+    "saat kac",
+]
+
+INTENT_TEMPLATE_TYPES = ("route", "poi", "multi", "single")
+_INTENT_TEMPLATE_PATH = os.getenv(
+    "ORP_INTENT_TEMPLATE_PATH",
+    str(Path(__file__).resolve().parent / "data" / "intent_templates_tr.json"),
+)
+
+
+def load_intent_template_bundle(path: Optional[str] = None) -> Tuple[Dict[str, List[str]], List[str]]:
+    """
+    Intent template bundle dosyasini yukler.
+    Dosya yoksa default template/hard-negative listesiyle devam edilir.
+    """
+    template_map = {
+        key: list(values)
+        for key, values in DEFAULT_QUERY_TEMPLATES.items()
+    }
+    hard_negatives = list(DEFAULT_HARD_NEGATIVE_TEMPLATES)
+    bundle_path = Path(path or _INTENT_TEMPLATE_PATH)
+    if not bundle_path.is_file():
+        return template_map, hard_negatives
+
+    try:
+        payload = json.loads(bundle_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"[BERT NLP] Intent template bundle okunamadi ({bundle_path}): {exc}")
+        return template_map, hard_negatives
+
+    loaded_templates = payload.get("templates", {})
+    if isinstance(loaded_templates, dict):
+        for key in INTENT_TEMPLATE_TYPES:
+            values = loaded_templates.get(key)
+            if isinstance(values, list):
+                cleaned = [str(item).strip() for item in values if str(item).strip()]
+                if cleaned:
+                    template_map[key] = cleaned
+
+    loaded_negatives = payload.get("hard_negatives", [])
+    if isinstance(loaded_negatives, list):
+        cleaned_negatives = [str(item).strip() for item in loaded_negatives if str(item).strip()]
+        if cleaned_negatives:
+            hard_negatives = cleaned_negatives
+
+    return template_map, hard_negatives
+
+
+QUERY_TEMPLATES, HARD_NEGATIVE_TEMPLATES = load_intent_template_bundle()
 # Query intenti artik kelime listesiyle override edilmiyor.
 # BERT skor dagilimi + yapisal sinyaller (role_hint, yer sayisi, poi_concept)
 # birlesik sekilde kullaniliyor.
 INTENT_MARGIN_MIN = 0.03
+HARD_NEGATIVE_UNKNOWN_THRESHOLD = 0.74
+HARD_NEGATIVE_PENALTY_THRESHOLD = 0.64
+
+
+def cosine_similarity(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
+    """Iki embedding arasinda cosine similarity hesaplar."""
+    norm = np.linalg.norm(vec_a) * np.linalg.norm(vec_b)
+    if norm <= 0:
+        return 0.0
+    return float(np.dot(vec_a, vec_b) / norm)
+
+
+def should_force_unknown_with_hard_negative(
+    best_score: float,
+    second_best_score: float,
+    hard_negative_score: float,
+) -> bool:
+    """
+    Hard-negative benzerligi yuksekse ve intent marji darsa unknown'a zorlar.
+    """
+    margin = float(best_score) - float(second_best_score)
+    return (
+        float(hard_negative_score) >= HARD_NEGATIVE_UNKNOWN_THRESHOLD
+        and float(best_score) < 0.82
+        and margin < 0.14
+    )
 
 
 def apply_intent_conflict_matrix(
@@ -1151,8 +1234,10 @@ class BertNLPEngine:
         self.places.get_embedding_matrix(self.bert)
         print(f"[BERT NLP] {len(self.places._place_names)} yer ismi indexlendi!")
 
-        # Query template'leri için embedding cache
+        # Query template/hard-negative embedding cache
         self._template_embeddings = None
+        self._template_centroids = None
+        self._hard_negative_embeddings = None
 
         print("[BERT NLP] Engine hazır!")
 
@@ -1165,12 +1250,24 @@ class BertNLPEngine:
         if self._template_embeddings is not None:
             return self._template_embeddings
 
-        embeddings = {}
+        embeddings: Dict[str, List[np.ndarray]] = {}
+        centroids: Dict[str, np.ndarray] = {}
         for query_type, templates in QUERY_TEMPLATES.items():
-            embeddings[query_type] = self.bert.encode_batch(templates)
+            encoded = self.bert.encode_batch(templates)
+            embeddings[query_type] = encoded
+            if encoded:
+                centroids[query_type] = np.mean(np.asarray(encoded), axis=0)
 
         self._template_embeddings = embeddings
+        self._template_centroids = centroids
         return embeddings
+
+    def _get_hard_negative_embeddings(self) -> List[np.ndarray]:
+        """Hard negative template embedding'lerini lazy olarak döner."""
+        if self._hard_negative_embeddings is not None:
+            return self._hard_negative_embeddings
+        self._hard_negative_embeddings = self.bert.encode_batch(HARD_NEGATIVE_TEMPLATES)
+        return self._hard_negative_embeddings
 
     def classify_query_type_with_scores(self, query: str) -> Tuple[str, float, Dict[str, float]]:
         """
@@ -1193,19 +1290,36 @@ class BertNLPEngine:
         for query_type, template_embs in template_embeddings.items():
             scores = []
             for template_emb in template_embs:
-                # Cosine similarity
-                dot = np.dot(query_embedding, template_emb)
-                norm = np.linalg.norm(query_embedding) * np.linalg.norm(template_emb)
-                if norm > 0:
-                    scores.append(dot / norm)
+                scores.append(cosine_similarity(query_embedding, template_emb))
 
-            # Ortalama similarity
             avg_score = np.mean(scores) if scores else 0.0
-            score_map[query_type] = float(avg_score)
+            centroid_score = 0.0
+            centroid = (self._template_centroids or {}).get(query_type)
+            if centroid is not None:
+                centroid_score = cosine_similarity(query_embedding, centroid)
 
-            if avg_score > best_score:
-                best_score = avg_score
+            # Template ortalamasını centroid ile birleştir.
+            final_score = (0.65 * float(avg_score)) + (0.35 * float(centroid_score))
+            score_map[query_type] = float(final_score)
+
+            if final_score > best_score:
+                best_score = final_score
                 best_type = query_type
+
+        # Hard-negative kontrolü: selamlaşma/yardım vb. sorguları yanlış intent'e çekmeyi azalt.
+        hard_negative_embs = self._get_hard_negative_embeddings()
+        hard_negative_score = 0.0
+        for neg_emb in hard_negative_embs:
+            hard_negative_score = max(hard_negative_score, cosine_similarity(query_embedding, neg_emb))
+
+        sorted_scores = sorted(score_map.values(), reverse=True)
+        second_best = float(sorted_scores[1]) if len(sorted_scores) > 1 else 0.0
+
+        if should_force_unknown_with_hard_negative(best_score, second_best, hard_negative_score):
+            return "unknown", float(best_score), score_map
+
+        if hard_negative_score >= HARD_NEGATIVE_PENALTY_THRESHOLD:
+            best_score = max(0.0, best_score - 0.05)
 
         # Threshold altındaysa unknown
         if best_score < 0.5:

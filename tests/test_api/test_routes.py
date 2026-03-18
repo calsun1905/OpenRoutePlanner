@@ -7,6 +7,7 @@ OpenRoutePlanner API endpoint'lerinin temel işlevselliğini test eder.
 import pytest
 import sys
 import os
+import importlib
 
 # Backend modüllerini path'e ekle
 backend_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'backend')
@@ -14,12 +15,56 @@ sys.path.insert(0, backend_dir)
 
 
 @pytest.fixture
-def client():
-    """Flask test client fixture"""
-    from app import app
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+def client(monkeypatch):
+    """Flask test client fixture (external dependency stubs enabled)."""
+    monkeypatch.setenv("ORP_BERT_FORCE_GPU", "0")
+    monkeypatch.setenv("ORP_BERT_STRICT_GPU", "0")
+    monkeypatch.setenv("ORP_BERT_PARSE_TRACE", "0")
+    monkeypatch.setenv("ORP_BERT_USE_OSM", "0")
+    monkeypatch.setenv("ORP_BERT_SEED_DYNAMIC", "0")
+
+    app_module = importlib.import_module("app")
+
+    class _StubNlpEngine:
+        def parse(self, query, include_trace=False):
+            result = {
+                "type": "route",
+                "confidence": 0.91,
+                "origin": "Istanbul",
+                "destination": "Ankara",
+                "locations": [],
+                "detected_places": [
+                    {"place": "Istanbul", "similarity": 0.9},
+                    {"place": "Ankara", "similarity": 0.89},
+                ],
+            }
+            if include_trace:
+                result["trace"] = {"query": query}
+            return result
+
+    monkeypatch.setattr(app_module, "BERT_NLP_AVAILABLE", True, raising=False)
+    monkeypatch.setattr(app_module, "get_bert_nlp_engine", lambda: _StubNlpEngine(), raising=False)
+    monkeypatch.setattr(
+        app_module,
+        "geocode",
+        lambda address: {
+            "status": "success",
+            "lat": 41.0284,
+            "lon": 29.0244,
+            "display_name": address,
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(
+        app_module,
+        "reverse_geocode",
+        lambda lat, lon: {"status": "success", "address": "Kadikoy, Istanbul"},
+        raising=False,
+    )
+
+    app_module.app.config["TESTING"] = True
+    with app_module.app.test_client() as test_client:
+        yield test_client
 
 
 def test_health_endpoint(client):

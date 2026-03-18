@@ -7,6 +7,11 @@ backend/data/*.graphml
 backend/data/saved_routes.json
 backend/data/saved_locations.json
 backend/data/app_data.db
+backend/data/pois.db
+backend/data/*.db-wal
+backend/data/*.db-shm
+backend/_test_result.json
+.coverage
 .env
 *.log
 
