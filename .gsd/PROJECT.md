@@ -11,8 +11,32 @@ Kullanıcının her oturumda nerede kalındığını tek bakışta görmesi ve b
 ## Current State
 
 - RoutePlanner kod tabanı (Flask backend, test altyapısı, NLP/route/weather modülleri) mevcut.
-- GSD tarafı yeni bootstrap ediliyor; henüz milestone/slice dokümantasyonu oluşturulmamış durumda.
-- Commit kontrolü için son onay mercii kullanıcı olacak şekilde süreç kuralı belirlendi.
+- GSD tarafı aktif olarak kullanılıyor; oturum içi çalışma ve lokal değişiklik yönetimi uygulanıyor.
+- Commit onayı kuralı: bundan sonra asıl commit/push işlemlerinden önce kullanıcıya sorulacaktır.
+
+## Recent Progress (özet)
+
+Aşağıdaki değişiklikler yerel çalışma ağacına uygulandı ve kullanıcı isteği üzerine commitlendi (lokal, remote'a push edilmedi):
+
+- tests/test_s01_state.py: merge çatışması çözüldü ve çözüm commitlendi (commit: ff47922).
+- OpenRoutePlanner/backend/app.py: turn-by-turn adımlarının üretim mantığı güncellendi:
+  - Türkçe talimat şablonları eklendi (deterministik varyasyonlar), roundabout (kavşak) tespiti, her adım için `step_id` ve `cumulative_distance_m` alanları eklendi.
+- OpenRoutePlanner/backend/test_route_steps.py: yeni/mühendislik testleri eklendi (basic, missing_street_name, roundabout_detection).
+- OpenRoutePlanner/frontend/index.html: navigasyon paneli ve konum modu seçici eklendi (map_center / gps).
+- OpenRoutePlanner/frontend/js/app.js: TTS entegrasyonu, adım vurgulama, map-center simülasyonu ve gerçek GPS (navigator.geolocation) destekli otomatik ilerleme eklendi.
+- .github/workflows/ci.yml: pytest çalıştıran basit GitHub Actions workflow dosyası eklendi.
+- Git: değişiklikler iki adımda commitlendi:
+  - OpenRoutePlanner içindeki dosyalar için tek bir commit (bddcbb8) eklendi.
+  - Superproject'te submodule pointer'ı güncellenerek commit (21bbfc2) eklendi.
+
+Not: Yukarıdaki commits yereldir; remote'a (origin) push edilmedi.
+
+## Next steps (kısa)
+
+- Kullanıcı onayına bağlı işlemler:
+  - Remote'a push & PR açma (kullanıcının yazılı onayı gerekir).
+  - Lokal test çalıştırma (pytest) — öncelikle virtualenv ve bağımlılık kurulumu gerekli.
+  - Commit mesaj düzenleme veya squashtan sonra farklı bir geçmiş yeniden yazma isteği.
 
 ## Architecture / Key Patterns
 
