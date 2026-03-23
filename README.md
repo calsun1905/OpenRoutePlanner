@@ -228,3 +228,39 @@ Bu proje açık kaynak kodludur.
 ## Destek
 
 Sorun bildirmek için [GitHub Issues](../../issues) sayfasını kullanın.
+
+## OpenRouter Entegrasyonu (Opsiyonel)
+
+OpenRouter ile LLM cagrisi yapmak icin `.env` dosyana su alanlari ekle:
+
+```env
+OPENROUTER_API_KEY=or-v1-buraya-kendi-keyini-yaz
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_MODEL=google/gemma-3-27b-it:free
+OPENROUTER_FALLBACK_MODELS=nousresearch/hermes-3-llama-3.1-405b:free,nvidia/nemotron-3-super-120b-a12b:free,minimax/minimax-m2.5:free,openrouter/free
+ORP_OPENROUTER_TIMEOUT_SEC=45
+OPENROUTER_HTTP_REFERER=
+OPENROUTER_APP_TITLE=OpenRoutePlanner
+```
+
+Yeni endpointler:
+
+- `GET /api/llm/openrouter/status`
+- `POST /api/llm/openrouter/chat`
+- `POST /api/llm/openrouter/chat/stream` (canli akis)
+
+Not:
+- Sistem `OPENROUTER_MODEL` ile baslar, 429/5xx olursa `OPENROUTER_FALLBACK_MODELS` listesindeki modellere sirayla gecer.
+- Canli chat arayuzunde ustte aktif model ve denenen model zinciri gorunur.
+
+Ornek istek:
+
+```bash
+curl -X POST http://localhost:5000/api/llm/openrouter/chat ^
+  -H "Content-Type: application/json" ^
+  -d "{\"query\":\"Merhaba, bana kisa bir rota plani oner.\"}"
+```
+
+Canli chat arayuzu:
+
+- `http://localhost:5000/openrouter-chat.html`

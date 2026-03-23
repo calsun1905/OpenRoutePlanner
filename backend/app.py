@@ -34,6 +34,37 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _openrouter_system_prompt() -> str:
+    """
+    OpenRouter uzerinden giden tum sohbetler icin global system prompt.
+    ENV ile override edilebilir: OPENROUTER_SYSTEM_PROMPT
+    """
+    prompt = os.getenv("OPENROUTER_SYSTEM_PROMPT", "").strip()
+    if prompt:
+        return prompt
+
+    return (
+        "Sen yardimci bir asistansin. "
+        "Mumkun oldugunca Turkce cevap ver. "
+        "Kisa, net ve dogru ol. "
+        "Metni temiz UTF-8 olarak uret; bozuk karakter, emoji kodu veya mojibake uretme. "
+        "Markdown kullanacaksan sade kullan. "
+        "Kullanici istemedikce gereksiz uzun aciklama yapma."
+    )
+
+
+def _inject_system_message(messages: list[dict]) -> list[dict]:
+    """
+    Mesaj listesinde en basta system rolu yoksa global system prompt ekler.
+    """
+    if not isinstance(messages, list):
+        return messages
+    if messages and isinstance(messages[0], dict) and messages[0].get("role") == "system":
+        return messages
+
+    return [{"role": "system", "content": _openrouter_system_prompt()}] + messages
+
+
 def _configure_live_console_output() -> None:
     """
     Console stream buffering'i azaltır ve print'i anlık flush edecek şekilde ayarlar.
@@ -55,7 +86,7 @@ def _configure_live_console_output() -> None:
 
 _configure_live_console_output()
 
-from flask import Flask, request, jsonify, send_from_directory, g
+from flask import Flask, request, jsonify, send_from_directory, g, Response, stream_with_context
 # Compatibility: allow test client to pass 'query' kw -> map to 'query_string'
 try:
     from flask.testing import EnvironBuilder as _EnvironBuilder
@@ -119,6 +150,19 @@ try:
 except ImportError:
     resolve_poi_concept = None
 from cache_manager import get_graph_cache, get_poi_cache
+try:
+    from openrouter_service import (
+        is_openrouter_configured,
+        openrouter_status,
+        openrouter_list_text_models,
+        openrouter_chat_completion,
+        openrouter_chat_completion_with_fallback,
+        openrouter_chat_completion_stream,
+        openrouter_chat_completion_stream_with_fallback,
+    )
+    OPENROUTER_SERVICE_AVAILABLE = True
+except ImportError:
+    OPENROUTER_SERVICE_AVAILABLE = False
 
 # Hava durumu servisi (OpenMeteo API entegrasyonu)
 try:
@@ -2143,6 +2187,195 @@ def api_weather_clear_cache():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/llm/openrouter/status", methods=["GET"])
+def api_openrouter_status():
+    """
+    OpenRouter entegrasyon durumunu dondurur.
+    """
+    if not OPENROUTER_SERVICE_AVAILABLE:
+        return jsonify({
+            "available": False,
+            "configured": False,
+            "error": "OpenRouter servisi yuklenemedi",
+        }), 503
+
+    status = openrouter_status()
+    return jsonify({
+        "available": True,
+        "configured": status["configured"],
+        "base_url": status["base_url"],
+        "default_model": status["default_model"],
+        "fallback_models": status.get("fallback_models", []),
+        "timeout_sec": status["timeout_sec"],
+    })
+
+
+@app.route("/api/llm/openrouter/chat", methods=["POST"])
+def api_openrouter_chat():
+    """
+    OpenRouter uzerinden chat completion cagrisi yapar.
+
+    Request body:
+    {
+      "query": "Merhaba",  # opsiyonel, messages ile alternatif
+      "messages": [{"role":"user","content":"Merhaba"}],  # opsiyonel
+      "model": "google/gemma-3-27b-it:free",  # opsiyonel
+      "temperature": 0.2,  # opsiyonel
+      "max_tokens": 512  # opsiyonel
+    }
+    """
+    if not OPENROUTER_SERVICE_AVAILABLE:
+        return jsonify({"error": "OpenRouter servisi mevcut degil"}), 503
+
+    if not is_openrouter_configured():
+        return jsonify({"error": "OPENROUTER_API_KEY tanimli degil"}), 503
+
+    data = request.get_json(silent=True) or {}
+
+    messages = data.get("messages")
+    query = data.get("query")
+    if messages is None:
+        if not isinstance(query, str) or not query.strip():
+            return jsonify({"error": "'query' veya 'messages' zorunlu"}), 400
+        messages = [{"role": "user", "content": query.strip()}]
+
+    if not isinstance(messages, list) or not messages:
+        return jsonify({"error": "'messages' bos olmayan liste olmali"}), 400
+    messages = _inject_system_message(messages)
+
+    model = data.get("model")
+    temperature = data.get("temperature")
+    max_tokens = data.get("max_tokens")
+    use_fallback_raw = data.get("use_fallback", True)
+    if isinstance(use_fallback_raw, bool):
+        use_fallback = use_fallback_raw
+    elif isinstance(use_fallback_raw, str):
+        use_fallback = use_fallback_raw.strip().lower() in {"1", "true", "yes", "on"}
+    else:
+        use_fallback = bool(use_fallback_raw)
+
+    try:
+        if use_fallback:
+            result = openrouter_chat_completion_with_fallback(
+                messages=messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+        else:
+            result = openrouter_chat_completion(
+                messages=messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            result["tried_models"] = [result.get("model") or model or ""]
+        return jsonify({
+            "ok": True,
+            "model": result.get("model"),
+            "text": result.get("text", ""),
+            "usage": result.get("usage", {}),
+            "id": result.get("id"),
+            "tried_models": result.get("tried_models", []),
+        })
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 502
+    except Exception as exc:
+        return jsonify({"error": f"Sunucu hatasi: {exc}"}), 500
+
+
+@app.route("/api/llm/openrouter/chat/stream", methods=["POST"])
+def api_openrouter_chat_stream():
+    """
+    OpenRouter chat cagrisini canli akis (stream) olarak dondurur.
+
+    Response format: application/x-ndjson
+    Her satir bir JSON objesidir.
+    """
+    if not OPENROUTER_SERVICE_AVAILABLE:
+        return jsonify({"error": "OpenRouter servisi mevcut degil"}), 503
+
+    if not is_openrouter_configured():
+        return jsonify({"error": "OPENROUTER_API_KEY tanimli degil"}), 503
+
+    data = request.get_json(silent=True) or {}
+
+    messages = data.get("messages")
+    query = data.get("query")
+    if messages is None:
+        if not isinstance(query, str) or not query.strip():
+            return jsonify({"error": "'query' veya 'messages' zorunlu"}), 400
+        messages = [{"role": "user", "content": query.strip()}]
+
+    if not isinstance(messages, list) or not messages:
+        return jsonify({"error": "'messages' bos olmayan liste olmali"}), 400
+    messages = _inject_system_message(messages)
+
+    model = data.get("model")
+    temperature = data.get("temperature")
+    max_tokens = data.get("max_tokens")
+    use_fallback_raw = data.get("use_fallback", True)
+    if isinstance(use_fallback_raw, bool):
+        use_fallback = use_fallback_raw
+    elif isinstance(use_fallback_raw, str):
+        use_fallback = use_fallback_raw.strip().lower() in {"1", "true", "yes", "on"}
+    else:
+        use_fallback = bool(use_fallback_raw)
+
+    @stream_with_context
+    def _generator():
+        try:
+            if use_fallback:
+                stream_iter = openrouter_chat_completion_stream_with_fallback(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+            else:
+                stream_iter = openrouter_chat_completion_stream(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                # UI tek model denendigini gorebilsin
+                yield json.dumps(
+                    {"type": "meta", "phase": "start", "model": model, "tried_models": [model]},
+                    ensure_ascii=False,
+                ) + "\n"
+
+            for chunk in stream_iter:
+                yield json.dumps(chunk, ensure_ascii=False) + "\n"
+        except ValueError as exc:
+            yield json.dumps({"type": "error", "error": str(exc)}, ensure_ascii=False) + "\n"
+        except RuntimeError as exc:
+            yield json.dumps({"type": "error", "error": str(exc)}, ensure_ascii=False) + "\n"
+        except Exception as exc:
+            yield json.dumps({"type": "error", "error": f"Sunucu hatasi: {exc}"}, ensure_ascii=False) + "\n"
+
+    return Response(_generator(), mimetype="application/x-ndjson")
+
+
+@app.route("/api/llm/openrouter/models", methods=["GET"])
+def api_openrouter_models():
+    """
+    OpenRouter'dan text modelleri listeler (image/video agirlikli modeller filtrelenir).
+    """
+    if not OPENROUTER_SERVICE_AVAILABLE:
+        return jsonify({"error": "OpenRouter servisi mevcut degil"}), 503
+
+    try:
+        models = openrouter_list_text_models()
+        return jsonify({"ok": True, "models": models})
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc), "models": []}), 502
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Sunucu hatasi: {exc}", "models": []}), 500
 
 
 if __name__ == "__main__":
