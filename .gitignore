@@ -27,3 +27,9 @@ backend/cache/
 
 # Geçici debug çıktıları
 scripts/debug/
+
+# Local tooling artifacts
+.bg-shell/
+.serena/
+tmp_buttons.html
+claude-mem-*.tgz
