@@ -1,5 +1,4 @@
-
-# ── GSD baseline (auto-generated) ──
+# GSD baseline (auto-generated)
 .gsd/activity/
 .gsd/runtime/
 .gsd/worktrees/
@@ -11,6 +10,8 @@
 .gsd/DISCUSSION-MANIFEST.json
 .gsd/milestones/**/*-CONTINUE.md
 .gsd/milestones/**/continue.md
+
+# OS/editor
 .DS_Store
 Thumbs.db
 *.swp
@@ -19,9 +20,13 @@ Thumbs.db
 .idea/
 .vscode/
 *.code-workspace
+
+# Environment
 .env
 .env.*
 !.env.example
+
+# Build/cache/runtime
 node_modules/
 .next/
 dist/
@@ -36,3 +41,11 @@ vendor/
 coverage/
 .cache/
 tmp/
+
+# Local tooling/config artifacts
+.bg-shell/
+.claude/settings.local.json
+.serena/
+cache/
+tmp_buttons.html
+claude-mem-*.tgz
