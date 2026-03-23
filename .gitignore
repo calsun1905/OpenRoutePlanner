@@ -24,12 +24,15 @@ backend/models/bert-base-turkish-uncased/*
 
 cache/
 backend/cache/
+!backend/cache/
+!backend/cache/.gitkeep
 
 # Geçici debug çıktıları
 scripts/debug/
 
 # Local tooling artifacts
 .bg-shell/
+.claude/settings.local.json
 .serena/
 tmp_buttons.html
 claude-mem-*.tgz
