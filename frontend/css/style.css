@@ -1,5 +1,5 @@
 /* ============================================
-   OpenTrip — Design System & Styles
+   OpenTrip â€” Design System & Styles
    ============================================ */
 
 /* --- CSS Custom Properties (Design Tokens) --- */
@@ -481,7 +481,7 @@ body {
     border-color: var(--accent-primary);
 }
 
-/* Öneri dropdown öğeleri (yazarken çıkan liste) */
+/* Ã–neri dropdown Ã¶ÄŸeleri (yazarken Ã§Ä±kan liste) */
 .search-suggestion-item {
     padding: 8px 12px;
     margin-bottom: 4px;
@@ -589,6 +589,19 @@ body {
     background: rgba(108, 92, 231, 0.1);
 }
 
+.poi-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.poi-meta-info {
+    margin-top: 8px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
 /* --- Stat Grid --- */
 .stat-grid {
     display: grid;
@@ -677,8 +690,8 @@ body {
 /* --- Toast Notifications --- */
 .toast-container {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    bottom: 158px; /* Weather widget ile cakismasin */
+    right: 14px;
     z-index: 10000;
     display: flex;
     flex-direction: column-reverse;
@@ -943,6 +956,11 @@ body {
 
     body {
         overflow-y: auto;
+    }
+
+    .toast-container {
+        bottom: 118px;
+        right: 10px;
     }
 }
 

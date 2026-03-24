@@ -13,6 +13,7 @@ let markers = [];
 let routePolyline = null;
 let routeGlowPolylines = [];  // Glow efektleri için ayrı takip
 let poiMarkers = [];
+let lastPoiSearch = null;
 let currentRouteData = null;
 let alternativeRoutesCache = {};  // Alternatif rota verileri cache'i (BUG FIX 07.03.2026)
 let currentNlpResult = null;
@@ -46,7 +47,9 @@ const elProvinceSelect = document.getElementById("provinceSelect");
 const elDistrictSelect = document.getElementById("districtSelect");
 const elLoadingOverlay = document.getElementById("loadingOverlay");
 const elLoadingText = document.getElementById("loadingText");
+const elBtnRefreshPois = document.getElementById("btnRefreshPois");
 const elBtnClearPois = document.getElementById("btnClearPois");
+const elPoiMetaInfo = document.getElementById("poiMetaInfo");
 const elToastContainer = document.getElementById("toastContainer");
 const elPlaceSearchInput = document.getElementById("placeSearchInput");
 const elBtnSearchPlace = document.getElementById("btnSearchPlace");
@@ -410,71 +413,139 @@ function showRouteInfo(data) {
 }
 
 // ========== POI SEARCH ==========
-async function searchPois(category) {
+/**
+ * POI buton metninden (örn. "🏛️ Belediye") harita işareti emojisi ve Türkçe etiket üretir.
+ * index.html'deki data-category API'ye gider; emoji/etiket butonun ilk satırından okunur.
+ */
+function parsePoiButtonLabel(buttonText) {
+    const raw = (buttonText || "").trim();
+    if (!raw) {
+        return { emoji: "\u{1F4CD}", label: "" };
+    }
+    const parts = raw.split(/\s+/);
+    const emoji = parts[0] || "\u{1F4CD}";
+    const label = parts.length > 1 ? parts.slice(1).join(" ") : "";
+    return { emoji, label };
+}
+
+function formatPoiAge(ageSeconds) {
+    if (ageSeconds === null || ageSeconds === undefined || Number.isNaN(Number(ageSeconds))) {
+        return "-";
+    }
+    const sec = Math.max(0, Number(ageSeconds));
+    if (sec < 60) return `${Math.round(sec)} sn`;
+    if (sec < 3600) return `${Math.round(sec / 60)} dk`;
+    if (sec < 86400) return `${(sec / 3600).toFixed(1)} saat`;
+    return `${(sec / 86400).toFixed(1)} gun`;
+}
+
+function renderPoiMeta(info) {
+    if (!elPoiMetaInfo) return;
+    const cache = (info && info.cache) || {};
+    const statusMap = {
+        fresh_cache_hit: "Cache (guncel)",
+        empty_cache_hit: "Cache (bos sonuc)",
+        stale_cache_served: "Cache (eski, arka planda yenileniyor)",
+        live_fetch: "Canli sorgu",
+        forced_live_refresh: "Canli zorunlu yenileme",
+        live_refresh_after_expiry: "Canli sorgu (cache suresi dolmus)",
+        fallback_on_error: "Canli hata, cache geri dondu",
+        error_live_fetch: "Canli hata",
+        legacy_no_meta: "Cache durumu bilinmiyor",
+    };
+
+    let lastUpdatedText = "-";
+    if (cache.last_updated) {
+        const dt = new Date(cache.last_updated);
+        if (!Number.isNaN(dt.getTime())) {
+            lastUpdatedText = dt.toLocaleString("tr-TR");
+        }
+    }
+
+    const statusText = statusMap[cache.status] || cache.status || "-";
+    const ageText = formatPoiAge(cache.age_seconds);
+    const bgText = cache.background_refresh ? "acik" : "kapali";
+    const countText = Number.isFinite(info?.count) ? info.count : "-";
+    elPoiMetaInfo.textContent = `Durum: ${statusText} | Son guncelleme: ${lastUpdatedText} | Yas: ${ageText} | Sonuc: ${countText} | Arka plan yenileme: ${bgText}`;
+}
+
+async function searchPois(category, markerEmoji, markerLabel, opts = {}) {
+    const forceRefresh = Boolean(opts.forceRefresh);
+
     // Yeni dropdown'lardan veri al
     const province = elProvinceSelect.value;
-    const district = elDistrictSelect.value;
-    
-    // Eğer il seçilmemişse uyarı ver
-    if (!province) {
-        showToast('Lütfen önce bir il seçin', 'warning');
+    const districtRaw = (elDistrictSelect.value || "").trim();
+    const districtNorm = districtRaw.toLocaleLowerCase("tr-TR").replace(/ç/g, "c").replace(/ş/g, "s").replace(/ı/g, "i").replace(/İ/g, "i");
+    const district = districtNorm.includes("ilce secin") ? "" : districtRaw;
+
+    // Eger il secilmemisse uyari ver
+    if (!province && !opts.placeOverride) {
+        showToast('Lutfen once bir il secin', 'warning');
         return;
     }
-    
-    // İlçe seçilmişse ilçe, yoksa il kullan
-    const place = district ? `${district}, ${province}, Turkey` : `${province}, Turkey`;
 
-    showLoading(`"${category}" mekanları aranıyor...`);
+    // Ilce secilmisse ilce, yoksa il kullan
+    const place = (opts.placeOverride && String(opts.placeOverride).trim())
+        ? String(opts.placeOverride).trim()
+        : (district ? `${district}, ${province}, Turkey` : `${province}, Turkey`);
+
+    // POI'de il/ilce secimi daima idari sinir (place boundary) uzerinden taransin.
+    const searchMode = "place_boundary_only";
+
+    lastPoiSearch = {
+        category,
+        markerEmoji,
+        markerLabel,
+        place,
+    };
+
+    const loadingText = forceRefresh
+        ? `"${category}" mekanlari canli yenileniyor...`
+        : `"${category}" mekanlari araniyor...`;
+    showLoading(loadingText);
 
     try {
         const response = await fetch(`${API_BASE}/search-pois`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ place, category }),
+            body: JSON.stringify({
+                place,
+                category,
+                search_mode: searchMode,
+                force_refresh: forceRefresh,
+            }),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "POI arama hatası");
+            throw new Error(data.error || "POI arama hatasi");
         }
 
         clearPois();
-        displayPois(data.pois, category);
+        displayPois(data.pois, category, markerEmoji, markerLabel);
+        renderPoiMeta({
+            cache: data.poi_cache,
+            count: data.pois.length,
+        });
 
-        showToast(`${data.pois.length} adet "${category}" bulundu`, "success");
+        const toastPrefix = forceRefresh ? "Canli yenileme: " : "";
+        showToast(`${toastPrefix}${data.pois.length} adet "${category}" bulundu`, "success");
 
     } catch (error) {
-        console.error("POI arama hatası:", error);
-        showToast(`POI arama hatası: ${error.message}`, "error");
+        console.error("POI arama hatasi:", error);
+        if (elPoiMetaInfo) {
+            elPoiMetaInfo.textContent = `POI arama hatasi: ${error.message}`;
+        }
+        showToast(`POI arama hatasi: ${error.message}`, "error");
     } finally {
         hideLoading();
     }
 }
-
-function displayPois(pois, category) {
-    const emojiMap = {
-        museum: "???",
-        cafe: "?",
-        park: "??",
-        restaurant: "???",
-        mosque: "??",
-        library: "??",
-        hotel: "??",
-    };
-
-    const categoryLabels = {
-        museum: "Müze",
-        cafe: "Kafe",
-        park: "Park",
-        restaurant: "Restoran",
-        mosque: "Cami",
-        library: "Kütüphane",
-        hotel: "Otel",
-    };
-
-    const emoji = emojiMap[category] || "??";
-    const label = categoryLabels[category] || category;
+function displayPois(pois, category, markerEmoji, markerLabel) {
+    const pin = "\u{1F4CD}";
+    const emoji = markerEmoji || pin;
+    const label = (markerLabel && String(markerLabel).trim()) || category;
 
     pois.forEach((poi) => {
         const marker = L.marker([poi.lat, poi.lon], {
@@ -517,22 +588,22 @@ function buildPoiPopup(poi, emoji, label) {
     html += `<div class="poi-card-details">`;
 
     if (isValidField(poi.opening_hours)) {
-        html += `<div class="poi-detail"><span class="poi-detail-icon">??</span> ${poi.opening_hours}</div>`;
+        html += `<div class="poi-detail"><span class="poi-detail-icon">\u{1F550}</span> ${poi.opening_hours}</div>`;
         hasDetails = true;
     }
 
     if (isValidField(poi.website)) {
-        html += `<div class="poi-detail"><span class="poi-detail-icon">??</span> <a href="${poi.website}" target="_blank" rel="noopener">Web Sitesi</a></div>`;
+        html += `<div class="poi-detail"><span class="poi-detail-icon">\u{1F310}</span> <a href="${poi.website}" target="_blank" rel="noopener">Web Sitesi</a></div>`;
         hasDetails = true;
     }
 
     if (poi.wikipedia_url) {
-        html += `<div class="poi-detail"><span class="poi-detail-icon">??</span> <a href="${poi.wikipedia_url}" target="_blank" rel="noopener">Wikipedia</a></div>`;
+        html += `<div class="poi-detail"><span class="poi-detail-icon">\u{1F4D5}</span> <a href="${poi.wikipedia_url}" target="_blank" rel="noopener">Wikipedia</a></div>`;
         hasDetails = true;
     }
 
     if (!hasDetails) {
-        html += `<div class="poi-detail"><span class="poi-detail-icon">??</span> ${poi.lat.toFixed(5)}, ${poi.lon.toFixed(5)}</div>`;
+        html += `<div class="poi-detail"><span class="poi-detail-icon">\u{1F4CD}</span> ${poi.lat.toFixed(5)}, ${poi.lon.toFixed(5)}</div>`;
     }
 
     html += `</div>`;
@@ -583,6 +654,20 @@ function showToast(message, type = "info") {
 elBtnClearAll.addEventListener("click", clearAllPoints);
 elBtnCalculate.addEventListener("click", calculateRoute);
 elBtnClearPois.addEventListener("click", clearPois);
+if (elBtnRefreshPois) {
+    elBtnRefreshPois.addEventListener("click", function () {
+        if (!lastPoiSearch) {
+            showToast("Once bir POI aramasi yap", "warning");
+            return;
+        }
+        searchPois(
+            lastPoiSearch.category,
+            lastPoiSearch.markerEmoji,
+            lastPoiSearch.markerLabel,
+            { forceRefresh: true, placeOverride: lastPoiSearch.place }
+        );
+    });
+}
 elBtnShowAlternatives.addEventListener("click", showAlternativeRoutes);
 elBtnSaveRoute.addEventListener("click", openSaveRouteModal);
 elBtnCloseSaveModal.addEventListener("click", closeSaveRouteModal);
@@ -613,12 +698,13 @@ locationIconBtns.forEach(btn => {
 document.querySelectorAll(".btn-poi").forEach((btn) => {
     btn.addEventListener("click", function () {
         const category = this.dataset.category;
+        const { emoji: markerEmoji, label: markerLabel } = parsePoiButtonLabel(this.textContent);
 
         // Toggle active sınıfı
         document.querySelectorAll(".btn-poi").forEach((b) => b.classList.remove("active"));
         this.classList.add("active");
 
-        searchPois(category);
+        searchPois(category, markerEmoji, markerLabel || category);
     });
 });
 
@@ -722,7 +808,8 @@ async function fetchSuggestions(query, signal = null) {
                 const lat = parseFloat(el.dataset.lat);
                 const lon = parseFloat(el.dataset.lon);
                 const nameEl = el.querySelector(".search-result-name");
-                const name = nameEl ? nameEl.textContent.replace(/^??\s*/, "").trim() : "";
+                // Basliktaki ikon/emoji prefix'ini temizle
+                const name = nameEl ? nameEl.textContent.replace(/^[^\p{L}\p{N}]+\s*/u, "").trim() : "";
                 selectSearchResult(lat, lon, name);
             });
         });
@@ -2567,9 +2654,9 @@ function applyPoiFilters() {
 }
 
 const _origDisplayPois = displayPois;
-displayPois = function (pois, category) {
+displayPois = function (pois, category, markerEmoji, markerLabel) {
     const startLen = poiMarkers.length;
-    _origDisplayPois(pois, category);
+    _origDisplayPois(pois, category, markerEmoji, markerLabel);
 
     const panel = ensurePoiFilterPanel();
     if (!panel) return;
@@ -2618,3 +2705,9 @@ if (typeof clearPois === "function") {
         }
     };
 }
+
+
+
+
+
+
