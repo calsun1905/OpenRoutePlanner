@@ -22,10 +22,13 @@ backend/models/*
 backend/models/bert-base-turkish-uncased/*
 !backend/models/bert-base-turkish-uncased/.gitkeep
 
+# Ortak cache klasoru: varsayilan olarak ignore.
+# Repoda tutmak istenen dosyalar icin asagiya ! ile istisna ekleyin (or. geocodes.db).
 cache/
-backend/cache/
-!backend/cache/
+backend/cache/*
 !backend/cache/.gitkeep
+# !backend/cache/geocodes.db
+# !backend/cache/*.json
 
 # Geçici debug çıktıları
 scripts/debug/
