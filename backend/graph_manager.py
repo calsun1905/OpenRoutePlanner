@@ -6,12 +6,18 @@ ve POI (Points of Interest) aramalarÄ±nÄ± gerÃ§ekleÅŸtirir.
 """
 
 import os
+import math
 import sqlite3
 import json
 import hashlib
 import threading
 from datetime import datetime, timezone
 import osmnx as ox
+
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 import networkx as nx
 from route_config import ROUTE_CONFIG
 
@@ -44,6 +50,23 @@ def _init_poi_db():
             PRIMARY KEY (place_name, category)
         )
     ''')
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS pois_archive (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            place_name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            data_json TEXT NOT NULL,
+            original_timestamp TEXT,
+            archived_at TEXT NOT NULL,
+            reason TEXT DEFAULT 'before_replace'
+        )
+        """
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pois_archive_place_cat "
+        "ON pois_archive(place_name, category, archived_at DESC)"
+    )
     conn.commit()
     conn.close()
 
@@ -119,13 +142,49 @@ def _read_poi_cache_entry(place_name: str, cache_category: str):
     }
 
 
+def _prune_poi_archive(cursor, place_name_lower: str, cache_category: str) -> None:
+    """Ayni yer+kategori icin arsiv satir sayisini sinirlar."""
+    max_keep = int(ROUTE_CONFIG.get("POI_ARCHIVE_MAX_PER_KEY", 5))
+    max_keep = max(1, min(50, max_keep))
+    cursor.execute(
+        "SELECT id FROM pois_archive WHERE place_name = ? AND category = ? ORDER BY archived_at DESC",
+        (place_name_lower, cache_category),
+    )
+    ids = [row[0] for row in cursor.fetchall()]
+    for old_id in ids[max_keep:]:
+        cursor.execute("DELETE FROM pois_archive WHERE id = ?", (old_id,))
+
+
 def _write_poi_cache_entry(place_name: str, cache_category: str, pois: list) -> None:
     """
     Yerel DB cache kaydini gunceller.
+    Eski surum varsa once pois_archive'a kopyalanir (silmeden once tekrar kullanima acik).
     """
     try:
         conn = sqlite3.connect(POI_DB_PATH)
         cursor = conn.cursor()
+        cursor.execute(
+            "SELECT data_json, timestamp FROM pois WHERE place_name = ? AND category = ?",
+            (place_name.lower(), cache_category),
+        )
+        row = cursor.fetchone()
+        if row is not None:
+            old_json, old_ts = row[0], row[1]
+            cursor.execute(
+                """
+                INSERT INTO pois_archive (place_name, category, data_json, original_timestamp, archived_at, reason)
+                VALUES (?, ?, ?, ?, datetime('now'), ?)
+                """,
+                (
+                    place_name.lower(),
+                    cache_category,
+                    old_json if old_json is not None else "[]",
+                    str(old_ts) if old_ts is not None else "",
+                    "before_replace",
+                ),
+            )
+            _prune_poi_archive(cursor, place_name.lower(), cache_category)
+
         cursor.execute(
             """
             INSERT OR REPLACE INTO pois (place_name, category, data_json)
@@ -358,6 +417,84 @@ def _resolve_search_center(place_name: str):
         return None
 
 
+def _bbox_span_km(minx: float, miny: float, maxx: float, maxy: float) -> float:
+    """Yaklasik en/boy (km) — genis bbox tespiti icin."""
+    center_lat = (miny + maxy) / 2.0
+    lat_km = max(1e-6, (maxy - miny)) * 111.0
+    lon_km = max(1e-6, (maxx - minx)) * 111.0 * max(0.15, math.cos(math.radians(center_lat)))
+    return max(lat_km, lon_km)
+
+
+def _merge_geo_frames(gdfs):
+    """Parcali sorgu GeoDataFrame birlestirme + tekrar satir dusurme."""
+    if pd is None or not gdfs:
+        return None
+    parts = [g for g in gdfs if g is not None and len(g) > 0]
+    if not parts:
+        return None
+    merged = pd.concat(parts, ignore_index=True)
+    if "osmid" in merged.columns:
+        merged = merged.drop_duplicates(subset=["osmid"], keep="first")
+    else:
+        merged = merged.drop_duplicates()
+    return merged
+
+
+def _fetch_pois_chunked_grid(place_name: str, normalized_tags: dict, gdf_place) -> object:
+    """
+    Buyuk idari alan icin bbox'i hucrelere bolup features_from_point ile tarar.
+    Overpass tek buyuk poligon sorgusunda zaman asimi/eksik sonuc riskini azaltir.
+    """
+    if pd is None or gdf_place is None or len(gdf_place) == 0:
+        return None
+
+    minx, miny, maxx, maxy = gdf_place.total_bounds
+    span_km = _bbox_span_km(minx, miny, maxx, maxy)
+    cell_km = float(ROUTE_CONFIG.get("POI_CHUNK_CELL_KM", 4.0))
+    max_cells = int(ROUTE_CONFIG.get("POI_CHUNK_MAX_CELLS", 36))
+
+    lat_deg = maxy - miny
+    lon_deg = maxx - minx
+    center_lat = (miny + maxy) / 2.0
+    lat_km = lat_deg * 111.0
+    lon_km = lon_deg * 111.0 * max(0.15, math.cos(math.radians(center_lat)))
+
+    n_lat = max(1, int(math.ceil(lat_km / cell_km)))
+    n_lon = max(1, int(math.ceil(lon_km / cell_km)))
+    safety = 0
+    while n_lat * n_lon > max_cells and safety < 12:
+        cell_km *= 1.35
+        n_lat = max(1, int(math.ceil(lat_km / cell_km)))
+        n_lon = max(1, int(math.ceil(lon_km / cell_km)))
+        safety += 1
+
+    print(
+        f"[POI] Parcali grid: ~{span_km:.1f} km span, hucre ~{cell_km:.1f} km, "
+        f"izgara {n_lat}x{n_lon} (<= {max_cells} hucre)"
+    )
+
+    collected = []
+    for i in range(n_lat):
+        for j in range(n_lon):
+            lo_lat = miny + (i / n_lat) * lat_deg
+            hi_lat = miny + ((i + 1) / n_lat) * lat_deg
+            lo_lon = minx + (j / n_lon) * lon_deg
+            hi_lon = minx + ((j + 1) / n_lon) * lon_deg
+            clat = (lo_lat + hi_lat) / 2.0
+            clon = (lo_lon + hi_lon) / 2.0
+            dlat_m = ((hi_lat - lo_lat) * 111000.0) / 2.0
+            dlon_m = ((hi_lon - lo_lon) * 111000.0 * max(0.15, math.cos(math.radians(clat)))) / 2.0
+            dist = int(min(8000, max(1200, math.sqrt(dlat_m**2 + dlon_m**2))))
+            try:
+                gdf_cell = ox.features_from_point((clat, clon), tags=normalized_tags, dist=dist)
+                if gdf_cell is not None and len(gdf_cell) > 0:
+                    collected.append(gdf_cell)
+            except Exception as exc:
+                print(f"[POI] Parca ({i},{j}) hata: {exc}")
+
+    return _merge_geo_frames(collected)
+
+
 def _fetch_pois_with_fallback(
     place_name: str,
     normalized_tags: dict,
@@ -371,17 +508,40 @@ def _fetch_pois_with_fallback(
     """
     search_mode = (search_mode or "auto").strip().lower()
 
-    # Il/genis alan sorgularinda dogrudan tum place siniri taransin.
+    # Idari sinir (il veya ilce): once tek sorgu; cok genis bbox'ta parcali grid; bos/hata -> parcali fallback.
     if search_mode == "place_boundary_only":
+        gdf_place = None
         try:
-            print("[POI] Search mode: place_boundary_only (tum il siniri)")
+            gdf_place = ox.geocode_to_gdf(place_name)
+        except Exception as exc:
+            print(f"[POI] geocode_to_gdf: {exc}")
+
+        min_km = float(ROUTE_CONFIG.get("POI_BOUNDARY_CHUNK_MIN_KM", 12.0))
+        span_km = 0.0
+        if gdf_place is not None and len(gdf_place) > 0:
+            bx = gdf_place.total_bounds
+            span_km = _bbox_span_km(bx[0], bx[1], bx[2], bx[3])
+
+        if span_km > min_km and pd is not None and gdf_place is not None and len(gdf_place) > 0:
+            print(f"[POI] place_boundary_only: bbox genis (~{span_km:.1f} km) -> parcali tarama")
+            gdf_chunked = _fetch_pois_chunked_grid(place_name, normalized_tags, gdf_place)
+            if gdf_chunked is not None and len(gdf_chunked) > 0:
+                return gdf_chunked, False
+
+        try:
+            print("[POI] Search mode: place_boundary_only (idari sinir, tek sorgu)")
             gdf = ox.features_from_place(place_name, tags=normalized_tags)
-            if gdf is None:
-                return None, False
-            return gdf, False
-        except Exception as e:
-            print(f"[POI] place-boundary sorgu hatasi: {e}")
-            return None, True
+            if gdf is not None and len(gdf) > 0:
+                return gdf, False
+        except Exception as exc:
+            print(f"[POI] place-boundary tek sorgu hatasi: {exc}")
+
+        if gdf_place is not None and len(gdf_place) > 0 and pd is not None:
+            print("[POI] place_boundary_only: tek sorgu bos/hata -> parcali fallback")
+            gdf_chunked = _fetch_pois_chunked_grid(place_name, normalized_tags, gdf_place)
+            if gdf_chunked is not None and len(gdf_chunked) > 0:
+                return gdf_chunked, False
+        return None, True
 
     center = _resolve_search_center(place_name)
     if center is None:

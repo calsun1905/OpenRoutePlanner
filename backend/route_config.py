@@ -47,11 +47,13 @@ ROUTE_CONFIG = {
 
     # POI kalici cache tazelik pencereleri
     # Soft TTL: bu sureden sonra cache gosterilir ama arkada yenileme tetiklenir.
-    "POI_CACHE_SOFT_TTL_DAYS": 7,
+    "POI_CACHE_SOFT_TTL_DAYS": 14,
     # Hard TTL: bu sureden sonra cache artik gecersiz sayilir, canli sorgu zorunlu olur.
     "POI_CACHE_HARD_TTL_DAYS": 30,
     # Bos sonuc cache'i daha kisa sureli tutulur (yeni acilan mekanlari yakalamak icin).
     "POI_CACHE_EMPTY_TTL_HOURS": 24,
+    # Ana pois tablosu guncellenmeden once kopyalanan eski surum sayisi (yer + kategori basina).
+    "POI_ARCHIVE_MAX_PER_KEY": 5,
 
     # =========================================================================
     # OVERLAP (Ã–RTÃœÅMe) EÅÄ°KLERÄ° â€” dynamic_overlap_threshold()
@@ -160,5 +162,11 @@ ROUTE_CONFIG = {
 
     "FALLBACK_NEIGHBOR_LIMIT": 3,
     "FALLBACK_DISTANCE_MULTIPLIER": 1.5,
+
+    # POI — buyuk idari alan (il/ilce) icin parcali (grid) tarama
+    # Bbox en/boyu bu km degerini asinca tek features_from_place yerine izgara hucresi sorgulari.
+    "POI_BOUNDARY_CHUNK_MIN_KM": 12.0,
+    "POI_CHUNK_CELL_KM": 4.0,
+    "POI_CHUNK_MAX_CELLS": 36,
 
 }
