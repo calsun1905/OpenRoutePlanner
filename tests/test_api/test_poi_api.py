@@ -22,16 +22,18 @@ def client():
 def test_search_pois_resolves_category_with_morph_dict(client, monkeypatch):
     captured = {}
 
-    def fake_search_pois(place, category):
+    def fake_search_pois(place, category, **kwargs):
+        search_mode = kwargs.get("search_mode", "auto")
         captured["place"] = place
         captured["category"] = category
-        return [{"name": "Örnek Pilavcı", "lat": 0.0, "lon": 0.0, "category": category}]
+        captured["search_mode"] = search_mode
+        return [{"name": "Ornek Pilavci", "lat": 0.0, "lon": 0.0, "category": category}]
 
     monkeypatch.setattr("app.search_pois", fake_search_pois)
 
     rv = client.post(
         "/api/search-pois",
-        json={"place": "Malatya, Turkey", "category": "pilavcılardan"},
+        json={"place": "Malatya, Turkey", "category": "pilavcilardan"},
         content_type="application/json",
     )
 
@@ -44,20 +46,24 @@ def test_search_pois_resolves_category_with_morph_dict(client, monkeypatch):
     assert data.get("version_profile", {}).get("plan_version")
     assert data.get("version_profile", {}).get("cache_token")
     assert captured["category"] == "pilavcı"
+    assert data["search_mode"] == "place_boundary_only"
+    assert captured["search_mode"] == "place_boundary_only"
 
 
 def test_search_pois_keeps_unknown_category(client, monkeypatch):
     captured = {}
 
-    def fake_search_pois(place, category):
+    def fake_search_pois(place, category, **kwargs):
+        search_mode = kwargs.get("search_mode", "auto")
         captured["category"] = category
+        captured["search_mode"] = search_mode
         return []
 
     monkeypatch.setattr("app.search_pois", fake_search_pois)
 
     rv = client.post(
         "/api/search-pois",
-        json={"place": "Kadıköy, Turkey", "category": "xzy-bilinmeyen"},
+        json={"place": "Kadikoy, Istanbul, Turkey", "category": "xzy-bilinmeyen"},
         content_type="application/json",
     )
 
@@ -66,3 +72,5 @@ def test_search_pois_keeps_unknown_category(client, monkeypatch):
     assert data["category"] == "xzy-bilinmeyen"
     assert data["category_resolution"]["status"] in {"unknown", "success"}
     assert captured["category"] == "xzy-bilinmeyen"
+    assert data["search_mode"] == "place_boundary_only"
+    assert captured["search_mode"] == "place_boundary_only"
