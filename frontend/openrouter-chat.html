@@ -152,11 +152,62 @@
     .controls {
       grid-column: 1 / -1;
       display: grid;
-      grid-template-columns: 180px 210px 1.3fr 1fr;
-      gap: 8px;
+      grid-template-columns: 1fr;
+      gap: 10px;
     }
-    .controls select,
-    .controls input {
+    .mode-switch {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      border: 1px solid var(--line);
+      background: rgba(2, 6, 23, 0.35);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .mode-switch label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .mode-panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .mode-panel {
+      border: 1px solid var(--line);
+      background: rgba(2, 6, 23, 0.35);
+      border-radius: 10px;
+      padding: 10px;
+      opacity: 0.72;
+      transition: opacity 0.12s ease, border-color 0.12s ease;
+    }
+    .mode-panel.active {
+      opacity: 1;
+      border-color: rgba(34, 197, 94, 0.5);
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--text);
+    }
+    .panel-help {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .manual-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .manual-grid select,
+    .manual-grid input {
       width: 100%;
       border-radius: 10px;
       border: 1px solid var(--line);
@@ -250,6 +301,7 @@
       .assistant { margin-right: 6%; }
       .composer { grid-template-columns: 1fr; }
       .controls { grid-template-columns: 1fr; }
+      .mode-panels { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -282,23 +334,41 @@
 
     <section class="composer">
       <div class="controls">
-        <select id="modelMode" title="Model modu">
-          <option value="auto" selected>Otomatik</option>
-          <option value="manual">Model Sec</option>
-        </select>
-        <select id="modelCategory" title="Model kategori" disabled>
-          <option value="all">Tum Modeller</option>
-          <option value="ok">Sorunsuz Calisanlar</option>
-          <option value="stalled">Tikananlar</option>
-          <option value="limit">Limit Hatasi (429)</option>
-          <option value="credit">Para/Kredi Gerektiren (402)</option>
-          <option value="embedding">Embedding/VL (chat uyumsuz)</option>
-          <option value="other">Diger/Belirsiz</option>
-        </select>
-        <select id="modelSelect" title="Model secimi" disabled>
-          <option value="">Model sec...</option>
-        </select>
-        <input id="customModel" type="text" placeholder="Istersen model slug yaz (opsiyonel)" disabled />
+        <div class="mode-switch">
+          <label>
+            <input type="radio" name="chatMode" value="auto" checked />
+            Otomatik Fallback Paneli
+          </label>
+          <label>
+            <input type="radio" name="chatMode" value="manual" />
+            Manuel Model Paneli
+          </label>
+        </div>
+        <div class="mode-panels">
+          <div id="autoPanel" class="mode-panel active">
+            <div class="panel-title">Otomatik Fallback</div>
+            <div class="panel-help">Sistem modeli otomatik dener, hata alirsa siradaki fallback modele gecer.</div>
+          </div>
+          <div id="manualPanel" class="mode-panel">
+            <div class="panel-title">Manuel Tek Model</div>
+            <div class="panel-help">Sadece sectigin modelle istek atilir. Fallback devreye girmez.</div>
+            <div class="manual-grid">
+              <select id="modelCategory" title="Model kategori" disabled>
+                <option value="all">Tum Modeller</option>
+                <option value="ok">Sorunsuz Calisanlar</option>
+                <option value="stalled">Tikananlar</option>
+                <option value="limit">Limit Hatasi (429)</option>
+                <option value="credit">Para/Kredi Gerektiren (402)</option>
+                <option value="embedding">Embedding/VL (chat uyumsuz)</option>
+                <option value="other">Diger/Belirsiz</option>
+              </select>
+              <select id="modelSelect" title="Model secimi" disabled>
+                <option value="">Model sec...</option>
+              </select>
+              <input id="customModel" type="text" placeholder="Istersen model slug yaz (opsiyonel)" disabled />
+            </div>
+          </div>
+        </div>
       </div>
       <textarea id="input" placeholder="Mesajini yaz... (Enter: gonder, Shift+Enter: yeni satir)"></textarea>
       <button id="clearBtn" type="button">Temizle</button>
@@ -314,7 +384,9 @@
     const statusDot = document.getElementById("statusDot");
     const statusText = document.getElementById("statusText");
     const activeModelEl = document.getElementById("activeModel");
-    const modelModeEl = document.getElementById("modelMode");
+    const chatModeEls = Array.from(document.querySelectorAll('input[name="chatMode"]'));
+    const autoPanelEl = document.getElementById("autoPanel");
+    const manualPanelEl = document.getElementById("manualPanel");
     const modelCategoryEl = document.getElementById("modelCategory");
     const modelSelectEl = document.getElementById("modelSelect");
     const customModelEl = document.getElementById("customModel");
@@ -529,8 +601,15 @@
       return selected || "";
     }
 
+    function getSelectedMode() {
+      const checked = chatModeEls.find((el) => el.checked);
+      return checked ? checked.value : "auto";
+    }
+
     function updateModelUiState() {
-      const isManual = modelModeEl.value === "manual";
+      const isManual = getSelectedMode() === "manual";
+      autoPanelEl.classList.toggle("active", !isManual);
+      manualPanelEl.classList.toggle("active", isManual);
       modelCategoryEl.disabled = !isManual || streaming;
       modelSelectEl.disabled = !isManual || streaming;
       customModelEl.disabled = !isManual || streaming;
@@ -588,7 +667,9 @@
       sendBtn.disabled = isBusy;
       clearBtn.disabled = isBusy;
       inputEl.disabled = isBusy;
-      modelModeEl.disabled = isBusy;
+      chatModeEls.forEach((el) => {
+        el.disabled = isBusy;
+      });
       updateModelUiState();
     }
 
@@ -597,7 +678,7 @@
 
       const prompt = inputEl.value.trim();
       if (!prompt) return;
-      const isManual = modelModeEl.value === "manual";
+      const isManual = getSelectedMode() === "manual";
       const forcedModel = isManual ? selectedManualModel() : "";
       currentAttemptModel = forcedModel || "";
       if (isManual && !forcedModel) {
@@ -673,7 +754,7 @@
               }
               if (payload.phase === "start") {
                 setStatus(true, `Model deneniyor: ${payload.model}`);
-                if (modelModeEl.value === "auto") {
+                if (getSelectedMode() === "auto") {
                   appendMeta(assistantBox, `Deneniyor: ${payload.model}`);
                 }
               } else if (payload.phase === "fallback") {
@@ -681,7 +762,7 @@
                 appendMeta(assistantBox, `Basarisiz: ${payload.model} | ${payload.error || "hata"}`);
               } else if (payload.phase === "success") {
                 setStatus(true, `Hazir`);
-                if (modelModeEl.value === "auto") {
+                if (getSelectedMode() === "auto") {
                   appendMeta(assistantBox, `Basarili model: ${payload.model}`);
                 }
               }
@@ -733,7 +814,9 @@
         sendMessage();
       }
     });
-    modelModeEl.addEventListener("change", updateModelUiState);
+    chatModeEls.forEach((el) => {
+      el.addEventListener("change", updateModelUiState);
+    });
     modelCategoryEl.addEventListener("change", refreshModelOptions);
     updateModelUiState();
 

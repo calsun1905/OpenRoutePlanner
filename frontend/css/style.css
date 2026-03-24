@@ -27,6 +27,7 @@
 
     /* Spacing */
     --sidebar-width: 380px;
+    --chat-panel-width: 360px;
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
@@ -82,7 +83,7 @@ body {
     position: absolute;
     top: 0;
     left: var(--sidebar-width);
-    right: 0;
+    right: var(--chat-panel-width);
     bottom: 0;
     z-index: 1;
     background-color: #e5e5e5;
@@ -136,6 +137,88 @@ body {
     color: var(--text-muted);
     font-weight: 400;
     letter-spacing: 0.5px;
+}
+
+/* --- Right LLM Panel --- */
+.right-chat-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: var(--chat-panel-width);
+    height: 100vh;
+    background: var(--bg-secondary);
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    transition: transform var(--transition-normal);
+}
+
+.right-chat-header {
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.right-chat-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.right-chat-header h2 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.right-chat-header p {
+    margin: 6px 0 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.right-chat-session-controls {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.right-chat-expand-btn {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 1010;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--radius-sm);
+    background: var(--bg-glass);
+    color: var(--text-primary);
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    display: none;
+}
+
+body.chat-panel-collapsed #map {
+    right: 0;
+}
+
+body.chat-panel-collapsed .right-chat-panel {
+    transform: translateX(calc(100% + 10px));
+}
+
+body.chat-panel-collapsed .right-chat-expand-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* --- Sections --- */
@@ -691,7 +774,7 @@ body {
 .toast-container {
     position: fixed;
     bottom: 158px; /* Weather widget ile cakismasin */
-    right: 14px;
+    right: calc(var(--chat-panel-width) + 14px);
     z-index: 10000;
     display: flex;
     flex-direction: column-reverse;
@@ -939,6 +1022,7 @@ body {
 @media (max-width: 768px) {
     :root {
         --sidebar-width: 100%;
+        --chat-panel-width: min(92vw, 420px);
     }
 
     .sidebar {
@@ -951,15 +1035,44 @@ body {
     #map {
         position: relative;
         left: 0;
+        right: 0;
         height: 55vh;
     }
 
-    body {
-        overflow-y: auto;
+    .right-chat-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: var(--chat-panel-width);
+        height: 100dvh;
+        max-height: none;
+        border-left: 1px solid rgba(255, 255, 255, 0.06);
+        border-top: none;
+        padding: 12px;
+        transform: translateX(calc(100% + 10px));
+        box-shadow: -8px 0 30px rgba(0, 0, 0, 0.35);
+        z-index: 1100;
+    }
+
+    body.chat-panel-mobile-open .right-chat-panel {
+        transform: translateX(0);
+    }
+
+    .right-chat-expand-btn {
+        display: inline-flex;
+        z-index: 1110;
+    }
+
+    body.chat-panel-collapsed .right-chat-expand-btn {
+        display: inline-flex;
     }
 
     .toast-container {
         bottom: 118px;
+        right: 10px;
+    }
+
+    .weather-widget {
         right: 10px;
     }
 }
@@ -1888,11 +2001,165 @@ body {
     font-size: 0.9rem;
 }
 
+/* --- Main LLM Chat Panel --- */
+.llm-chat-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.llm-mode-switch,
+.llm-provider-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.llm-mode-switch label,
+.llm-provider-switch label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.llm-mode-panels {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+
+.llm-mode-panel {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    padding: 8px 10px;
+    opacity: 0.7;
+    transition: all var(--transition-fast);
+}
+
+.llm-mode-panel.active {
+    opacity: 1;
+    border-color: rgba(0, 206, 201, 0.35);
+    color: var(--text-secondary);
+}
+
+.llm-manual-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+
+.llm-manual-controls select,
+.llm-manual-controls input {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: 0.82rem;
+}
+
+body.chat-panel-collapsed .toast-container {
+    right: 14px;
+}
+
+#mainLlmSessionSelect {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: 0.82rem;
+}
+
+.llm-manual-controls select:disabled,
+.llm-manual-controls input:disabled {
+    opacity: 0.55;
+}
+
+.llm-status-line {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+}
+
+.llm-chat-log {
+    min-height: 180px;
+    max-height: 360px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    padding: 8px;
+}
+
+.llm-msg {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.llm-msg-user {
+    background: rgba(0, 206, 201, 0.08);
+    border-color: rgba(0, 206, 201, 0.28);
+}
+
+.llm-msg-assistant {
+    background: rgba(108, 92, 231, 0.08);
+    border-color: rgba(108, 92, 231, 0.28);
+}
+
+.llm-msg-meta {
+    margin-top: 5px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.llm-composer {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+
+.llm-input {
+    width: 100%;
+    min-height: 64px;
+    max-height: 140px;
+    resize: vertical;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    padding: 10px 12px;
+    font-size: 0.82rem;
+    font-family: 'Inter', sans-serif;
+}
+
+.llm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
 /* --- Weather Widget --- */
 .weather-widget {
     position: absolute;
     bottom: 70px;
-    right: 10px;
+    right: calc(var(--chat-panel-width) + 10px);
     z-index: 1000;
     background: var(--bg-glass);
     backdrop-filter: blur(12px);
@@ -1905,6 +2172,10 @@ body {
     opacity: 1;
     transition: opacity 1.2s ease, border-color var(--transition-fast);
     pointer-events: auto;
+}
+
+body.chat-panel-collapsed .weather-widget {
+    right: 10px;
 }
 
 .weather-widget.auto-hide {

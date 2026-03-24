@@ -1,7 +1,7 @@
 /**
- * app.js — OpenTrip Frontend Application
+ * app.js Ã¢â‚¬â€ OpenTrip Frontend Application
  *
- * Harita etkileşimi, API iletişimi, rota gösterimi ve POI arama.
+ * Harita etkileÃ…Å¸imi, API iletiÃ…Å¸imi, rota gÃƒÂ¶sterimi ve POI arama.
  */
 
 // ========== CONFIG ==========
@@ -11,7 +11,7 @@ const API_BASE = "/api";
 let selectedPoints = [];
 let markers = [];
 let routePolyline = null;
-let routeGlowPolylines = [];  // Glow efektleri için ayrı takip
+let routeGlowPolylines = [];  // Glow efektleri iÃƒÂ§in ayrÃ„Â± takip
 let poiMarkers = [];
 let lastPoiSearch = null;
 let currentRouteData = null;
@@ -21,12 +21,12 @@ let currentNlpResult = null;
 // ========== MAP INIT ==========
 const map = L.map("map", {
     zoomControl: false,
-}).setView([40.9903, 29.0291], 14); // Kadıköy merkez
+}).setView([40.9903, 29.0291], 14); // KadÃ„Â±kÃƒÂ¶y merkez
 
-// Custom zoom control (sağ üste)
+// Custom zoom control (saÃ„Å¸ ÃƒÂ¼ste)
 L.control.zoom({ position: "topright" }).addTo(map);
 
-// Tile Layer — OpenStreetMap Standard (Canlı, detaylı, dükkanlar görünür)
+// Tile Layer Ã¢â‚¬â€ OpenStreetMap Standard (CanlÃ„Â±, detaylÃ„Â±, dÃƒÂ¼kkanlar gÃƒÂ¶rÃƒÂ¼nÃƒÂ¼r)
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
@@ -58,6 +58,26 @@ const elNlpInput = document.getElementById("nlpInput");
 const elBtnNLP = document.getElementById("btnNLP");
 const elNlpResults = document.getElementById("nlpResults");
 const elNlpLoading = document.getElementById("nlpLoading");
+const elMainLlmBox = document.getElementById("mainLlmBox");
+const elMainLlmProviderRadios = Array.from(document.querySelectorAll("input[name='mainLlmProvider']"));
+const elMainLlmModeRadios = Array.from(document.querySelectorAll("input[name='mainLlmMode']"));
+const elMainLlmAutoPanel = document.getElementById("mainLlmAutoPanel");
+const elMainLlmManualPanel = document.getElementById("mainLlmManualPanel");
+const elMainLlmCategory = document.getElementById("mainLlmCategory");
+const elMainLlmModelSelect = document.getElementById("mainLlmModelSelect");
+const elMainLlmCustomModel = document.getElementById("mainLlmCustomModel");
+const elMainLlmStatusText = document.getElementById("mainLlmStatusText");
+const elMainLlmActiveModel = document.getElementById("mainLlmActiveModel");
+const elMainLlmChatLog = document.getElementById("mainLlmChatLog");
+const elMainLlmInput = document.getElementById("mainLlmInput");
+const elMainLlmSend = document.getElementById("mainLlmSend");
+const elMainLlmClear = document.getElementById("mainLlmClear");
+const elMainLlmSessionSelect = document.getElementById("mainLlmSessionSelect");
+const elMainLlmNewSession = document.getElementById("mainLlmNewSession");
+const elMainLlmArchiveSession = document.getElementById("mainLlmArchiveSession");
+const elRightChatPanel = document.getElementById("rightChatPanel");
+const elRightChatCollapse = document.getElementById("rightChatCollapse");
+const elRightChatExpand = document.getElementById("rightChatExpand");
 const elBtnShowAlternatives = document.getElementById("btnShowAlternatives");
 const elAlternativesPanel = document.getElementById("alternativesPanel");
 const elAlternativesList = document.getElementById("alternativesList");
@@ -112,7 +132,7 @@ function createPoiIcon(emoji) {
     });
 }
 
-// Helper: geçerli bir alan değeri mi? (undefined/null/''/'nan' ise geçersiz say)
+// Helper: geÃƒÂ§erli bir alan deÃ„Å¸eri mi? (undefined/null/''/'nan' ise geÃƒÂ§ersiz say)
 function isValidField(v) {
     return v !== undefined && v !== null && String(v).trim() !== '' && String(v).toLowerCase() !== 'nan';
 }
@@ -127,7 +147,7 @@ function addPoint(lat, lng) {
     const index = selectedPoints.length;
     selectedPoints.push([lat, lng]);
 
-    // Hava durumu widget'ını bu noktaya göre güncelle
+    // Hava durumu widget'Ã„Â±nÃ„Â± bu noktaya gÃƒÂ¶re gÃƒÂ¼ncelle
     fetchWeatherWidget(lat, lng);
 
     // Marker ekle
@@ -135,7 +155,7 @@ function addPoint(lat, lng) {
         icon: createNumberedIcon(index + 1),
     }).addTo(map);
 
-    // Sağ tıklama menüsü - Konumu Kaydet
+    // SaÃ„Å¸ tÃ„Â±klama menÃƒÂ¼sÃƒÂ¼ - Konumu Kaydet
     marker.on('contextmenu', function (e) {
         openSaveLocationModal(lat, lng, `Nokta ${index + 1}`);
     });
@@ -147,7 +167,7 @@ function addPoint(lat, lng) {
             data-lat="${lat}"
             data-lng="${lng}"
             data-label="Nokta ${index + 1}">
-            ?? Konumu Kaydet
+            \u{1F4BE} Konumu Kaydet
          </button>`
     );
 
@@ -160,12 +180,12 @@ function addPoint(lat, lng) {
 }
 
 function removePoint(index) {
-    // Marker'ı kaldır
+    // Marker'Ã„Â± kaldÃ„Â±r
     map.removeLayer(markers[index]);
     markers.splice(index, 1);
     selectedPoints.splice(index, 1);
 
-    // Marker numaralarını güncelle
+    // Marker numaralarÃ„Â±nÃ„Â± gÃƒÂ¼ncelle
     markers.forEach((m, i) => {
         m.setIcon(createNumberedIcon(i + 1));
         m.setPopupContent(
@@ -177,7 +197,7 @@ function removePoint(index) {
     updateButtons();
     clearRoute();
 
-    // Son kalan noktanın hava durumunu göster, yoksa harita merkezi
+    // Son kalan noktanÃ„Â±n hava durumunu gÃƒÂ¶ster, yoksa harita merkezi
     if (selectedPoints.length > 0) {
         const last = selectedPoints[selectedPoints.length - 1];
         fetchWeatherWidget(last[0], last[1]);
@@ -194,9 +214,9 @@ function clearAllPoints() {
     updatePointsList();
     updateButtons();
     clearRoute();
-    showToast("Tüm noktalar silindi", "info");
+    showToast("TÃƒÂ¼m noktalar silindi", "info");
 
-    // Noktalar temizlenince harita merkezine geri dön
+    // Noktalar temizlenince harita merkezine geri dÃƒÂ¶n
     const center = map.getCenter();
     fetchWeatherWidget(center.lat, center.lng);
 }
@@ -249,21 +269,21 @@ function handleDrop(e, targetIndex) {
         return;
     }
 
-    // Array'de yer değiştir
+    // Array'de yer deÃ„Å¸iÃ…Å¸tir
     const draggedPoint = selectedPoints.splice(draggedIndex, 1)[0];
     selectedPoints.splice(targetIndex, 0, draggedPoint);
 
-    // Marker'ları da güncelle
+    // Marker'larÃ„Â± da gÃƒÂ¼ncelle
     const draggedMarker = markers.splice(draggedIndex, 1)[0];
     markers.splice(targetIndex, 0, draggedMarker);
 
-    // UI güncelle
+    // UI gÃƒÂ¼ncelle
     updatePointsList();
 
-    // Eğer rota varsa, rota sırasını güncelle
+    // EÃ„Å¸er rota varsa, rota sÃ„Â±rasÃ„Â±nÃ„Â± gÃƒÂ¼ncelle
     if (currentRouteData) {
         clearRoute();
-        showToast('Nokta sırası değiştirildi. Rota için tekrar hesaplayın.', 'info');
+        showToast('Nokta sÃ„Â±rasÃ„Â± deÃ„Å¸iÃ…Å¸tirildi. Rota iÃƒÂ§in tekrar hesaplayÃ„Â±n.', 'info');
     }
 }
 
@@ -271,7 +291,7 @@ function updatePointsList() {
     elPointCount.textContent = selectedPoints.length;
 
     if (selectedPoints.length === 0) {
-        elPointsList.innerHTML = `<div class="empty-state"><p>Haritaya tıklayarak nokta ekleyin</p></div>`;
+        elPointsList.innerHTML = `<div class="empty-state"><p>Haritaya tÃ„Â±klayarak nokta ekleyin</p></div>`;
         return;
     }
 
@@ -284,7 +304,7 @@ function updatePointsList() {
                  ondragover="handleDragOver(event)"
                  ondragleave="handleDragLeave(event)"
                  ondrop="handleDrop(event, ${i})">
-                <div class="drag-handle" title="Sıralamak için sürükle">
+                <div class="drag-handle" title="SÃ„Â±ralamak iÃƒÂ§in sÃƒÂ¼rÃƒÂ¼kle">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                         <circle cx="9" cy="6" r="1.5"/>
                         <circle cx="15" cy="6" r="1.5"/>
@@ -317,13 +337,13 @@ function updateButtons() {
 // ========== ROUTE CALCULATION ==========
 async function calculateRoute() {
     if (selectedPoints.length < 2) {
-        showToast("En az 2 nokta seçmelisiniz!", "error");
+        showToast("En az 2 nokta seÃƒÂ§melisiniz!", "error");
         return;
     }
 
-    showLoading("Rota hesaplanıyor...\nHarita verisi ilk kez indiriliyorsa biraz zaman alabilir.");
+    showLoading("Rota hesaplanÃ„Â±yor...\nHarita verisi ilk kez indiriliyorsa biraz zaman alabilir.");
 
-    const optimize = false; // TSP optimizasyonu devre dışı
+    const optimize = false; // TSP optimizasyonu devre dÃ„Â±Ã…Å¸Ã„Â±
 
     try {
         const response = await fetch(`${API_BASE}/get-route`, {
@@ -345,14 +365,14 @@ async function calculateRoute() {
         drawRoute(data);
         showRouteInfo(data);
         await fetchRouteSteps();
-        updateButtons();  // Buton durumlarını güncelle
-        showToast("Rota başarıyla hesaplandı! ?", "success");
+        updateButtons();  // Buton durumlarÃ„Â±nÃ„Â± gÃƒÂ¼ncelle
+        showToast("Rota baÃ…Å¸arÃ„Â±yla hesaplandÃ„Â±! \u{2705}", "success");
 
-        // Hava durumu uyarılarını göster (arka planda, rotayı engelleme)
+        // Hava durumu uyarÃ„Â±larÃ„Â±nÃ„Â± gÃƒÂ¶ster (arka planda, rotayÃ„Â± engelleme)
         checkRouteWeatherAndShowBanner(selectedPoints);
 
     } catch (error) {
-        console.error("Rota hesaplama hatası:", error);
+        console.error("Rota hesaplama hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -364,7 +384,7 @@ function drawRoute(data) {
 
     if (!data.route_coords || data.route_coords.length === 0) return;
 
-    // Rota çizgisini çiz — gradient efektli
+    // Rota ÃƒÂ§izgisini ÃƒÂ§iz Ã¢â‚¬â€ gradient efektli
     routePolyline = L.polyline(data.route_coords, {
         color: "#6c5ce7",
         weight: 5,
@@ -373,7 +393,7 @@ function drawRoute(data) {
         dashArray: null,
     }).addTo(map);
 
-    // Rota çizgisi üstüne glow efekti
+    // Rota ÃƒÂ§izgisi ÃƒÂ¼stÃƒÂ¼ne glow efekti
     const glow = L.polyline(data.route_coords, {
         color: "#a594f9",
         weight: 10,
@@ -382,7 +402,7 @@ function drawRoute(data) {
     }).addTo(map);
     routeGlowPolylines.push(glow);
 
-    // Haritayı rotaya sığdır
+    // HaritayÃ„Â± rotaya sÃ„Â±Ã„Å¸dÃ„Â±r
     map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
 }
 
@@ -392,7 +412,7 @@ function clearRoute() {
         routePolyline = null;
     }
 
-    // Glow katmanlarını temizle (routeGlowPolylines takip listesiyle)
+    // Glow katmanlarÃ„Â±nÃ„Â± temizle (routeGlowPolylines takip listesiyle)
     routeGlowPolylines.forEach(layer => map.removeLayer(layer));
     routeGlowPolylines = [];
 
@@ -414,8 +434,8 @@ function showRouteInfo(data) {
 
 // ========== POI SEARCH ==========
 /**
- * POI buton metninden (örn. "🏛️ Belediye") harita işareti emojisi ve Türkçe etiket üretir.
- * index.html'deki data-category API'ye gider; emoji/etiket butonun ilk satırından okunur.
+ * POI buton metninden (ÃƒÂ¶rn. "ÄŸÅ¸Ââ€ºÃ¯Â¸Â Belediye") harita iÃ…Å¸areti emojisi ve TÃƒÂ¼rkÃƒÂ§e etiket ÃƒÂ¼retir.
+ * index.html'deki data-category API'ye gider; emoji/etiket butonun ilk satÃ„Â±rÃ„Â±ndan okunur.
  */
 function parsePoiButtonLabel(buttonText) {
     const raw = (buttonText || "").trim();
@@ -475,7 +495,7 @@ async function searchPois(category, markerEmoji, markerLabel, opts = {}) {
     // Yeni dropdown'lardan veri al
     const province = elProvinceSelect.value;
     const districtRaw = (elDistrictSelect.value || "").trim();
-    const districtNorm = districtRaw.toLocaleLowerCase("tr-TR").replace(/ç/g, "c").replace(/ş/g, "s").replace(/ı/g, "i").replace(/İ/g, "i");
+    const districtNorm = districtRaw.toLocaleLowerCase("tr-TR").replace(/ÃƒÂ§/g, "c").replace(/Ã…Å¸/g, "s").replace(/Ã„Â±/g, "i").replace(/Ã„Â°/g, "i");
     const district = districtNorm.includes("ilce secin") ? "" : districtRaw;
 
     // Eger il secilmemisse uyari ver
@@ -552,7 +572,7 @@ function displayPois(pois, category, markerEmoji, markerLabel) {
             icon: createPoiIcon(emoji),
         }).addTo(map);
 
-        // Zengin popup kartı oluştur
+        // Zengin popup kartÃ„Â± oluÃ…Å¸tur
         const popupContent = buildPoiPopup(poi, emoji, label);
         marker.bindPopup(popupContent, {
             maxWidth: 280,
@@ -569,7 +589,7 @@ function displayPois(pois, category, markerEmoji, markerLabel) {
 function buildPoiPopup(poi, emoji, label) {
     let html = `<div class="poi-card">`;
 
-    // Başlık
+    // BaÃ…Å¸lÃ„Â±k
     html += `<div class="poi-card-header">`;
     html += `<span class="poi-card-emoji">${emoji}</span>`;
     html += `<div>`;
@@ -578,7 +598,7 @@ function buildPoiPopup(poi, emoji, label) {
     html += `</div>`;
     html += `</div>`;
 
-    // Açıklama
+    // AÃƒÂ§Ã„Â±klama
     if (poi.description) {
         html += `<p class="poi-card-desc">${poi.description}</p>`;
     }
@@ -620,13 +640,13 @@ function clearPois() {
     poiMarkers = [];
     elBtnClearPois.style.display = "none";
 
-    // POI butonlarının active sınıfını kaldır
+    // POI butonlarÃ„Â±nÃ„Â±n active sÃ„Â±nÃ„Â±fÃ„Â±nÃ„Â± kaldÃ„Â±r
     document.querySelectorAll(".btn-poi").forEach((btn) => btn.classList.remove("active"));
 }
 
 // ========== LOADING ==========
 function showLoading(text) {
-    elLoadingText.textContent = text || "Yükleniyor...";
+    elLoadingText.textContent = text || "YÃƒÂ¼kleniyor...";
     elLoadingOverlay.style.display = "flex";
 }
 
@@ -641,7 +661,7 @@ function showToast(message, type = "info") {
     toast.textContent = message;
     elToastContainer.appendChild(toast);
 
-    // 3 saniye sonra kaldır
+    // 3 saniye sonra kaldÃ„Â±r
     setTimeout(() => {
         toast.style.opacity = "0";
         toast.style.transform = "translateX(40px)";
@@ -694,13 +714,13 @@ locationIconBtns.forEach(btn => {
     });
 });
 
-// POI butonları
+// POI butonlarÃ„Â±
 document.querySelectorAll(".btn-poi").forEach((btn) => {
     btn.addEventListener("click", function () {
         const category = this.dataset.category;
         const { emoji: markerEmoji, label: markerLabel } = parsePoiButtonLabel(this.textContent);
 
-        // Toggle active sınıfı
+        // Toggle active sÃ„Â±nÃ„Â±fÃ„Â±
         document.querySelectorAll(".btn-poi").forEach((b) => b.classList.remove("active"));
         this.classList.add("active");
 
@@ -708,24 +728,24 @@ document.querySelectorAll(".btn-poi").forEach((btn) => {
     });
 });
 
-// İlk bildirim
-showToast("Haritaya tıklayarak başlayın! ???", "info");
+// Ã„Â°lk bildirim
+showToast("Haritaya tÃ„Â±klayarak baÃ…Å¸layÃ„Â±n! \u{1F5FA}\u{FE0F}", "info");
 
-// Kaydedilmiş rotaları ve yerleri yükle
+// KaydedilmiÃ…Å¸ rotalarÃ„Â± ve yerleri yÃƒÂ¼kle
 loadSavedRoutes();
 loadSavedLocations();
 
-// Hava durumu widget'inı başlat
+// Hava durumu widget'inÃ„Â± baÃ…Å¸lat
 initWeatherWidget();
 
 // ========== PLACE SEARCH (GEOCODING) ==========
 
-// Debounce: yazmayı bitirdikten sonra öneri isteği at
-// İyileştirme: Request cancellation + adaptive delay
+// Debounce: yazmayÃ„Â± bitirdikten sonra ÃƒÂ¶neri isteÃ„Å¸i at
+// Ã„Â°yileÃ…Å¸tirme: Request cancellation + adaptive delay
 let suggestDebounceTimer = null;
 let suggestAbortController = null;
 const SUGGEST_DELAY_MS = 400;
-const SUGGEST_DELAY_MS_SHORT = 200;  // Kısa sorgular için daha hızlı
+const SUGGEST_DELAY_MS_SHORT = 200;  // KÃ„Â±sa sorgular iÃƒÂ§in daha hÃ„Â±zlÃ„Â±
 
 elPlaceSearchInput.addEventListener("input", function () {
     const query = elPlaceSearchInput.value.trim();
@@ -734,20 +754,20 @@ elPlaceSearchInput.addEventListener("input", function () {
         elSearchResults.style.display = "none";
         clearTimeout(suggestDebounceTimer);
         if (suggestAbortController) {
-            suggestAbortController.abort();  // Bekleyen isteği iptal et
+            suggestAbortController.abort();  // Bekleyen isteÃ„Å¸i iptal et
         }
         return;
     }
 
-    // Önceki isteği iptal et
+    // Ãƒâ€“nceki isteÃ„Å¸i iptal et
     if (suggestAbortController) {
         suggestAbortController.abort();
     }
 
-    // Yeni AbortController oluştur
+    // Yeni AbortController oluÃ…Å¸tur
     suggestAbortController = new AbortController();
 
-    // Adaptive delay: kısa sorgular daha hızlı, uzun sorgular daha yavaş
+    // Adaptive delay: kÃ„Â±sa sorgular daha hÃ„Â±zlÃ„Â±, uzun sorgular daha yavaÃ…Å¸
     const delay = query.length < 4 ? SUGGEST_DELAY_MS_SHORT : SUGGEST_DELAY_MS;
 
     clearTimeout(suggestDebounceTimer);
@@ -757,7 +777,7 @@ elPlaceSearchInput.addEventListener("input", function () {
     );
 });
 
-// Enter tuşu ile tam arama
+// Enter tuÃ…Å¸u ile tam arama
 elPlaceSearchInput.addEventListener("keypress", function (e) {
     if (e.key === "Enter") {
         searchPlace();
@@ -772,7 +792,7 @@ elNlpInput.addEventListener("keypress", function (e) {
     }
 });
 
-// Dışarı tıklanınca önerileri kapat
+// DÃ„Â±Ã…Å¸arÃ„Â± tÃ„Â±klanÃ„Â±nca ÃƒÂ¶nerileri kapat
 document.addEventListener("click", function (e) {
     if (!elPlaceSearchInput.contains(e.target) && !elSearchResults.contains(e.target)) {
         elSearchResults.style.display = "none";
@@ -780,8 +800,8 @@ document.addEventListener("click", function (e) {
 });
 
 /**
- * Yazarken öneri listesi getirir (autocomplete)
- * İyileştirme: AbortController ile request cancellation
+ * Yazarken ÃƒÂ¶neri listesi getirir (autocomplete)
+ * Ã„Â°yileÃ…Å¸tirme: AbortController ile request cancellation
  */
 async function fetchSuggestions(query, signal = null) {
     try {
@@ -797,12 +817,12 @@ async function fetchSuggestions(query, signal = null) {
         elSearchResults.style.display = "block";
         elSearchResults.innerHTML = data.suggestions.map((s) => `
             <div class="search-result-item search-suggestion-item" data-lat="${s.lat}" data-lon="${s.lon}">
-                <div class="search-result-name">?? ${escapeHtml(s.display_name)}</div>
+                <div class="search-result-name">\u{1F4CD} ${escapeHtml(s.display_name)}</div>
                 <div class="search-result-coords">${s.lat.toFixed(5)}, ${s.lon.toFixed(5)}</div>
             </div>
         `).join("");
 
-        // Öneri tıklama
+        // Ãƒâ€“neri tÃ„Â±klama
         elSearchResults.querySelectorAll(".search-suggestion-item").forEach((el) => {
             el.addEventListener("click", () => {
                 const lat = parseFloat(el.dataset.lat);
@@ -814,11 +834,11 @@ async function fetchSuggestions(query, signal = null) {
             });
         });
     } catch (err) {
-        // AbortError ise sessizce geç (kullanıcı hala yazıyor)
+        // AbortError ise sessizce geÃƒÂ§ (kullanÃ„Â±cÃ„Â± hala yazÃ„Â±yor)
         if (err.name === 'AbortError') {
             return;
         }
-        console.error("Öneri hatası:", err);
+        console.error("Ãƒâ€“neri hatasÃ„Â±:", err);
         elSearchResults.style.display = "none";
     }
 }
@@ -830,16 +850,16 @@ async function searchPlace() {
     const query = elPlaceSearchInput.value.trim();
 
     if (!query) {
-        showToast("Lütfen bir yer ismi girin", "error");
+        showToast("LÃƒÂ¼tfen bir yer ismi girin", "error");
         return;
     }
 
     if (query.length < 2) {
-        showToast("Arama terimi çok kısa", "error");
+        showToast("Arama terimi ÃƒÂ§ok kÃ„Â±sa", "error");
         return;
     }
 
-    showLoading("Yer aranıyor...");
+    showLoading("Yer aranÃ„Â±yor...");
 
     try {
         const response = await fetch(`${API_BASE}/geocode`, {
@@ -851,14 +871,14 @@ async function searchPlace() {
         const data = await response.json();
 
         if (!response.ok || data.status === "error") {
-            throw new Error(data.message || "Yer bulunamadı");
+            throw new Error(data.message || "Yer bulunamadÃ„Â±");
         }
 
         displaySearchResult(data);
         showToast(`Bulundu: ${data.display_name}`, "success");
 
     } catch (error) {
-        console.error("Geocoding hatası:", error);
+        console.error("Geocoding hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
         elSearchResults.style.display = "none";
     } finally {
@@ -867,7 +887,7 @@ async function searchPlace() {
 }
 
 /**
- * Arama sonucunu gösterir
+ * Arama sonucunu gÃƒÂ¶sterir
  */
 function displaySearchResult(data) {
     elSearchResults.style.display = "block";
@@ -876,14 +896,14 @@ function displaySearchResult(data) {
 
     elSearchResults.innerHTML = `
         <div class="search-result-item">
-            <div class="search-result-name">?? ${escapeHtml(displayName)}</div>
+            <div class="search-result-name">\u{1F4CD} ${escapeHtml(displayName)}</div>
             <div class="search-result-coords">${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}</div>
             <button
                 class="btn btn-ghost btn-sm"
                 data-action="save-location"
                 style="margin-top:5px; width: 100%; border: 1px solid rgba(255,255,255,0.1);"
             >
-                ?? Bu Konumu Kaydet
+                \u{1F4BE} Bu Konumu Kaydet
             </button>
         </div>
     `;
@@ -902,16 +922,16 @@ function displaySearchResult(data) {
 }
 
 /**
- * Arama sonucuna tıklanınca haritaya ekler
+ * Arama sonucuna tÃ„Â±klanÃ„Â±nca haritaya ekler
  */
 function selectSearchResult(lat, lon, name) {
-    // Haritayı o noktaya odakla
+    // HaritayÃ„Â± o noktaya odakla
     map.setView([lat, lon], 16);
 
-    // Noktayı ekle
+    // NoktayÃ„Â± ekle
     addPoint(lat, lon);
 
-    // Input ve sonuçları temizle
+    // Input ve sonuÃƒÂ§larÃ„Â± temizle
     elPlaceSearchInput.value = "";
     elSearchResults.style.display = "none";
 
@@ -919,7 +939,7 @@ function selectSearchResult(lat, lon, name) {
 }
 
 /**
- * HTML kaçış karakterleri
+ * HTML kaÃƒÂ§Ã„Â±Ã…Å¸ karakterleri
  */
 function escapeHtml(text) {
     const div = document.createElement("div");
@@ -939,7 +959,7 @@ async function geocodePlaceName(placeName) {
 
     const data = await response.json();
     if (!response.ok || data.status === "error") {
-        throw new Error(data.message || `"${placeName}" bulunamadı`);
+        throw new Error(data.message || `"${placeName}" bulunamadÃ„Â±`);
     }
 
     return data;
@@ -952,18 +972,18 @@ function setNlpLoading(isLoading) {
 
 function buildNlpSummary(result) {
     if (result.type === "route") {
-        return `${escapeHtml(result.origin || "?" )} › ${escapeHtml(result.destination || "?")}`;
+        return `${escapeHtml(result.origin || "?" )} Ã¢â‚¬Âº ${escapeHtml(result.destination || "?")}`;
     }
     if (result.type === "multi") {
-        return (result.locations || []).map(escapeHtml).join(" › ");
+        return (result.locations || []).map(escapeHtml).join(" Ã¢â‚¬Âº ");
     }
     if (result.type === "poi") {
-        return `${escapeHtml(result.location || "Bilinmeyen konum")} için mekan araması`;
+        return `${escapeHtml(result.location || "Bilinmeyen konum")} iÃƒÂ§in mekan aramasÃ„Â±`;
     }
     if (result.type === "single") {
-        return `${escapeHtml(result.destination || "Bilinmeyen hedef")} hedef olarak algılandı`;
+        return `${escapeHtml(result.destination || "Bilinmeyen hedef")} hedef olarak algÃ„Â±landÃ„Â±`;
     }
-    return escapeHtml(result.error || "Sorgu anlaşılamadı");
+    return escapeHtml(result.error || "Sorgu anlaÃ…Å¸Ã„Â±lamadÃ„Â±");
 }
 
 function renderNlpResults(result) {
@@ -971,7 +991,7 @@ function renderNlpResults(result) {
 
     const confidence = typeof result.confidence === "number"
         ? `%${Math.round(result.confidence * 100)}`
-        : "—";
+        : "Ã¢â‚¬â€";
 
     const detectedPlaces = Array.isArray(result.detected_places) ? result.detected_places : [];
     const placesHtml = detectedPlaces.length > 0
@@ -979,7 +999,7 @@ function renderNlpResults(result) {
             <div class="nlp-result-places">
                 ${detectedPlaces.map((item) => `
                     <span class="nlp-place-tag">
-                        ?? ${escapeHtml(item.place)}
+                        \u{1F4CD} ${escapeHtml(item.place)}
                     </span>
                 `).join("")}
             </div>
@@ -990,14 +1010,14 @@ function renderNlpResults(result) {
     if (result.type === "route" || result.type === "multi") {
         actions.push(`<button class="nlp-action-btn primary" data-action="apply-nlp">Haritaya Uygula</button>`);
     } else if ((result.type === "single" && result.destination) || (result.type === "poi" && result.location)) {
-        actions.push(`<button class="nlp-action-btn primary" data-action="focus-nlp">Haritada Göster</button>`);
+        actions.push(`<button class="nlp-action-btn primary" data-action="focus-nlp">Haritada GÃƒÂ¶ster</button>`);
     }
 
     elNlpResults.innerHTML = `
         <div class="nlp-result-item">
             <div class="nlp-result-type">${escapeHtml(result.type || "unknown")}</div>
             <div class="nlp-result-content">${buildNlpSummary(result)}</div>
-            <div class="nlp-result-confidence">Güven: ${confidence}</div>
+            <div class="nlp-result-confidence">GÃƒÂ¼ven: ${confidence}</div>
             ${placesHtml}
             ${actions.length > 0 ? `<div class="nlp-actions">${actions.join("")}</div>` : ""}
         </div>
@@ -1016,7 +1036,7 @@ async function analyzeNaturalLanguageQuery() {
     const query = elNlpInput.value.trim();
 
     if (!query) {
-        showToast("Lütfen bir sorgu girin", "error");
+        showToast("LÃƒÂ¼tfen bir sorgu girin", "error");
         return;
     }
 
@@ -1032,13 +1052,13 @@ async function analyzeNaturalLanguageQuery() {
 
         const data = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || "NLP analizi başarısız");
+            throw new Error(data.error || "NLP analizi baÃ…Å¸arÃ„Â±sÃ„Â±z");
         }
 
         renderNlpResults(data);
-        showToast(`AI analiz tamamlandı (${data.engine || "nlp"})`, "success");
+        showToast(`AI analiz tamamlandÃ„Â± (${data.engine || "nlp"})`, "success");
     } catch (error) {
-        console.error("NLP analizi hatası:", error);
+        console.error("NLP analizi hatasÃ„Â±:", error);
         elNlpResults.innerHTML = `<div class="nlp-error">${escapeHtml(error.message)}</div>`;
         elNlpResults.style.display = "block";
         showToast(`Hata: ${error.message}`, "error");
@@ -1061,11 +1081,11 @@ async function applyNlpResult() {
     }
 
     if (targetPlaces.length < 2) {
-        showToast("Uygulanacak yeterli konum bulunamadı", "error");
+        showToast("Uygulanacak yeterli konum bulunamadÃ„Â±", "error");
         return;
     }
 
-    showLoading("AI sonucu haritaya uygulanıyor...");
+    showLoading("AI sonucu haritaya uygulanÃ„Â±yor...");
 
     try {
         clearAllPoints();
@@ -1077,7 +1097,7 @@ async function applyNlpResult() {
 
         await calculateRoute();
     } catch (error) {
-        console.error("NLP uygulama hatası:", error);
+        console.error("NLP uygulama hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -1091,7 +1111,7 @@ async function focusNlpLocation() {
 
     const placeName = currentNlpResult.location || currentNlpResult.destination;
     if (!placeName) {
-        showToast("Gösterilecek konum bulunamadı", "error");
+        showToast("GÃƒÂ¶sterilecek konum bulunamadÃ„Â±", "error");
         return;
     }
 
@@ -1101,9 +1121,9 @@ async function focusNlpLocation() {
         const place = await geocodePlaceName(placeName);
         map.setView([place.lat, place.lon], 16);
         addPoint(place.lat, place.lon);
-        showToast(`"${placeName}" haritada gösterildi`, "success");
+        showToast(`"${placeName}" haritada gÃƒÂ¶sterildi`, "success");
     } catch (error) {
-        console.error("NLP konum gösterme hatası:", error);
+        console.error("NLP konum gÃƒÂ¶sterme hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -1111,20 +1131,830 @@ async function focusNlpLocation() {
 }
 
 
-// ========== ALTERNATIVE ROUTES ==========
+// ========== MAIN LLM CHAT (OPENROUTER/GEMINI) ==========
 
-/**
- * Alternatif rotaları gösterir
- */
-async function showAlternativeRoutes() {
-    if (selectedPoints.length < 2) {
-        showToast("En az 2 nokta seçmelisiniz!", "error");
+let mainLlmMessages = [];
+let mainLlmSessions = [];
+let mainLlmActiveSessionId = "";
+let mainLlmStreaming = false;
+let mainLlmStatusInfo = null;
+let mainLlmCurrentAttemptModel = "";
+const mainLlmManualCandidates = [];
+const MAIN_LLM_ACTIVE_SESSION_KEY = "opentrip.main_llm.active_session";
+
+const mainLlmKnownOkModels = new Set([
+    "arcee-ai/trinity-mini:free",
+    "arcee-ai/trinity-mini-20251201:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3-super-120b-a12b-20230311:free",
+    "stepfun/step-3.5-flash:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "google/gemma-3-12b-it:free",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-001",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro",
+]);
+
+const mainLlmKnownLimitModels = new Set([
+    "nousresearch/hermes-3-llama-3.1-405b:free",
+    "minimax/minimax-m2.5:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemma-3-27b-it:free",
+    "google/gemma-3n-e2b-it:free",
+    "google/gemma-3n-e4b-it:free",
+    "google/gemma-3-4b-it:free",
+    "openai/gpt-oss-20b:free",
+    "openai/gpt-oss-120b:free",
+    "qwen/qwen3-coder:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "z-ai/glm-4.5-air:free",
+    "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "qwen/qwen3-4b:free",
+]);
+
+const mainLlmKnownStalledModels = new Set([
+    "liquid/lfm-2.5-1.2b-thinking:free",
+    "liquid/lfm-2.5-1.2b-thinking-20260120:free",
+    "liquid/lfm-2.5-1.2b-instruct:free",
+]);
+
+const mainLlmKnownCreditModels = new Set([
+    "sourceful/riverflow-v2-pro",
+    "sourceful/riverflow-v2-fast",
+    "sourceful/riverflow-v2-max-preview",
+    "sourceful/riverflow-v2-standard-preview",
+    "sourceful/riverflow-v2-fast-preview",
+    "black-forest-labs/flux.2-klein-4b",
+    "black-forest-labs/flux.2-max",
+    "black-forest-labs/flux.2-flex",
+    "black-forest-labs/flux.2-pro",
+    "bytedance-seed/seedream-4.5",
+]);
+
+const mainLlmKnownEmbeddingModels = new Set([
+    "nvidia/llama-nemotron-embed-vl-1b-v2:free",
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+]);
+
+const mainLlmExtraKnownModels = [
+    "nousresearch/hermes-3-llama-3.1-405b:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "qwen/qwen3-4b:free",
+    "qwen/qwen3-coder:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "openai/gpt-oss-20b:free",
+    "openai/gpt-oss-120b:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemma-3-27b-it:free",
+    "google/gemma-3-12b-it:free",
+    "google/gemma-3-4b-it:free",
+    "google/gemma-3n-e2b-it:free",
+    "google/gemma-3n-e4b-it:free",
+    "stepfun/step-3.5-flash:free",
+    "arcee-ai/trinity-mini:free",
+    "arcee-ai/trinity-mini-20251201:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "nvidia/llama-nemotron-embed-vl-1b-v2:free",
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-001",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro",
+];
+
+const mainLlmMojibakeReplacements = {
+    "ÃƒÂ¼": "Ã¼",
+    "ÃƒÅ“": "Ãœ",
+    "ÃƒÂ¶": "Ã¶",
+    "Ãƒâ€“": "Ã–",
+    "ÃƒÂ§": "Ã§",
+    "Ãƒâ€¡": "Ã‡",
+    "Ã„Â±": "Ä±",
+    "Ã„Â°": "Ä°",
+    "Ã…Å¸": "ÅŸ",
+    "Ã…Å¾": "Å",
+    "Ã„Å¸": "ÄŸ",
+    "Ã„Å¾": "Ä",
+    "Ã¢â‚¬â„¢": "'",
+    "Ã¢â‚¬Ëœ": "'",
+    "Ã¢â‚¬Å“": '"',
+    "Ã¢â‚¬Â": '"',
+    "Ã¢â‚¬â€œ": "-",
+    "Ã¢â‚¬â€": "-",
+    "Ã¢â‚¬Â¦": "...",
+};
+
+function mainLlmRepairText(text) {
+    if (text === undefined || text === null) return "";
+    let out = String(text);
+    if (/[ÃÄÅâ]/.test(out)) {
+        try {
+            out = decodeURIComponent(escape(out));
+        } catch (_) {
+            // ignore
+        }
+    }
+    for (const [bad, good] of Object.entries(mainLlmMojibakeReplacements)) {
+        out = out.split(bad).join(good);
+    }
+    return out.replace(/Â/g, "").trim();
+}
+
+function mainLlmGetProvider() {
+    const checked = elMainLlmProviderRadios.find((radio) => radio.checked);
+    return checked ? checked.value : "openrouter";
+}
+
+function mainLlmGetMode() {
+    const checked = elMainLlmModeRadios.find((radio) => radio.checked);
+    return checked ? checked.value : "auto";
+}
+
+function mainLlmLocalCacheKey(sessionId) {
+    return `opentrip.main_llm.messages.${sessionId}`;
+}
+
+function mainLlmSaveLocalCache(sessionId) {
+    if (!sessionId) return;
+    try {
+        localStorage.setItem(mainLlmLocalCacheKey(sessionId), JSON.stringify(mainLlmMessages));
+        localStorage.setItem(MAIN_LLM_ACTIVE_SESSION_KEY, sessionId);
+    } catch (_) {
+        // ignore
+    }
+}
+
+function mainLlmLoadLocalCache(sessionId) {
+    if (!sessionId) return [];
+    try {
+        const raw = localStorage.getItem(mainLlmLocalCacheKey(sessionId));
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+            .filter((item) => item && (item.role === "user" || item.role === "assistant"))
+            .map((item) => ({
+                role: item.role,
+                content: mainLlmRepairText(item.content || ""),
+                model: mainLlmRepairText(item.model || ""),
+                token_total: item.token_total ?? null,
+                error_type: mainLlmRepairText(item.error_type || ""),
+                created_at: item.created_at || "",
+            }));
+    } catch (_) {
+        return [];
+    }
+}
+
+function mainLlmSetStatus(text) {
+    if (elMainLlmStatusText) {
+        elMainLlmStatusText.textContent = mainLlmRepairText(text || "-");
+    }
+}
+
+function mainLlmSetActiveModel(model, triedModels) {
+    if (!elMainLlmActiveModel) return;
+    const cleanedModel = mainLlmRepairText(model || "-");
+    const cleanedTried = Array.isArray(triedModels) ? triedModels.map((m) => mainLlmRepairText(m)) : [];
+    const tried = cleanedTried.length ? ` | denenen: ${cleanedTried.join(" -> ")}` : "";
+    elMainLlmActiveModel.textContent = `Aktif model: ${cleanedModel}${tried}`;
+}
+
+function mainLlmClassifyModel(model) {
+    const m = String(model || "").trim();
+    if (!m) return "other";
+    if (mainLlmKnownStalledModels.has(m)) return "stalled";
+    if (mainLlmKnownEmbeddingModels.has(m) || m.includes("embed")) return "embedding";
+    if (mainLlmKnownCreditModels.has(m)) return "credit";
+    if (mainLlmKnownOkModels.has(m)) return "ok";
+    if (mainLlmKnownLimitModels.has(m)) return "limit";
+    return "other";
+}
+
+function mainLlmSelectedManualModel() {
+    const customModel = String(elMainLlmCustomModel?.value || "").trim();
+    if (customModel) return customModel;
+    return String(elMainLlmModelSelect?.value || "").trim();
+}
+
+function mainLlmClassifyError(errorText) {
+    const txt = String(errorText || "").toLowerCase();
+    if (txt.includes("(429)") || txt.includes("rate-limit") || txt.includes("temporarily rate-limited")) return "limit";
+    if (txt.includes("(402)") || txt.includes("insufficient credits")) return "credit";
+    if (txt.includes("(400)") && (txt.includes("embedding model") || txt.includes("chat/completions endpoint"))) return "incompat";
+    if (txt.includes("(404)") && txt.includes("guardrail restrictions")) return "privacy";
+    return "other";
+}
+
+function mainLlmAppendMeta(target, text) {
+    if (!target || !text) return;
+    const meta = document.createElement("div");
+    meta.className = "llm-msg-meta";
+    meta.textContent = mainLlmRepairText(text);
+    target.appendChild(meta);
+}
+
+function mainLlmAddMessage(role, text) {
+    if (!elMainLlmChatLog) return null;
+    const msg = document.createElement("div");
+    msg.className = `llm-msg ${role === "user" ? "llm-msg-user" : "llm-msg-assistant"}`;
+    msg.textContent = mainLlmRepairText(text || "");
+    elMainLlmChatLog.appendChild(msg);
+    elMainLlmChatLog.scrollTop = elMainLlmChatLog.scrollHeight;
+    return msg;
+}
+
+function mainLlmRenderMessages() {
+    if (!elMainLlmChatLog) return;
+    elMainLlmChatLog.innerHTML = "";
+    mainLlmMessages.forEach((msg) => {
+        const box = mainLlmAddMessage(msg.role, msg.content || "");
+        if (box && (msg.model || msg.token_total !== null && msg.token_total !== undefined)) {
+            const model = mainLlmRepairText(msg.model || "-");
+            const token = msg.token_total === null || msg.token_total === undefined ? "-" : msg.token_total;
+            mainLlmAppendMeta(box, `model: ${model} | token: ${token}`);
+        }
+    });
+}
+
+function mainLlmUpdateModeUi() {
+    if (!elMainLlmBox) return;
+    const isManual = mainLlmGetMode() === "manual";
+
+    if (elMainLlmAutoPanel) {
+        elMainLlmAutoPanel.classList.toggle("active", !isManual);
+    }
+    if (elMainLlmManualPanel) {
+        elMainLlmManualPanel.classList.toggle("active", isManual);
+    }
+    elMainLlmProviderRadios.forEach((radio) => {
+        radio.disabled = mainLlmStreaming;
+    });
+    if (elMainLlmCategory) {
+        elMainLlmCategory.disabled = !isManual || mainLlmStreaming;
+    }
+    if (elMainLlmModelSelect) {
+        elMainLlmModelSelect.disabled = !isManual || mainLlmStreaming;
+    }
+    if (elMainLlmCustomModel) {
+        elMainLlmCustomModel.disabled = !isManual || mainLlmStreaming;
+    }
+    if (elMainLlmSessionSelect) {
+        elMainLlmSessionSelect.disabled = mainLlmStreaming;
+    }
+    if (elMainLlmNewSession) {
+        elMainLlmNewSession.disabled = mainLlmStreaming;
+    }
+    if (elMainLlmArchiveSession) {
+        elMainLlmArchiveSession.disabled = mainLlmStreaming || !mainLlmActiveSessionId;
+    }
+}
+
+function mainLlmRefreshModelOptions() {
+    if (!elMainLlmModelSelect || !elMainLlmCategory) return;
+
+    const currentSelected = elMainLlmModelSelect.value;
+    elMainLlmModelSelect.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Model sec...";
+    elMainLlmModelSelect.appendChild(placeholder);
+
+    const selectedCategory = elMainLlmCategory.value || "all";
+    const groups = {
+        ok: [],
+        stalled: [],
+        limit: [],
+        credit: [],
+        embedding: [],
+        other: [],
+    };
+    const labels = {
+        ok: "Sorunsuz Calisanlar",
+        stalled: "Tikananlar",
+        limit: "Limit Hatasi (429)",
+        credit: "Para/Kredi Gerektiren (402)",
+        embedding: "Embedding/VL (chat uyumsuz)",
+        other: "Diger/Belirsiz",
+    };
+
+    const unique = new Set();
+    const addModel = (model) => {
+        const m = String(model || "").trim();
+        if (!m || unique.has(m)) return;
+        unique.add(m);
+        groups[mainLlmClassifyModel(m)].push(m);
+    };
+
+    mainLlmManualCandidates.forEach(addModel);
+    mainLlmExtraKnownModels.forEach(addModel);
+    if (mainLlmStatusInfo) {
+        addModel(mainLlmStatusInfo.default_model);
+        (mainLlmStatusInfo.fallback_models || []).forEach(addModel);
+    }
+
+    ["ok", "stalled", "limit", "credit", "embedding", "other"].forEach((category) => {
+        if (selectedCategory !== "all" && selectedCategory !== category) return;
+        const items = groups[category];
+        if (!items.length) return;
+        items.sort();
+        const optGroup = document.createElement("optgroup");
+        optGroup.label = labels[category];
+        items.forEach((model) => {
+            const option = document.createElement("option");
+            option.value = model;
+            option.textContent = model;
+            optGroup.appendChild(option);
+        });
+        elMainLlmModelSelect.appendChild(optGroup);
+    });
+
+    if (currentSelected && [...elMainLlmModelSelect.options].some((o) => o.value === currentSelected)) {
+        elMainLlmModelSelect.value = currentSelected;
+    }
+}
+
+function mainLlmSortSessions(sessions) {
+    return [...sessions].sort((a, b) => {
+        const ad = Date.parse(a.updated_at || a.created_at || "") || 0;
+        const bd = Date.parse(b.updated_at || b.created_at || "") || 0;
+        return bd - ad;
+    });
+}
+
+function mainLlmPopulateSessionSelect() {
+    if (!elMainLlmSessionSelect) return;
+    elMainLlmSessionSelect.innerHTML = "";
+    mainLlmSortSessions(mainLlmSessions).forEach((session) => {
+        const option = document.createElement("option");
+        option.value = session.id;
+        const count = Number(session.message_count || 0);
+        const title = mainLlmRepairText(session.title || "Yeni Sohbet");
+        option.textContent = `${title} (${count})`;
+        elMainLlmSessionSelect.appendChild(option);
+    });
+    if (mainLlmActiveSessionId) {
+        elMainLlmSessionSelect.value = mainLlmActiveSessionId;
+    }
+}
+
+async function mainLlmLoadSessions(includeArchived = false) {
+    const url = `/api/llm/chat/sessions?include_archived=${includeArchived ? 1 : 0}&limit=500`;
+    const response = await fetch(url);
+    const payload = await response.json();
+    if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Oturumlar yuklenemedi");
+    }
+    mainLlmSessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+    mainLlmPopulateSessionSelect();
+}
+
+async function mainLlmCreateSession(title = "") {
+    const response = await fetch("/api/llm/chat/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload?.ok || !payload?.session?.id) {
+        throw new Error(payload?.error || "Yeni sohbet olusturulamadi");
+    }
+    mainLlmSessions = [payload.session, ...mainLlmSessions.filter((s) => s.id !== payload.session.id)];
+    return payload.session;
+}
+
+async function mainLlmLoadSessionMessages(sessionId) {
+    const response = await fetch(`/api/llm/chat/sessions/${encodeURIComponent(sessionId)}/messages`);
+    const payload = await response.json();
+    if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Mesaj gecmisi yuklenemedi");
+    }
+    const rows = Array.isArray(payload.messages) ? payload.messages : [];
+    mainLlmMessages = rows.map((msg) => ({
+        role: msg.role,
+        content: mainLlmRepairText(msg.content || ""),
+        model: mainLlmRepairText(msg.model || ""),
+        token_total: msg.token_total ?? null,
+        error_type: mainLlmRepairText(msg.error_type || ""),
+        created_at: msg.created_at || "",
+    }));
+    mainLlmRenderMessages();
+    mainLlmSaveLocalCache(sessionId);
+}
+
+async function mainLlmSetActiveSession(sessionId) {
+    mainLlmActiveSessionId = sessionId;
+    if (elMainLlmSessionSelect) {
+        elMainLlmSessionSelect.value = sessionId;
+    }
+    try {
+        await mainLlmLoadSessionMessages(sessionId);
+    } catch (error) {
+        mainLlmMessages = mainLlmLoadLocalCache(sessionId);
+        mainLlmRenderMessages();
+        throw error;
+    } finally {
+        mainLlmSaveLocalCache(sessionId);
+        mainLlmUpdateModeUi();
+    }
+}
+
+async function mainLlmEnsureActiveSession() {
+    await mainLlmLoadSessions(false);
+    const savedSession = localStorage.getItem(MAIN_LLM_ACTIVE_SESSION_KEY) || "";
+    let targetSession = "";
+    if (savedSession && mainLlmSessions.some((s) => s.id === savedSession)) {
+        targetSession = savedSession;
+    } else if (mainLlmSessions.length > 0) {
+        targetSession = mainLlmSortSessions(mainLlmSessions)[0].id;
+    } else {
+        const created = await mainLlmCreateSession("Yeni Sohbet");
+        targetSession = created.id;
+    }
+    await mainLlmSetActiveSession(targetSession);
+}
+
+async function mainLlmCreateAndSwitchSession(title = "") {
+    const created = await mainLlmCreateSession(title);
+    mainLlmPopulateSessionSelect();
+    await mainLlmSetActiveSession(created.id);
+}
+
+async function mainLlmArchiveCurrentSession() {
+    if (!mainLlmActiveSessionId) return;
+    const response = await fetch(
+        `/api/llm/chat/sessions/${encodeURIComponent(mainLlmActiveSessionId)}/archive`,
+        { method: "POST" }
+    );
+    const payload = await response.json();
+    if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "Oturum arsivlenemedi");
+    }
+    mainLlmSessions = mainLlmSessions.filter((s) => s.id !== mainLlmActiveSessionId);
+    if (mainLlmSessions.length === 0) {
+        await mainLlmCreateAndSwitchSession("Yeni Sohbet");
+    } else {
+        const nextSessionId = mainLlmSortSessions(mainLlmSessions)[0].id;
+        mainLlmPopulateSessionSelect();
+        await mainLlmSetActiveSession(nextSessionId);
+    }
+}
+
+function mainLlmToggleBusy(isBusy) {
+    mainLlmStreaming = isBusy;
+    if (elMainLlmInput) elMainLlmInput.disabled = isBusy;
+    if (elMainLlmSend) elMainLlmSend.disabled = isBusy;
+    if (elMainLlmClear) elMainLlmClear.disabled = isBusy;
+    elMainLlmModeRadios.forEach((radio) => {
+        radio.disabled = isBusy;
+    });
+    mainLlmUpdateModeUi();
+}
+
+function mainLlmPanelSetOpen(open) {
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    if (isMobile) {
+        document.body.classList.toggle("chat-panel-mobile-open", Boolean(open));
+    } else {
+        document.body.classList.toggle("chat-panel-collapsed", !open);
+    }
+    if (elRightChatExpand) {
+        elRightChatExpand.style.display = open ? "none" : "";
+    }
+}
+
+async function mainLlmCheckStatus() {
+    if (!elMainLlmBox) return;
+    const provider = mainLlmGetProvider();
+    const statusUrl = provider === "gemini"
+        ? "/api/llm/gemini/status"
+        : "/api/llm/openrouter/status";
+    try {
+        const response = await fetch(statusUrl);
+        const data = await response.json();
+        mainLlmStatusInfo = data;
+
+        mainLlmManualCandidates.length = 0;
+        if (data?.default_model) {
+            mainLlmManualCandidates.push(data.default_model);
+        }
+        if (Array.isArray(data?.fallback_models)) {
+            mainLlmManualCandidates.push(...data.fallback_models);
+        }
+        mainLlmRefreshModelOptions();
+
+        if (response.ok && data.available && data.configured) {
+            mainLlmSetStatus("Hazir");
+            mainLlmSetActiveModel(data.default_model, data.fallback_models || []);
+            if (elMainLlmModelSelect && !elMainLlmModelSelect.value && data.default_model) {
+                elMainLlmModelSelect.value = data.default_model;
+            }
+        } else if (response.ok && data.available && !data.configured) {
+            const msg = provider === "gemini"
+                ? "GEMINI_API_KEY / GOOGLE_API_KEY tanimli degil"
+                : "OPENROUTER_API_KEY tanimli degil";
+            mainLlmSetStatus(msg);
+            mainLlmSetActiveModel("-", []);
+        } else {
+            const svc = provider === "gemini" ? "Gemini" : "OpenRouter";
+            mainLlmSetStatus(`${svc} servisi hazir degil`);
+        }
+    } catch (error) {
+        mainLlmSetStatus("Sunucuya baglanilamadi");
+    }
+}
+
+async function mainLlmSendMessage() {
+    if (!elMainLlmBox || mainLlmStreaming) return;
+
+    const prompt = mainLlmRepairText(elMainLlmInput?.value || "");
+    if (!prompt) return;
+    if (!mainLlmActiveSessionId) {
+        await mainLlmEnsureActiveSession();
+    }
+
+    const isManual = mainLlmGetMode() === "manual";
+    const forcedModel = isManual ? mainLlmSelectedManualModel() : "";
+
+    if (isManual && !forcedModel) {
+        showToast("Manuel modda model sec veya yaz", "warning");
         return;
     }
 
-    showLoading("Alternatif rotalar hesaplanıyor...");
+    if (elMainLlmInput) elMainLlmInput.value = "";
+    mainLlmAddMessage("user", prompt);
+    mainLlmMessages.push({ role: "user", content: prompt, model: "", token_total: null });
+    mainLlmSaveLocalCache(mainLlmActiveSessionId);
 
-    const optimize = false; // TSP optimizasyonu devre dışı
+    const assistantBox = mainLlmAddMessage("assistant", "");
+    mainLlmToggleBusy(true);
+    mainLlmSetStatus("Canli akis devam ediyor...");
+    mainLlmCurrentAttemptModel = forcedModel || "";
+
+    const streamPath = mainLlmGetProvider() === "gemini"
+        ? "/api/llm/gemini/chat/stream"
+        : "/api/llm/openrouter/chat/stream";
+
+    try {
+        const response = await fetch(streamPath, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                session_id: mainLlmActiveSessionId,
+                query: prompt,
+                model: forcedModel || undefined,
+                use_fallback: !isManual,
+            }),
+        });
+
+        if (!response.ok || !response.body) {
+            let errText = `HTTP ${response.status}`;
+            try {
+                const payload = await response.json();
+                if (payload?.error) errText = payload.error;
+            } catch (_) {
+                // ignore
+            }
+            if (assistantBox) assistantBox.textContent = `[Hata] ${mainLlmRepairText(errText)}`;
+            mainLlmSetStatus("Istek hatasi");
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let output = "";
+        let usageMeta = "";
+        let usageModel = "";
+        let usageToken = null;
+        let streamError = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+
+                let payload = null;
+                try {
+                    payload = JSON.parse(trimmed);
+                } catch (_) {
+                    continue;
+                }
+
+                if (payload.type === "token") {
+                    const tokenText = mainLlmRepairText(payload.text || "");
+                    output += tokenText;
+                    if (assistantBox) assistantBox.textContent = output;
+                    if (elMainLlmChatLog) {
+                        elMainLlmChatLog.scrollTop = elMainLlmChatLog.scrollHeight;
+                    }
+                } else if (payload.type === "meta") {
+                    if (payload.model) {
+                        mainLlmCurrentAttemptModel = mainLlmRepairText(payload.model);
+                        mainLlmSetActiveModel(payload.model, payload.tried_models || []);
+                    }
+
+                    if (payload.phase === "start") {
+                        mainLlmSetStatus(`Model deneniyor: ${mainLlmRepairText(payload.model || "")}`);
+                        if (mainLlmGetMode() === "auto") {
+                            mainLlmAppendMeta(assistantBox, `Deneniyor: ${mainLlmRepairText(payload.model || "")}`);
+                        }
+                    } else if (payload.phase === "fallback") {
+                        mainLlmSetStatus(`Fallback: ${mainLlmRepairText(payload.model || "")} basarisiz`);
+                        mainLlmAppendMeta(
+                            assistantBox,
+                            `Basarisiz: ${mainLlmRepairText(payload.model || "")} | ${mainLlmRepairText(payload.error || "hata")}`
+                        );
+                    } else if (payload.phase === "success") {
+                        mainLlmSetStatus("Hazir");
+                        if (mainLlmGetMode() === "auto") {
+                            mainLlmAppendMeta(assistantBox, `Basarili model: ${mainLlmRepairText(payload.model || "")}`);
+                        }
+                    }
+
+                    const usage = payload.usage || {};
+                    usageModel = mainLlmRepairText(payload.model || usageModel || "-");
+                    usageToken = usage.total_tokens ?? usageToken;
+                    usageMeta = `model: ${usageModel || "-"} | token: ${usageToken ?? "-"}`;
+                } else if (payload.type === "error") {
+                    streamError = mainLlmRepairText(payload.error || "Bilinmeyen hata");
+                    if (assistantBox) {
+                        assistantBox.textContent = `[Hata] ${streamError}`;
+                    }
+                    const kind = mainLlmClassifyError(streamError);
+                    if (kind === "limit") {
+                        mainLlmSetStatus("Limit hatasi (429)");
+                    } else if (kind === "credit") {
+                        mainLlmSetStatus("Kredi hatasi (402)");
+                    } else if (kind === "incompat") {
+                        mainLlmSetStatus("Model endpoint uyumsuz (400)");
+                    } else if (kind === "privacy") {
+                        mainLlmSetStatus("Privacy/Guardrail kisiti (404)");
+                    } else {
+                        mainLlmSetStatus("Akis hatasi");
+                    }
+                }
+            }
+        }
+
+        const finalOutput = mainLlmRepairText(output);
+        const finalAssistantText = finalOutput || (streamError ? `[Hata] ${streamError}` : "[Bos yanit]");
+        if (assistantBox) {
+            assistantBox.textContent = finalAssistantText;
+        }
+        mainLlmMessages.push({
+            role: "assistant",
+            content: finalAssistantText,
+            model: usageModel || mainLlmCurrentAttemptModel || "",
+            token_total: usageToken,
+            error_type: streamError ? mainLlmClassifyError(streamError) : "",
+        });
+        mainLlmSaveLocalCache(mainLlmActiveSessionId);
+
+        if (assistantBox && usageMeta) {
+            mainLlmAppendMeta(assistantBox, usageMeta);
+        }
+
+        mainLlmSetStatus("Hazir");
+        await mainLlmLoadSessions(false);
+        mainLlmPopulateSessionSelect();
+    } catch (error) {
+        if (assistantBox) {
+            assistantBox.textContent = `[Hata] ${mainLlmRepairText(error.message || error)}`;
+        }
+        mainLlmSetStatus("Baglanti hatasi");
+    } finally {
+        mainLlmToggleBusy(false);
+        if (elMainLlmInput) elMainLlmInput.focus();
+    }
+}
+
+function initMainLlmChat() {
+    if (!elMainLlmBox) return;
+
+    elMainLlmModeRadios.forEach((radio) => {
+        radio.addEventListener("change", mainLlmUpdateModeUi);
+    });
+
+    if (elMainLlmCategory) {
+        elMainLlmCategory.addEventListener("change", mainLlmRefreshModelOptions);
+    }
+    if (elMainLlmSend) {
+        elMainLlmSend.addEventListener("click", mainLlmSendMessage);
+    }
+    if (elMainLlmClear) {
+        elMainLlmClear.addEventListener("click", async () => {
+            try {
+                await mainLlmCreateAndSwitchSession("Yeni Sohbet");
+                mainLlmSetStatus("Yeni sohbet acildi");
+            } catch (error) {
+                showToast(mainLlmRepairText(error.message || "Yeni sohbet acilamadi"), "error");
+            }
+        });
+    }
+    if (elMainLlmInput) {
+        elMainLlmInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                mainLlmSendMessage();
+            }
+        });
+    }
+
+    elMainLlmProviderRadios.forEach((radio) => {
+        radio.addEventListener("change", () => {
+            if (elMainLlmModelSelect) elMainLlmModelSelect.value = "";
+            if (elMainLlmCustomModel) elMainLlmCustomModel.value = "";
+            mainLlmCheckStatus();
+        });
+    });
+
+    if (elMainLlmSessionSelect) {
+        elMainLlmSessionSelect.addEventListener("change", async () => {
+            const sessionId = elMainLlmSessionSelect.value;
+            if (!sessionId || sessionId === mainLlmActiveSessionId) return;
+            try {
+                await mainLlmSetActiveSession(sessionId);
+                mainLlmSetStatus("Oturum degisti");
+            } catch (error) {
+                showToast(mainLlmRepairText(error.message || "Oturum degistirilemedi"), "error");
+            }
+        });
+    }
+
+    if (elMainLlmNewSession) {
+        elMainLlmNewSession.addEventListener("click", async () => {
+            try {
+                await mainLlmCreateAndSwitchSession("Yeni Sohbet");
+                mainLlmSetStatus("Yeni sohbet olusturuldu");
+            } catch (error) {
+                showToast(mainLlmRepairText(error.message || "Yeni sohbet olusturulamadi"), "error");
+            }
+        });
+    }
+
+    if (elMainLlmArchiveSession) {
+        elMainLlmArchiveSession.addEventListener("click", async () => {
+            try {
+                await mainLlmArchiveCurrentSession();
+                mainLlmSetStatus("Oturum arsivlendi");
+            } catch (error) {
+                showToast(mainLlmRepairText(error.message || "Oturum arsivlenemedi"), "error");
+            }
+        });
+    }
+
+    if (elRightChatCollapse) {
+        elRightChatCollapse.addEventListener("click", () => mainLlmPanelSetOpen(false));
+    }
+    if (elRightChatExpand) {
+        elRightChatExpand.addEventListener("click", () => mainLlmPanelSetOpen(true));
+    }
+
+    if (window.matchMedia("(max-width: 768px)").matches) {
+        mainLlmPanelSetOpen(false);
+    } else {
+        mainLlmPanelSetOpen(true);
+    }
+
+    mainLlmUpdateModeUi();
+    mainLlmCheckStatus();
+    mainLlmEnsureActiveSession().catch((error) => {
+        mainLlmMessages = [];
+        mainLlmRenderMessages();
+        mainLlmSetStatus("Sohbet oturumu yuklenemedi");
+        showToast(mainLlmRepairText(error.message || "Sohbet oturumu yuklenemedi"), "error");
+    });
+}
+// ========== ALTERNATIVE ROUTES ==========
+
+/**
+ * Alternatif rotalarÃ„Â± gÃƒÂ¶sterir
+ */
+async function showAlternativeRoutes() {
+    if (selectedPoints.length < 2) {
+        showToast("En az 2 nokta seÃƒÂ§melisiniz!", "error");
+        return;
+    }
+
+    showLoading("Alternatif rotalar hesaplanÃ„Â±yor...");
+
+    const optimize = false; // TSP optimizasyonu devre dÃ„Â±Ã…Å¸Ã„Â±
 
     try {
         const response = await fetch(`${API_BASE}/get-alternative-routes`, {
@@ -1143,10 +1973,10 @@ async function showAlternativeRoutes() {
         }
 
         displayAlternativeRoutes(data.alternatives);
-        showToast(`${data.alternatives.length} alternatif rota bulundu! ??`, "success");
+        showToast(`${data.alternatives.length} alternatif rota bulundu! \u{2728}`, "success");
 
     } catch (error) {
-        console.error("Alternatif rota hatası:", error);
+        console.error("Alternatif rota hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -1154,7 +1984,7 @@ async function showAlternativeRoutes() {
 }
 
 /**
- * Alternatif rotaları listeler
+ * Alternatif rotalarÃ„Â± listeler
  */
 function displayAlternativeRoutes(alternatives) {
     elAlternativesPanel.style.display = "block";
@@ -1186,11 +2016,11 @@ function displayAlternativeRoutes(alternatives) {
                 </div>
                 <div class="alternative-stats">
                     <div class="alternative-stat">
-                        <span class="stat-icon">??</span>
+                        <span class="stat-icon">\u{1F4CF}</span>
                         <span class="stat-text">${alt.distance_km} km</span>
                     </div>
                     <div class="alternative-stat">
-                        <span class="stat-icon">??</span>
+                        <span class="stat-icon">\u{23F1}\u{FE0F}</span>
                         <span class="stat-text">${alt.duration_minutes} dk</span>
                     </div>
                 </div>
@@ -1198,7 +2028,7 @@ function displayAlternativeRoutes(alternatives) {
                     data-action-select-alt
                     data-type="${escapeHtml(alt.type)}"
                     data-coords='${JSON.stringify(alt.route_coords)}'>
-                    Bu Rotayı Seç
+                    Bu RotayÃ„Â± SeÃƒÂ§
                 </button>
             </div>
         `;
@@ -1211,7 +2041,7 @@ function displayAlternativeRoutes(alternatives) {
 }
 
 /**
- * Seçilen alternatif rotayı haritada gösterir
+ * SeÃƒÂ§ilen alternatif rotayÃ„Â± haritada gÃƒÂ¶sterir
  */
 function selectAlternativeRoute(routeType, routeCoords) {
     clearRoute();
@@ -1220,7 +2050,7 @@ function selectAlternativeRoute(routeType, routeCoords) {
     const routeColors = {
         route_1: "#6c5ce7",     // Mor
         route_2: "#00cec9",     // Turkuaz
-        route_3: "#feca57"      // Sarı
+        route_3: "#feca57"      // SarÃ„Â±
     };
 
     // Eski tip compatibility (shortest/fastest/balanced)
@@ -1230,7 +2060,7 @@ function selectAlternativeRoute(routeType, routeCoords) {
 
     const color = routeColors[routeType] || "#6c5ce7";
 
-    // Rotayı çiz
+    // RotayÃ„Â± ÃƒÂ§iz
     routePolyline = L.polyline(routeCoords, {
         color: color,
         weight: 5,
@@ -1247,16 +2077,16 @@ function selectAlternativeRoute(routeType, routeCoords) {
     }).addTo(map);
     routeGlowPolylines.push(glow);
 
-    // Haritayı rotaya sığdır
+    // HaritayÃ„Â± rotaya sÃ„Â±Ã„Å¸dÃ„Â±r
     map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
 
-    // Active sınıfını güncelle
+    // Active sÃ„Â±nÃ„Â±fÃ„Â±nÃ„Â± gÃƒÂ¼ncelle
     document.querySelectorAll(".alternative-card").forEach(card => {
         card.classList.remove("active");
     });
     document.querySelector(`[data-route-type="${routeType}"]`).classList.add("active");
 
-    // currentRouteData'yı seçilen alternatif rota ile güncelle
+    // currentRouteData'yÃ„Â± seÃƒÂ§ilen alternatif rota ile gÃƒÂ¼ncelle
     if (alternativeRoutesCache[routeType]) {
         const altData = alternativeRoutesCache[routeType];
         currentRouteData = {
@@ -1272,7 +2102,7 @@ function selectAlternativeRoute(routeType, routeCoords) {
         showRouteInfo(currentRouteData);
     }
 
-    // Butonları güncelle
+    // ButonlarÃ„Â± gÃƒÂ¼ncelle
     updateButtons();
 
     const routeNames = {
@@ -1281,18 +2111,18 @@ function selectAlternativeRoute(routeType, routeCoords) {
         route_3: "Rota 3"
     };
 
-    showToast(`${routeNames[routeType]} seçildi! ??`, "success");
+    showToast(`${routeNames[routeType]} seÃƒÂ§ildi! \u{2705}`, "success");
 }
 
 
 // ========== SAVE ROUTE ==========
 
 /**
- * Rota kaydetme modalını açar
+ * Rota kaydetme modalÃ„Â±nÃ„Â± aÃƒÂ§ar
  */
 function openSaveRouteModal() {
     if (!currentRouteData) {
-        showToast("Önce bir rota hesaplayın!", "error");
+        showToast("Ãƒâ€“nce bir rota hesaplayÃ„Â±n!", "error");
         return;
     }
 
@@ -1301,7 +2131,7 @@ function openSaveRouteModal() {
 }
 
 /**
- * Rota kaydetme modalını kapatır
+ * Rota kaydetme modalÃ„Â±nÃ„Â± kapatÃ„Â±r
  */
 function closeSaveRouteModal() {
     elSaveRouteModal.style.display = "none";
@@ -1312,7 +2142,7 @@ function closeSaveRouteModal() {
 }
 
 /**
- * Rotayı kaydeder
+ * RotayÃ„Â± kaydeder
  */
 async function confirmSaveRoute() {
     const name = document.getElementById("routeName").value.trim();
@@ -1320,16 +2150,16 @@ async function confirmSaveRoute() {
     const tagsInput = document.getElementById("routeTags").value.trim();
 
     if (!name) {
-        showToast("Rota adı gerekli!", "error");
+        showToast("Rota adÃ„Â± gerekli!", "error");
         return;
     }
 
     if (!currentRouteData) {
-        showToast("Kaydedilecek rota bulunamadı!", "error");
+        showToast("Kaydedilecek rota bulunamadÃ„Â±!", "error");
         return;
     }
 
-    // Etiketleri ayır
+    // Etiketleri ayÃ„Â±r
     const tags = tagsInput ? tagsInput.split(",").map(t => t.trim()).filter(t => t) : [];
 
     showLoading("Rota kaydediliyor...");
@@ -1353,15 +2183,15 @@ async function confirmSaveRoute() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Kaydetme hatası");
+            throw new Error(data.error || "Kaydetme hatasÃ„Â±");
         }
 
         closeSaveRouteModal();
         loadSavedRoutes(); // Listeyi yenile
-        showToast(`"${name}" rotası kaydedildi! ??`, "success");
+        showToast(`"${name}" rotasÃ„Â± kaydedildi! \u{2705}`, "success");
 
     } catch (error) {
-        console.error("Rota kaydetme hatası:", error);
+        console.error("Rota kaydetme hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -1369,7 +2199,7 @@ async function confirmSaveRoute() {
 }
 
 /**
- * Kaydedilmiş rotaları yükler
+ * KaydedilmiÃ…Å¸ rotalarÃ„Â± yÃƒÂ¼kler
  */
 async function loadSavedRoutes() {
     try {
@@ -1377,23 +2207,23 @@ async function loadSavedRoutes() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Rotalar yüklenemedi");
+            throw new Error(data.error || "Rotalar yÃƒÂ¼klenemedi");
         }
 
         displaySavedRoutes(data.routes);
 
     } catch (error) {
-        console.error("Rota yükleme hatası:", error);
-        elSavedRoutesList.innerHTML = `<div class="empty-state"><p>Rotalar yüklenemedi</p></div>`;
+        console.error("Rota yÃƒÂ¼kleme hatasÃ„Â±:", error);
+        elSavedRoutesList.innerHTML = `<div class="empty-state"><p>Rotalar yÃƒÂ¼klenemedi</p></div>`;
     }
 }
 
 /**
- * Kaydedilmiş rotaları listeler
+ * KaydedilmiÃ…Å¸ rotalarÃ„Â± listeler
  */
 function displaySavedRoutes(routes) {
     if (!routes || routes.length === 0) {
-        elSavedRoutesList.innerHTML = `<div class="empty-state"><p>Henüz kaydedilmiş rota yok</p></div>`;
+        elSavedRoutesList.innerHTML = `<div class="empty-state"><p>HenÃƒÂ¼z kaydedilmiÃ…Å¸ rota yok</p></div>`;
         return;
     }
 
@@ -1405,7 +2235,7 @@ function displaySavedRoutes(routes) {
             month: "short"
         });
 
-        const favoriteIcon = route.favorite ? "?" : "?";
+        const favoriteIcon = route.favorite ? "\u{2B50}" : "\u{2606}";
 
         html += `
             <div class="saved-route-card">
@@ -1417,9 +2247,9 @@ function displaySavedRoutes(routes) {
                 </div>
                 ${route.description ? `<p class="saved-route-desc">${escapeHtml(route.description)}</p>` : ""}
                 <div class="saved-route-stats">
-                    <span>?? ${route.distance_km} km</span>
-                    <span>?? ${route.duration_minutes} dk</span>
-                    <span>?? ${date}</span>
+                    <span>\u{1F4CF} ${route.distance_km} km</span>
+                    <span>\u{23F1}\u{FE0F} ${route.duration_minutes} dk</span>
+                    <span>\u{1F4C5} ${date}</span>
                 </div>
                 ${route.tags && route.tags.length > 0 ? `
                     <div class="saved-route-tags">
@@ -1428,10 +2258,10 @@ function displaySavedRoutes(routes) {
                 ` : ""}
                 <div class="saved-route-actions">
                     <button class="btn-load-route" data-action-load-route data-id="${escapeHtml(route.id)}">
-                        ?? Yükle
+                        \u{1F4E5} YÃƒÂ¼kle
                     </button>
                     <button class="btn-delete-route" data-action-delete-route data-id="${escapeHtml(route.id)}" title="Sil">
-                        ???
+                        \u{1F5D1}\u{FE0F}
                     </button>
                 </div>
             </div>
@@ -1442,30 +2272,30 @@ function displaySavedRoutes(routes) {
 }
 
 /**
- * Kaydedilmiş rotayı yükler
+ * KaydedilmiÃ…Å¸ rotayÃ„Â± yÃƒÂ¼kler
  */
 async function loadRoute(routeId) {
-    showLoading("Rota yükleniyor...");
+    showLoading("Rota yÃƒÂ¼kleniyor...");
 
     try {
         const response = await fetch(`${API_BASE}/routes/${routeId}`);
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Rota yüklenemedi");
+            throw new Error(data.error || "Rota yÃƒÂ¼klenemedi");
         }
 
         const route = data.route;
 
-        // Mevcut noktaları temizle
+        // Mevcut noktalarÃ„Â± temizle
         clearAllPoints();
 
-        // Rotanın noktalarını ekle
+        // RotanÃ„Â±n noktalarÃ„Â±nÃ„Â± ekle
         route.points.forEach(([lat, lon]) => {
             addPoint(lat, lon);
         });
 
-        // Rotayı çiz
+        // RotayÃ„Â± ÃƒÂ§iz
         currentRouteData = {
             route_coords: route.route_coords,
             total_distance_km: route.distance_km,
@@ -1475,12 +2305,12 @@ async function loadRoute(routeId) {
 
         drawRoute(currentRouteData);
         showRouteInfo(currentRouteData);
-        updateButtons();  // Buton durumlarını güncelle
+        updateButtons();  // Buton durumlarÃ„Â±nÃ„Â± gÃƒÂ¼ncelle
 
-        showToast(`"${route.name}" rotası yüklendi! ??`, "success");
+        showToast(`"${route.name}" rotasÃ„Â± yÃƒÂ¼klendi! \u{2705}`, "success");
 
     } catch (error) {
-        console.error("Rota yükleme hatası:", error);
+        console.error("Rota yÃƒÂ¼kleme hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -1488,7 +2318,7 @@ async function loadRoute(routeId) {
 }
 
 /**
- * Rotayı favorilere ekler/çıkarır
+ * RotayÃ„Â± favorilere ekler/ÃƒÂ§Ã„Â±karÃ„Â±r
  */
 async function toggleRouteFavorite(routeId) {
     try {
@@ -1499,25 +2329,25 @@ async function toggleRouteFavorite(routeId) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Favori işlemi başarısız");
+            throw new Error(data.error || "Favori iÃ…Å¸lemi baÃ…Å¸arÃ„Â±sÃ„Â±z");
         }
 
         loadSavedRoutes(); // Listeyi yenile
 
-        const message = data.is_favorite ? "Favorilere eklendi ?" : "Favorilerden çıkarıldı";
+        const message = data.is_favorite ? "Favorilere eklendi \u{2B50}" : "Favorilerden ÃƒÂ§Ã„Â±karÃ„Â±ldÃ„Â±";
         showToast(message, "success");
 
     } catch (error) {
-        console.error("Favori işlemi hatası:", error);
+        console.error("Favori iÃ…Å¸lemi hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     }
 }
 
 /**
- * Rotayı siler
+ * RotayÃ„Â± siler
  */
 async function deleteRoute(routeId) {
-    if (!confirm("Bu rotayı silmek istediğinizden emin misiniz?")) {
+    if (!confirm("Bu rotayÃ„Â± silmek istediÃ„Å¸inizden emin misiniz?")) {
         return;
     }
 
@@ -1529,14 +2359,14 @@ async function deleteRoute(routeId) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Silme işlemi başarısız");
+            throw new Error(data.error || "Silme iÃ…Å¸lemi baÃ…Å¸arÃ„Â±sÃ„Â±z");
         }
 
         loadSavedRoutes(); // Listeyi yenile
-        showToast("Rota silindi ???", "success");
+        showToast("Rota silindi \u{1F5D1}\u{FE0F}", "success");
 
     } catch (error) {
-        console.error("Rota silme hatası:", error);
+        console.error("Rota silme hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     }
 }
@@ -1545,11 +2375,11 @@ async function deleteRoute(routeId) {
 // ========== TIME PLANNING ==========
 
 /**
- * Zaman planlama panelini gösterir
+ * Zaman planlama panelini gÃƒÂ¶sterir
  */
 function showTimelinePlanner() {
     if (!currentRouteData || selectedPoints.length < 2) {
-        showToast("Önce bir rota hesaplayın!", "error");
+        showToast("Ãƒâ€“nce bir rota hesaplayÃ„Â±n!", "error");
         return;
     }
 
@@ -1558,11 +2388,11 @@ function showTimelinePlanner() {
 }
 
 /**
- * Zaman çizelgesi oluşturur
+ * Zaman ÃƒÂ§izelgesi oluÃ…Å¸turur
  */
 async function generateTimeline() {
     if (!currentRouteData) {
-        showToast("Önce bir rota hesaplayın!", "error");
+        showToast("Ãƒâ€“nce bir rota hesaplayÃ„Â±n!", "error");
         return;
     }
 
@@ -1570,17 +2400,17 @@ async function generateTimeline() {
     const visitDuration = parseInt(document.getElementById("visitDuration").value);
 
     if (!startTime) {
-        showToast("Başlangıç saati seçin!", "error");
+        showToast("BaÃ…Å¸langÃ„Â±ÃƒÂ§ saati seÃƒÂ§in!", "error");
         return;
     }
 
-    showLoading("Zaman çizelgesi oluşturuluyor...");
+    showLoading("Zaman ÃƒÂ§izelgesi oluÃ…Å¸turuluyor...");
 
     try {
-        // Noktalar arası mesafeleri hesapla
+        // Noktalar arasÃ„Â± mesafeleri hesapla
         const segmentDistances = calculateSegmentDistances();
 
-        // Nokta bilgilerini hazırla
+        // Nokta bilgilerini hazÃ„Â±rla
         const points = selectedPoints.map((point, index) => ({
             name: `Nokta ${index + 1}`,
             lat: point[0],
@@ -1603,14 +2433,14 @@ async function generateTimeline() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Zaman çizelgesi oluşturulamadı");
+            throw new Error(data.error || "Zaman ÃƒÂ§izelgesi oluÃ…Å¸turulamadÃ„Â±");
         }
 
         displayTimeline(data);
-        showToast("Zaman çizelgesi oluşturuldu! ?", "success");
+        showToast("Zaman ÃƒÂ§izelgesi oluÃ…Å¸turuldu! \u{2705}", "success");
 
     } catch (error) {
-        console.error("Timeline hatası:", error);
+        console.error("Timeline hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -1618,14 +2448,14 @@ async function generateTimeline() {
 }
 
 /**
- * Segment mesafelerini hesaplar (basitleştirilmiş)
+ * Segment mesafelerini hesaplar (basitleÃ…Å¸tirilmiÃ…Å¸)
  */
 function calculateSegmentDistances() {
     if (!currentRouteData || !currentRouteData.total_distance_km) {
         return [];
     }
 
-    // Basit yaklaşım: toplam mesafeyi nokta sayısına böl
+    // Basit yaklaÃ…Å¸Ã„Â±m: toplam mesafeyi nokta sayÃ„Â±sÃ„Â±na bÃƒÂ¶l
     const numSegments = selectedPoints.length - 1;
     const avgDistance = currentRouteData.total_distance_km / numSegments;
 
@@ -1633,7 +2463,7 @@ function calculateSegmentDistances() {
 }
 
 /**
- * Zaman çizelgesini görüntüler
+ * Zaman ÃƒÂ§izelgesini gÃƒÂ¶rÃƒÂ¼ntÃƒÂ¼ler
  */
 function displayTimeline(timeline) {
     elTimelineDisplay.style.display = "block";
@@ -1644,16 +2474,16 @@ function displayTimeline(timeline) {
     let html = `
         <div class="timeline-summary">
             <div class="timeline-stat">
-                <span class="timeline-stat-label">Başlangıç</span>
-                <span class="timeline-stat-value">?? ${timeline.start_time}</span>
+                <span class="timeline-stat-label">BaÃ…Å¸langÃ„Â±ÃƒÂ§</span>
+                <span class="timeline-stat-value">\u{1F553} ${timeline.start_time}</span>
             </div>
             <div class="timeline-stat">
-                <span class="timeline-stat-label">Bitiş</span>
-                <span class="timeline-stat-value">?? ${timeline.end_time}</span>
+                <span class="timeline-stat-label">BitiÃ…Å¸</span>
+                <span class="timeline-stat-value">\u{1F553} ${timeline.end_time}</span>
             </div>
             <div class="timeline-stat">
-                <span class="timeline-stat-label">Toplam Süre</span>
-                <span class="timeline-stat-value">?? ${totalHours}s ${totalMins}dk</span>
+                <span class="timeline-stat-label">Toplam SÃƒÂ¼re</span>
+                <span class="timeline-stat-value">\u{23F1}\u{FE0F} ${totalHours}s ${totalMins}dk</span>
             </div>
         </div>
         
@@ -1670,21 +2500,21 @@ function displayTimeline(timeline) {
                     <div class="timeline-point-name">${escapeHtml(item.point_name)}</div>
                     <div class="timeline-times">
                         <span class="timeline-time">
-                            <span class="timeline-time-label">Varış:</span>
+                            <span class="timeline-time-label">VarÃ„Â±Ã…Å¸:</span>
                             <span class="timeline-time-value">${item.arrival_time}</span>
                         </span>
                         <span class="timeline-time">
-                            <span class="timeline-time-label">Ayrılış:</span>
+                            <span class="timeline-time-label">AyrÃ„Â±lÃ„Â±Ã…Å¸:</span>
                             <span class="timeline-time-value">${item.departure_time}</span>
                         </span>
                     </div>
                     <div class="timeline-duration">
-                        ?? ${item.visit_duration_minutes} dakika kalış
+                        \u{23F1}\u{FE0F} ${item.visit_duration_minutes} dakika kalÃ„Â±Ã…Å¸
                     </div>
                     ${item.weather ? `
                     <div class="timeline-weather">
-                        <span class="tl-weather-emoji">${item.weather.weather_emoji || '???'}</span>
-                        <span class="tl-weather-temp">${item.weather.temperature != null ? Math.round(item.weather.temperature) + '°C' : ''}</span>
+                        <span class="tl-weather-emoji">${item.weather.weather_emoji || '\u{2601}\u{FE0F}'}</span>
+                        <span class="tl-weather-temp">${item.weather.temperature != null ? Math.round(item.weather.temperature) + 'Ã‚Â°C' : ''}</span>
                         <span class="tl-weather-desc">${escapeHtml(item.weather.weather_tr || item.weather.weather_description || '')}</span>
                     </div>
                     ${item.weather.advice && item.weather.advice.items && item.weather.advice.items.length > 0 ? `
@@ -1696,7 +2526,7 @@ function displayTimeline(timeline) {
                     ` : ''}
                     ${!isLast ? `
                         <div class="timeline-travel">
-                            ???>? ${item.next_travel_time_minutes} dakika yürüyüş
+                            \u{1F6B6} \u{2192} ${item.next_travel_time_minutes} dakika yÃƒÂ¼rÃƒÂ¼yÃƒÂ¼Ã…Å¸
                         </div>
                     ` : ''}
                 </div>
@@ -1711,41 +2541,41 @@ function displayTimeline(timeline) {
 
 // ========== SAVED LOCATIONS (KAYITLI YERLER) ==========
 
-// İkon haritası — Kayıtlı yerler için emoji eşlemesi
+// Ã„Â°kon haritasÃ„Â± Ã¢â‚¬â€ KayÃ„Â±tlÃ„Â± yerler iÃƒÂ§in emoji eÃ…Å¸lemesi
 const locationEmojiMap = {
-    marker: "??",
-    home: "??",
-    work: "??",
-    school: "??",
-    gym: "???",
-    market: "??",
-    star: "?",
-    coffee: "?",
-    restaurant: "???",
-    heart: "??",
-    hospital: "??",
-    park: "??",
-    museum: "???",
-    plane: "??",
-    car: "??",
-    bike: "??",
-    beach: "???",
-    mountain: "??",
-    bank: "??",
-    gas: "?",
-    pharmacy: "??"
+    marker: "\u{1F4CD}",
+    home: "\u{1F3E0}",
+    work: "\u{1F4BC}",
+    school: "\u{1F3EB}",
+    gym: "\u{1F3CB}\u{FE0F}",
+    market: "\u{1F6D2}",
+    star: "\u{2B50}",
+    coffee: "\u{2615}",
+    restaurant: "\u{1F37D}\u{FE0F}",
+    heart: "\u{2764}\u{FE0F}",
+    hospital: "\u{1F3E5}",
+    park: "\u{1F333}",
+    museum: "\u{1F3DB}\u{FE0F}",
+    plane: "\u{2708}\u{FE0F}",
+    car: "\u{1F697}",
+    bike: "\u{1F6B2}",
+    beach: "\u{1F3D6}\u{FE0F}",
+    mountain: "\u{26F0}\u{FE0F}",
+    bank: "\u{1F3E6}",
+    gas: "\u{26FD}",
+    pharmacy: "\u{1F48A}"
 };
 
 /**
- * Konum kaydetme modalını açar
+ * Konum kaydetme modalÃ„Â±nÃ„Â± aÃƒÂ§ar
  */
 window.openSaveLocationModal = function (lat, lon, defaultName = "") {
     elLocationLat.value = lat;
     elLocationLon.value = lon;
     elLocationName.value = defaultName;
-    elLocationAddress.value = ""; // Reverse geocoding ile de doldurulabilir (şimdilik boş kalsın)
+    elLocationAddress.value = ""; // Reverse geocoding ile de doldurulabilir (Ã…Å¸imdilik boÃ…Å¸ kalsÃ„Â±n)
 
-    // Default marker'ı sıfırla
+    // Default marker'Ã„Â± sÃ„Â±fÃ„Â±rla
     locationIconBtns.forEach(b => b.classList.remove("active"));
     const defaultBtn = document.querySelector('#locationIconSelector [data-icon="marker"]');
     if (defaultBtn) defaultBtn.classList.add("active");
@@ -1772,12 +2602,12 @@ async function confirmSaveLocation() {
     const iconType = activeIconBtn ? activeIconBtn.dataset.icon : "marker";
 
     if (!name) {
-        showToast("Konum adı gerekli!", "error");
+        showToast("Konum adÃ„Â± gerekli!", "error");
         return;
     }
 
     if (isNaN(lat) || isNaN(lon)) {
-        showToast("Geçersiz koordinatlar!", "error");
+        showToast("GeÃƒÂ§ersiz koordinatlar!", "error");
         return;
     }
 
@@ -1799,15 +2629,15 @@ async function confirmSaveLocation() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Kaydetme hatası");
+            throw new Error(data.error || "Kaydetme hatasÃ„Â±");
         }
 
         closeSaveLocationModal();
         loadSavedLocations(); // Listeyi yenile
-        showToast(`"${name}" konumu kaydedildi! ??`, "success");
+        showToast(`"${name}" konumu kaydedildi! \u{2705}`, "success");
 
     } catch (error) {
-        console.error("Konum kaydetme hatası:", error);
+        console.error("Konum kaydetme hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -1815,7 +2645,7 @@ async function confirmSaveLocation() {
 }
 
 /**
- * Sunucudan kayıtlı konumları getir ve ekrana çiz
+ * Sunucudan kayÃ„Â±tlÃ„Â± konumlarÃ„Â± getir ve ekrana ÃƒÂ§iz
  */
 async function loadSavedLocations() {
     try {
@@ -1823,7 +2653,7 @@ async function loadSavedLocations() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Konumlar yüklenemedi");
+            throw new Error(data.error || "Konumlar yÃƒÂ¼klenemedi");
         }
 
         displaySavedLocationsSidebar(data.locations);
@@ -1833,20 +2663,20 @@ async function loadSavedLocations() {
         }
 
     } catch (error) {
-        console.error("Konum yükleme hatası:", error);
-        elSavedLocationsList.innerHTML = `<div class="empty-state"><p>Yer imleri yüklenemedi</p></div>`;
+        console.error("Konum yÃƒÂ¼kleme hatasÃ„Â±:", error);
+        elSavedLocationsList.innerHTML = `<div class="empty-state"><p>Yer imleri yÃƒÂ¼klenemedi</p></div>`;
     }
 }
 
 function displaySavedLocationsSidebar(locations) {
     if (!locations || locations.length === 0) {
-        elSavedLocationsList.innerHTML = `<div class="empty-state"><p>Henüz kayıtlı yeriniz yok</p></div>`;
+        elSavedLocationsList.innerHTML = `<div class="empty-state"><p>HenÃƒÂ¼z kayÃ„Â±tlÃ„Â± yeriniz yok</p></div>`;
         return;
     }
 
     let html = "";
     locations.forEach(loc => {
-        const emoji = locationEmojiMap[loc.icon_type] || "??";
+        const emoji = locationEmojiMap[loc.icon_type] || "\u{1F4CD}";
         const favoriteIcon = loc.favorite ? "?" : "?";
 
         html += `
@@ -1858,7 +2688,7 @@ function displaySavedLocationsSidebar(locations) {
                 <div class="saved-location-icon">${emoji}</div>
                 <div class="saved-location-info">
                     <h3 class="saved-location-name">${escapeHtml(loc.name)}</h3>
-                    <p class="saved-location-address">Kullanım: ${loc.times_used || 0}</p>
+                    <p class="saved-location-address">KullanÃ„Â±m: ${loc.times_used || 0}</p>
                 </div>
                 <div class="saved-location-actions" data-stop-propagation>
                     <button class="ic-btn ic-btn-favorite" data-action-toggle-loc-fav data-id="${escapeHtml(loc.id)}" title="Favori">
@@ -1883,7 +2713,7 @@ window.zoomToLocation = function (lat, lon, name) {
 };
 
 /**
- * Kayıtlı konumun favori durumunu değiştirir
+ * KayÃ„Â±tlÃ„Â± konumun favori durumunu deÃ„Å¸iÃ…Å¸tirir
  */
 async function toggleLocationFavorite(locationId) {
     try {
@@ -1894,20 +2724,20 @@ async function toggleLocationFavorite(locationId) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Favori işlemi başarısız");
+            throw new Error(data.error || "Favori iÃ…Å¸lemi baÃ…Å¸arÃ„Â±sÃ„Â±z");
         }
 
         loadSavedLocations();
-        showToast(data.is_favorite ? "Favorilere eklendi ?" : "Favorilerden çıkarıldı", "success");
+        showToast(data.is_favorite ? "Favorilere eklendi \u{2B50}" : "Favorilerden ÃƒÂ§Ã„Â±karÃ„Â±ldÃ„Â±", "success");
 
     } catch (error) {
-        console.error("Favori işlemi hatası:", error);
+        console.error("Favori iÃ…Å¸lemi hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     }
 }
 
 async function deleteSavedLocation(locationId) {
-    if (!confirm("Bu konumu silmek istediğinizden emin misiniz?")) {
+    if (!confirm("Bu konumu silmek istediÃ„Å¸inizden emin misiniz?")) {
         return;
     }
 
@@ -1919,26 +2749,26 @@ async function deleteSavedLocation(locationId) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Silme işlemi başarısız");
+            throw new Error(data.error || "Silme iÃ…Å¸lemi baÃ…Å¸arÃ„Â±sÃ„Â±z");
         }
 
-        loadSavedLocations(); // Backendi ve haritayı yenile
-        showToast("Konum silindi ???", "success");
+        loadSavedLocations(); // Backendi ve haritayÃ„Â± yenile
+        showToast("Konum silindi \u{1F5D1}\u{FE0F}", "success");
 
     } catch (error) {
-        console.error("Konum silme hatası:", error);
+        console.error("Konum silme hatasÃ„Â±:", error);
         showToast(`Hata: ${error.message}`, "error");
     }
 }
 
 /**
- * Haritadaki markerları çizer
+ * Haritadaki markerlarÃ„Â± ÃƒÂ§izer
  */
 function drawSavedLocationsOnMap(locations) {
     clearSavedLocationMarkers();
 
     locations.forEach(loc => {
-        const emoji = locationEmojiMap[loc.icon_type] || "??";
+        const emoji = locationEmojiMap[loc.icon_type] || "\u{1F4CD}";
 
         const icon = L.divIcon({
             className: "custom-marker-wrapper",
@@ -1965,15 +2795,15 @@ function toggleSavedLocationsVisibility() {
     showSavedLocationsOnMap = !showSavedLocationsOnMap;
 
     if (showSavedLocationsOnMap) {
-        // İkonu aktif göz yap
+        // Ã„Â°konu aktif gÃƒÂ¶z yap
         elIconLocationVisible.innerHTML = `
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
             <circle cx="12" cy="12" r="3" />
         `;
         elIconLocationVisible.style.stroke = "currentColor";
-        loadSavedLocations(); // Yeniden yükleyip çizsin
+        loadSavedLocations(); // Yeniden yÃƒÂ¼kleyip ÃƒÂ§izsin
     } else {
-        // İkonu kapalı göz yap
+        // Ã„Â°konu kapalÃ„Â± gÃƒÂ¶z yap
         elIconLocationVisible.innerHTML = `
             <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path>
             <line x1="1" y1="1" x2="23" y2="23"></line>
@@ -1983,9 +2813,9 @@ function toggleSavedLocationsVisibility() {
     }
 }
 
-// ========== EVENT DELEGATION - XSS Güvenlik Düzeltmeleri ==========
-// Tüm inline onclick handlers yerine tek bir event listener kullanılır
-// Bu, XSS saldırılarını önler ve daha iyi performans sağlar
+// ========== EVENT DELEGATION - XSS GÃƒÂ¼venlik DÃƒÂ¼zeltmeleri ==========
+// TÃƒÂ¼m inline onclick handlers yerine tek bir event listener kullanÃ„Â±lÃ„Â±r
+// Bu, XSS saldÃ„Â±rÃ„Â±larÃ„Â±nÃ„Â± ÃƒÂ¶nler ve daha iyi performans saÃ„Å¸lar
 
 document.addEventListener("click", function(e) {
     // Find closest element with data attribute (handles nested clicks)
@@ -2091,11 +2921,11 @@ async function fetchWeatherWidget(lat, lon) {
         if (!data.success) return;
 
         const cur = data.data.current;
-        document.getElementById("weatherWidgetEmoji").textContent = cur.weather_emoji || "??";
-        document.getElementById("weatherWidgetTemp").textContent = `${Math.round(cur.temperature)}°C`;
-        document.getElementById("weatherWidgetDesc").textContent = cur.weather_tr || cur.weather_description || "—";
+        document.getElementById("weatherWidgetEmoji").textContent = cur.weather_emoji || "\u{2601}\u{FE0F}";
+        document.getElementById("weatherWidgetTemp").textContent = `${Math.round(cur.temperature)}Ã‚Â°C`;
+        document.getElementById("weatherWidgetDesc").textContent = cur.weather_tr || cur.weather_description || "Ã¢â‚¬â€";
 
-        // Göster ve 5 sn sonra otomatik kaybet
+        // GÃƒÂ¶ster ve 5 sn sonra otomatik kaybet
         el.style.display = "block";
         el.classList.remove("auto-hide");
         if (_weatherHideTimer) clearTimeout(_weatherHideTimer);
@@ -2103,15 +2933,15 @@ async function fetchWeatherWidget(lat, lon) {
             el.classList.add("auto-hide");
         }, 5000);
     } catch (e) {
-        // fail silently — widget gösterilmez
+        // fail silently Ã¢â‚¬â€ widget gÃƒÂ¶sterilmez
     }
 }
 
 function initWeatherWidget() {
-    // Sayfa açıldığında harita merkezinden başla
+    // Sayfa aÃƒÂ§Ã„Â±ldÃ„Â±Ã„Å¸Ã„Â±nda harita merkezinden baÃ…Å¸la
     const center = map.getCenter();
     fetchWeatherWidget(center.lat, center.lng);
-    // Nokta eklenmediği sürece harita hareketiyle güncelleme yapma
+    // Nokta eklenmediÃ„Å¸i sÃƒÂ¼rece harita hareketiyle gÃƒÂ¼ncelleme yapma
 }
 
 // ========== WEATHER BANNER ==========
@@ -2126,7 +2956,7 @@ function formatLocalDateISO(date) {
     return `${y}-${m}-${d}`;
 }
 
-// Kullanıcı startTime alanını bilinçli değiştirdiyse forecast modunu aç
+// KullanÃ„Â±cÃ„Â± startTime alanÃ„Â±nÃ„Â± bilinÃƒÂ§li deÃ„Å¸iÃ…Å¸tirdiyse forecast modunu aÃƒÂ§
 (function initWeatherStartTimePreference() {
     const startTimeInput = document.getElementById("startTime");
     if (!startTimeInput) return;
@@ -2150,13 +2980,13 @@ async function checkRouteWeatherAndShowBanner(points) {
             lat: p[0], lon: p[1], name: `Nokta ${i + 1}`
         }));
 
-        // Kullanıcı özel saat seçtiyse, route-weather için forecast modunu aç
+        // KullanÃ„Â±cÃ„Â± ÃƒÂ¶zel saat seÃƒÂ§tiyse, route-weather iÃƒÂ§in forecast modunu aÃƒÂ§
         const startTimeInput = document.getElementById("startTime");
         const startTimeValue = (startTimeInput?.value || "").trim();
 
         let hasTime = _weatherUseCustomStartTime && /^\d{2}:\d{2}$/.test(startTimeValue);
 
-        // Geçmiş saat seçildiyse (bugün için), anlık moda düş
+        // GeÃƒÂ§miÃ…Å¸ saat seÃƒÂ§ildiyse (bugÃƒÂ¼n iÃƒÂ§in), anlÃ„Â±k moda dÃƒÂ¼Ã…Å¸
         if (hasTime) {
             const now = new Date();
             const [hh, mm] = startTimeValue.split(":").map(Number);
@@ -2190,12 +3020,12 @@ async function checkRouteWeatherAndShowBanner(points) {
         const criticalAdvice = data.data.critical_advice || null;
         showWeatherBanner(routeWeather, criticalAdvice);
     } catch (e) {
-        // sessiz hata – banner olmadan devam
+        // sessiz hata Ã¢â‚¬â€œ banner olmadan devam
     }
 }
 
 function showWeatherBanner(routeWeather, criticalAdvice = null) {
-    // Tüm noktalardan tavsiye topla, tekrar edenleri filtrele
+    // TÃƒÂ¼m noktalardan tavsiye topla, tekrar edenleri filtrele
     const seenTypes = new Set();
     const allItems = [];
     let topLevel = "info";
@@ -2224,21 +3054,21 @@ function showWeatherBanner(routeWeather, criticalAdvice = null) {
     const banner = document.getElementById("weatherBanner");
     if (!banner) return;
 
-    const iconMap = { info: "??", warning: "??", danger: "??" };
-    const titleMap = { info: "Hava Durumu Bilgisi", warning: "Hava Durumu Uyarısı", danger: "Tehlikeli Hava Koşulları" };
+    const iconMap = { info: "\u{2139}\u{FE0F}", warning: "\u{26A0}\u{FE0F}", danger: "\u{1F6A8}" };
+    const titleMap = { info: "Hava Durumu Bilgisi", warning: "Hava Durumu UyarÃ„Â±sÃ„Â±", danger: "Tehlikeli Hava KoÃ…Å¸ullarÃ„Â±" };
 
     let html = `
         <div class="weather-banner-header">
             <span class="weather-banner-icon">${iconMap[topLevel]}</span>
             <span class="weather-banner-title">${titleMap[topLevel]}</span>
-            <button class="weather-banner-close" onclick="hideWeatherBanner()">?</button>
+            <button class="weather-banner-close" onclick="hideWeatherBanner()">\u{2715}</button>
         </div>
     `;
 
     if (criticalAdvice) {
         html += `
         <div class="weather-banner-critical">
-            <span class="wbc-icon">??</span>
+            <span class="wbc-icon">\u{26A0}\u{FE0F}</span>
             <span class="wbc-text">${escapeHtml(criticalAdvice)}</span>
         </div>`;
     }
@@ -2266,26 +3096,26 @@ function hideWeatherBanner() {
 }
 
 
-// ========== TÜRKİYE VERİSİ YÖNETİMİ ==========
+// ========== TÃƒÅ“RKÃ„Â°YE VERÃ„Â°SÃ„Â° YÃƒâ€“NETÃ„Â°MÃ„Â° ==========
 let turkiyeData = null;
 
-// Türkiye verisini yükle
+// TÃƒÂ¼rkiye verisini yÃƒÂ¼kle
 async function loadTurkiyeData() {
     try {
         const response = await fetch('data/turkiye-data.json');
         turkiyeData = await response.json();
         initializeRegionDropdown();
     } catch (error) {
-        console.error('Türkiye verisi yüklenemedi:', error);
-        showToast('Bölge verileri yüklenemedi', 'error');
+        console.error('TÃƒÂ¼rkiye verisi yÃƒÂ¼klenemedi:', error);
+        showToast('BÃƒÂ¶lge verileri yÃƒÂ¼klenemedi', 'error');
     }
 }
 
-// Bölge dropdown'ını doldur
+// BÃƒÂ¶lge dropdown'Ã„Â±nÃ„Â± doldur
 function initializeRegionDropdown() {
     if (!turkiyeData) return;
     
-    elRegionSelect.innerHTML = '<option value="">Bölge Seçin</option>';
+    elRegionSelect.innerHTML = '<option value="">BÃƒÂ¶lge SeÃƒÂ§in</option>';
     Object.keys(turkiyeData).forEach(region => {
         const option = document.createElement('option');
         option.value = region;
@@ -2294,20 +3124,20 @@ function initializeRegionDropdown() {
     });
 }
 
-// Bölge seçildiğinde illeri doldur
+// BÃƒÂ¶lge seÃƒÂ§ildiÃ„Å¸inde illeri doldur
 elRegionSelect.addEventListener('change', function() {
     const selectedRegion = this.value;
     
     if (!selectedRegion) {
         elProvinceSelect.disabled = true;
-        elProvinceSelect.innerHTML = '<option value="">Önce Bölge Seçin</option>';
+        elProvinceSelect.innerHTML = '<option value="">Ãƒâ€“nce BÃƒÂ¶lge SeÃƒÂ§in</option>';
         elDistrictSelect.disabled = true;
-        elDistrictSelect.innerHTML = '<option value="">Önce İl Seçin</option>';
+        elDistrictSelect.innerHTML = '<option value="">Ãƒâ€“nce Ã„Â°l SeÃƒÂ§in</option>';
         return;
     }
     
     const provinces = turkiyeData[selectedRegion];
-    elProvinceSelect.innerHTML = '<option value="">İl Seçin</option>';
+    elProvinceSelect.innerHTML = '<option value="">Ã„Â°l SeÃƒÂ§in</option>';
     
     Object.keys(provinces).forEach(province => {
         const option = document.createElement('option');
@@ -2318,22 +3148,22 @@ elRegionSelect.addEventListener('change', function() {
     
     elProvinceSelect.disabled = false;
     elDistrictSelect.disabled = true;
-    elDistrictSelect.innerHTML = '<option value="">Önce İl Seçin</option>';
+    elDistrictSelect.innerHTML = '<option value="">Ãƒâ€“nce Ã„Â°l SeÃƒÂ§in</option>';
 });
 
-// İl seçildiğinde ilçeleri doldur
+// Ã„Â°l seÃƒÂ§ildiÃ„Å¸inde ilÃƒÂ§eleri doldur
 elProvinceSelect.addEventListener('change', function() {
     const selectedRegion = elRegionSelect.value;
     const selectedProvince = this.value;
     
     if (!selectedProvince) {
         elDistrictSelect.disabled = true;
-        elDistrictSelect.innerHTML = '<option value="">Önce İl Seçin</option>';
+        elDistrictSelect.innerHTML = '<option value="">Ãƒâ€“nce Ã„Â°l SeÃƒÂ§in</option>';
         return;
     }
     
     const districts = turkiyeData[selectedRegion][selectedProvince];
-    elDistrictSelect.innerHTML = '<option value="">İlçe Seçin (Opsiyonel)</option>';
+    elDistrictSelect.innerHTML = '<option value="">Ã„Â°lÃƒÂ§e SeÃƒÂ§in (Opsiyonel)</option>';
     
     districts.forEach(district => {
         const option = document.createElement('option');
@@ -2345,7 +3175,7 @@ elProvinceSelect.addEventListener('change', function() {
     elDistrictSelect.disabled = false;
 });
 
-// İlçe seçildiğinde haritayı oraya odakla
+// Ã„Â°lÃƒÂ§e seÃƒÂ§ildiÃ„Å¸inde haritayÃ„Â± oraya odakla
 elDistrictSelect.addEventListener('change', async function() {
     const selectedProvince = elProvinceSelect.value;
     const selectedDistrict = this.value;
@@ -2358,15 +3188,15 @@ elDistrictSelect.addEventListener('change', async function() {
             if (data && data.length > 0) {
                 const { lat, lon } = data[0];
                 map.setView([lat, lon], 14);
-                showToast(`${selectedDistrict}, ${selectedProvince} konumuna odaklandı`, 'success');
+                showToast(`${selectedDistrict}, ${selectedProvince} konumuna odaklandÃ„Â±`, 'success');
             }
         } catch (error) {
-            console.error('Konum bulunamadı:', error);
+            console.error('Konum bulunamadÃ„Â±:', error);
         }
     }
 });
 
-// Sayfa yüklendiğinde Türkiye verisini yükle
+// Sayfa yÃƒÂ¼klendiÃ„Å¸inde TÃƒÂ¼rkiye verisini yÃƒÂ¼kle
 
 // ========== TURN-BY-TURN & TTS ==========
 const elTurnByTurnPanel = document.getElementById('turnByTurnPanel');
@@ -2405,10 +3235,10 @@ function displayRouteSteps(steps) {
 }
 
 function startVoicePlayback() {
-    if (!('speechSynthesis' in window)) { showToast('Tarayıcı TTS desteklemiyor','warning'); return; }
+    if (!('speechSynthesis' in window)) { showToast('TarayÃ„Â±cÃ„Â± TTS desteklemiyor','warning'); return; }
     if (!elTurnByTurnList) return;
     const items = Array.from(elTurnByTurnList.querySelectorAll('.turn-step')).map(el=> el.textContent.trim());
-    if (!items.length) { showToast('Adım yok','warning'); return; }
+    if (!items.length) { showToast('AdÃ„Â±m yok','warning'); return; }
     stopVoicePlayback();
     ttsQueue = items;
     ttsPlaying = true;
@@ -2438,6 +3268,7 @@ if (elBtnStartVoice) elBtnStartVoice.addEventListener('click', startVoicePlaybac
 if (elBtnStopVoice) elBtnStopVoice.addEventListener('click', stopVoicePlayback);
 
 loadTurkiyeData();
+initMainLlmChat();
 
 // ========== UX ENHANCEMENTS (2026-03-18) ==========
 
@@ -2502,7 +3333,7 @@ function renderRouteDecisionPanel() {
     panel.innerHTML = `
         <div style="font-weight:700; margin-bottom:4px;">Akilli Rota Karari</div>
         <div style="font-size:0.92rem; line-height:1.45;">
-            <div><strong>${routeLabel}</strong> secildi • ${distance} km • ${duration} dk</div>
+            <div><strong>${routeLabel}</strong> secildi Ã¢â‚¬Â¢ ${distance} km Ã¢â‚¬Â¢ ${duration} dk</div>
             <div style="margin-top:4px;">Hava etkisi: ${weatherText}</div>
             ${warningHtml}
         </div>
