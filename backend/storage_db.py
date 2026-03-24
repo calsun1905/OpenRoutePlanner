@@ -251,6 +251,44 @@ def init_schema(conn: sqlite3.Connection, run_analyze: bool = False) -> None:
     )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_local_places_name ON local_places(name);")
 
+    # LLM sohbet kaliciligi
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            archived INTEGER NOT NULL DEFAULT 0,
+            message_count INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            model TEXT DEFAULT '',
+            token_total INTEGER,
+            error_type TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(session_id) REFERENCES chat_sessions(id)
+        )
+        """
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_chat_messages_session_created ON chat_messages(session_id, created_at);"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at);"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_chat_sessions_archived ON chat_sessions(archived);"
+    )
+
     conn.commit()
 
     # ANALYZE pahali bir islem; sadece startup/bakimda calistir.

@@ -13,6 +13,7 @@ import uuid
 import re
 from datetime import datetime
 from functools import partial
+from typing import Any
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -63,6 +64,70 @@ def _inject_system_message(messages: list[dict]) -> list[dict]:
         return messages
 
     return [{"role": "system", "content": _openrouter_system_prompt()}] + messages
+
+
+def _as_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
+def _normalize_messages(messages: list[dict]) -> list[dict]:
+    normalized: list[dict] = []
+    for item in messages or []:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role", "")).strip().lower()
+        content = repair_text(item.get("content"))
+        if role not in {"system", "user", "assistant"}:
+            continue
+        if not content:
+            continue
+        normalized.append({"role": role, "content": content})
+    return normalized
+
+
+def _extract_latest_user_text(messages: list[dict]) -> str:
+    for item in reversed(messages or []):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("role", "")).strip().lower() != "user":
+            continue
+        content = repair_text(item.get("content"))
+        if content:
+            return content
+    return ""
+
+
+def _classify_llm_error(text: str) -> str:
+    lowered = (text or "").lower()
+    if "(429)" in lowered or "rate-limit" in lowered or "temporarily rate-limited" in lowered:
+        return "limit_429"
+    if "(402)" in lowered or "insufficient credits" in lowered:
+        return "credit_402"
+    if "(400)" in lowered and ("embedding model" in lowered or "chat/completions endpoint" in lowered):
+        return "incompat_400"
+    if "(404)" in lowered and "guardrail restrictions" in lowered:
+        return "privacy_404"
+    return "other"
+
+
+def _chat_context_from_session(session_id: str, context_limit: int = 40) -> list[dict]:
+    history = list_chat_messages(session_id, limit=context_limit)
+    context: list[dict] = []
+    for item in history:
+        role = str(item.get("role", "")).strip().lower()
+        if role not in {"user", "assistant", "system"}:
+            continue
+        content = repair_text(item.get("content"))
+        if not content:
+            continue
+        context.append({"role": role, "content": content})
+    return context
 
 
 def _configure_live_console_output() -> None:
@@ -144,6 +209,17 @@ from location_storage import (
     toggle_location_favorite,
 )
 from storage_db import ensure_db, run_sqlite_maintenance
+from chat_storage import (
+    ensure_chat_schema,
+    rebuild_db_from_sync_json,
+    create_session as create_chat_session,
+    list_sessions as list_chat_sessions,
+    get_session as get_chat_session,
+    archive_session as archive_chat_session,
+    list_messages as list_chat_messages,
+    save_turn as save_chat_turn,
+)
+from text_utils import repair_text
 from nlp_engine import parse_query as regex_parse_query
 try:
     from nlp_concept_resolver import resolve_poi_concept
@@ -163,6 +239,19 @@ try:
     OPENROUTER_SERVICE_AVAILABLE = True
 except ImportError:
     OPENROUTER_SERVICE_AVAILABLE = False
+
+try:
+    from gemini_service import (
+        is_gemini_configured,
+        gemini_status,
+        gemini_chat_completion,
+        gemini_chat_completion_with_fallback,
+        gemini_chat_completion_stream,
+        gemini_chat_completion_stream_with_fallback,
+    )
+    GEMINI_SERVICE_AVAILABLE = True
+except ImportError:
+    GEMINI_SERVICE_AVAILABLE = False
 
 # Hava durumu servisi (OpenMeteo API entegrasyonu)
 try:
@@ -364,6 +453,8 @@ def initialize_runtime() -> None:
         return
 
     ensure_db(run_analyze=True)
+    ensure_chat_schema()
+    rebuild_db_from_sync_json(force=False)
     run_sqlite_maintenance(checkpoint_mode="PASSIVE")
     purge_old_geocodes(days=90)
 
@@ -440,6 +531,21 @@ def _attach_trace_headers(response):
     try:
         response.headers["X-Request-ID"] = getattr(g, "request_id", "")
         response.headers["X-Correlation-ID"] = getattr(g, "correlation_id", "")
+    except Exception:
+        pass
+
+    try:
+        content_type = response.headers.get("Content-Type", "")
+        if (
+            content_type
+            and "charset=" not in content_type.lower()
+            and (
+                content_type.startswith("application/json")
+                or content_type.startswith("application/x-ndjson")
+                or content_type.startswith("text/")
+            )
+        ):
+            response.headers["Content-Type"] = f"{content_type}; charset=utf-8"
     except Exception:
         pass
     return response
@@ -2233,6 +2339,73 @@ def api_weather_clear_cache():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/llm/chat/sessions", methods=["GET"])
+def api_llm_chat_sessions():
+    """
+    Sohbet oturumlarini listeler.
+    Query:
+      include_archived=1/0 (default: 0)
+      limit=200
+    """
+    include_archived = _as_bool(request.args.get("include_archived"), default=False)
+    raw_limit = request.args.get("limit")
+    try:
+        limit = int(raw_limit) if raw_limit is not None else 200
+    except (TypeError, ValueError):
+        limit = 200
+    limit = max(1, min(limit, 1000))
+    sessions = list_chat_sessions(include_archived=include_archived, limit=limit)
+    return jsonify({"ok": True, "sessions": sessions})
+
+
+@app.route("/api/llm/chat/sessions", methods=["POST"])
+def api_create_llm_chat_session():
+    """
+    Yeni sohbet oturumu olusturur.
+    Body:
+      { "title": "opsiyonel baslik" }
+    """
+    data = request.get_json(silent=True) or {}
+    title = repair_text(data.get("title"))
+    session = create_chat_session(title=title or None)
+    return jsonify({"ok": True, "session": session}), 201
+
+
+@app.route("/api/llm/chat/sessions/<session_id>/messages", methods=["GET"])
+def api_llm_chat_session_messages(session_id: str):
+    """
+    Verilen oturumun mesajlarini getirir.
+    Query:
+      limit=opsiyonel
+    """
+    session = get_chat_session(session_id)
+    if not session:
+        return jsonify({"ok": False, "error": "Oturum bulunamadi"}), 404
+
+    raw_limit = request.args.get("limit")
+    if raw_limit is None or str(raw_limit).strip() == "":
+        limit = None
+    else:
+        try:
+            limit = max(1, min(int(raw_limit), 2000))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "Gecersiz limit"}), 400
+
+    messages = list_chat_messages(session_id, limit=limit)
+    return jsonify({"ok": True, "session": session, "messages": messages})
+
+
+@app.route("/api/llm/chat/sessions/<session_id>/archive", methods=["POST"])
+def api_archive_llm_chat_session(session_id: str):
+    """
+    Oturumu arsivler (silmez).
+    """
+    ok = archive_chat_session(session_id)
+    if not ok:
+        return jsonify({"ok": False, "error": "Oturum bulunamadi"}), 404
+    return jsonify({"ok": True, "session_id": session_id, "archived": True})
+
+
 @app.route("/api/llm/openrouter/status", methods=["GET"])
 def api_openrouter_status():
     """
@@ -2279,26 +2452,23 @@ def api_openrouter_chat():
     data = request.get_json(silent=True) or {}
 
     messages = data.get("messages")
-    query = data.get("query")
+    query = repair_text(data.get("query"))
     if messages is None:
-        if not isinstance(query, str) or not query.strip():
+        if not query:
             return jsonify({"error": "'query' veya 'messages' zorunlu"}), 400
-        messages = [{"role": "user", "content": query.strip()}]
+        messages = [{"role": "user", "content": query}]
 
-    if not isinstance(messages, list) or not messages:
+    if not isinstance(messages, list):
+        return jsonify({"error": "'messages' bos olmayan liste olmali"}), 400
+    messages = _normalize_messages(messages)
+    if not messages:
         return jsonify({"error": "'messages' bos olmayan liste olmali"}), 400
     messages = _inject_system_message(messages)
 
     model = data.get("model")
     temperature = data.get("temperature")
     max_tokens = data.get("max_tokens")
-    use_fallback_raw = data.get("use_fallback", True)
-    if isinstance(use_fallback_raw, bool):
-        use_fallback = use_fallback_raw
-    elif isinstance(use_fallback_raw, str):
-        use_fallback = use_fallback_raw.strip().lower() in {"1", "true", "yes", "on"}
-    else:
-        use_fallback = bool(use_fallback_raw)
+    use_fallback = _as_bool(data.get("use_fallback", True), default=True)
 
     try:
         if use_fallback:
@@ -2318,8 +2488,8 @@ def api_openrouter_chat():
             result["tried_models"] = [result.get("model") or model or ""]
         return jsonify({
             "ok": True,
-            "model": result.get("model"),
-            "text": result.get("text", ""),
+            "model": repair_text(result.get("model")),
+            "text": repair_text(result.get("text", "")),
             "usage": result.get("usage", {}),
             "id": result.get("id"),
             "tried_models": result.get("tried_models", []),
@@ -2348,41 +2518,62 @@ def api_openrouter_chat_stream():
 
     data = request.get_json(silent=True) or {}
 
-    messages = data.get("messages")
-    query = data.get("query")
-    if messages is None:
-        if not isinstance(query, str) or not query.strip():
-            return jsonify({"error": "'query' veya 'messages' zorunlu"}), 400
-        messages = [{"role": "user", "content": query.strip()}]
+    session_id = str(data.get("session_id", "") or "").strip()
+    session = None
+    if session_id:
+        session = get_chat_session(session_id)
+        if not session:
+            return jsonify({"error": "Gecerli bir session_id gerekli"}), 404
+        if int(session.get("archived") or 0) == 1:
+            return jsonify({"error": "Arsivlenmis oturuma mesaj yazilamaz"}), 400
 
-    if not isinstance(messages, list) or not messages:
-        return jsonify({"error": "'messages' bos olmayan liste olmali"}), 400
-    messages = _inject_system_message(messages)
+    raw_messages = data.get("messages")
+    query = repair_text(data.get("query"))
+
+    provided_messages: list[dict] = []
+    if raw_messages is not None:
+        if not isinstance(raw_messages, list):
+            return jsonify({"error": "'messages' bos olmayan liste olmali"}), 400
+        provided_messages = _normalize_messages(raw_messages)
+
+    if not query and not provided_messages:
+        return jsonify({"error": "'query' veya 'messages' zorunlu"}), 400
+
+    user_text = query or _extract_latest_user_text(provided_messages)
+    if not user_text:
+        return jsonify({"error": "Kullanici mesaji bos olamaz"}), 400
+
+    if session_id:
+        llm_messages = _inject_system_message(
+            _chat_context_from_session(session_id, context_limit=40) + [{"role": "user", "content": user_text}]
+        )
+    else:
+        llm_messages = provided_messages or [{"role": "user", "content": user_text}]
+        llm_messages = _inject_system_message(llm_messages)
 
     model = data.get("model")
     temperature = data.get("temperature")
     max_tokens = data.get("max_tokens")
-    use_fallback_raw = data.get("use_fallback", True)
-    if isinstance(use_fallback_raw, bool):
-        use_fallback = use_fallback_raw
-    elif isinstance(use_fallback_raw, str):
-        use_fallback = use_fallback_raw.strip().lower() in {"1", "true", "yes", "on"}
-    else:
-        use_fallback = bool(use_fallback_raw)
+    use_fallback = _as_bool(data.get("use_fallback", True), default=True)
 
     @stream_with_context
     def _generator():
+        collected_tokens: list[str] = []
+        final_model = repair_text(model)
+        token_total = None
+        stream_error = ""
+        error_type = ""
         try:
             if use_fallback:
                 stream_iter = openrouter_chat_completion_stream_with_fallback(
-                    messages=messages,
+                    messages=llm_messages,
                     model=model,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
             else:
                 stream_iter = openrouter_chat_completion_stream(
-                    messages=messages,
+                    messages=llm_messages,
                     model=model,
                     temperature=temperature,
                     max_tokens=max_tokens,
@@ -2394,13 +2585,56 @@ def api_openrouter_chat_stream():
                 ) + "\n"
 
             for chunk in stream_iter:
+                if chunk.get("type") == "token":
+                    clean_text = repair_text(chunk.get("text"))
+                    if clean_text:
+                        collected_tokens.append(clean_text)
+                    chunk = {"type": "token", "text": clean_text}
+                elif chunk.get("type") == "meta":
+                    if chunk.get("model"):
+                        final_model = repair_text(chunk.get("model"))
+                    usage = chunk.get("usage") or {}
+                    try:
+                        if usage.get("total_tokens") is not None:
+                            token_total = int(usage.get("total_tokens"))
+                    except (TypeError, ValueError):
+                        token_total = None
+                    chunk = dict(chunk)
+                    if final_model:
+                        chunk["model"] = final_model
                 yield json.dumps(chunk, ensure_ascii=False) + "\n"
         except ValueError as exc:
-            yield json.dumps({"type": "error", "error": str(exc)}, ensure_ascii=False) + "\n"
+            stream_error = repair_text(str(exc))
+            error_type = _classify_llm_error(stream_error)
+            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
         except RuntimeError as exc:
-            yield json.dumps({"type": "error", "error": str(exc)}, ensure_ascii=False) + "\n"
+            stream_error = repair_text(str(exc))
+            error_type = _classify_llm_error(stream_error)
+            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
         except Exception as exc:
-            yield json.dumps({"type": "error", "error": f"Sunucu hatasi: {exc}"}, ensure_ascii=False) + "\n"
+            stream_error = repair_text(f"Sunucu hatasi: {exc}")
+            error_type = _classify_llm_error(stream_error)
+            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
+        finally:
+            if not session_id:
+                return
+            assistant_text = repair_text("".join(collected_tokens))
+            if stream_error and not assistant_text:
+                assistant_text = f"[Hata] {stream_error}"
+            if not assistant_text:
+                assistant_text = "[Bos yanit]"
+            try:
+                save_chat_turn(
+                    session_id=session_id,
+                    user_text=user_text,
+                    assistant_text=assistant_text,
+                    model=final_model or "",
+                    token_total=token_total,
+                    error_type=error_type,
+                )
+            except Exception as persist_exc:
+                warn_text = repair_text(f"Sohbet kaydi yazilamadi: {persist_exc}")
+                yield json.dumps({"type": "meta", "phase": "persist_warn", "error": warn_text}, ensure_ascii=False) + "\n"
 
     return Response(_generator(), mimetype="application/x-ndjson")
 
@@ -2418,6 +2652,243 @@ def api_openrouter_models():
         return jsonify({"ok": True, "models": models})
     except RuntimeError as exc:
         return jsonify({"ok": False, "error": str(exc), "models": []}), 502
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Sunucu hatasi: {exc}", "models": []}), 500
+
+
+@app.route("/api/llm/gemini/status", methods=["GET"])
+def api_gemini_status():
+    """Google Gemini entegrasyon durumunu dondurur."""
+    if not GEMINI_SERVICE_AVAILABLE:
+        return jsonify({
+            "available": False,
+            "configured": False,
+            "error": "Gemini servisi yuklenemedi",
+        }), 503
+
+    status = gemini_status()
+    return jsonify({
+        "available": True,
+        "configured": status["configured"],
+        "api_base": status["api_base"],
+        "default_model": status["default_model"],
+        "fallback_models": status.get("fallback_models", []),
+        "timeout_sec": status["timeout_sec"],
+    })
+
+
+@app.route("/api/llm/gemini/chat", methods=["POST"])
+def api_gemini_chat():
+    """
+    Gemini uzerinden uretim (tek seferde tam yanit).
+    Istek govdesi OpenRouter ile ayni sembolik.
+    """
+    if not GEMINI_SERVICE_AVAILABLE:
+        return jsonify({"error": "Gemini servisi mevcut degil"}), 503
+
+    if not is_gemini_configured():
+        return jsonify({"error": "GEMINI_API_KEY veya GOOGLE_API_KEY tanimli degil"}), 503
+
+    data = request.get_json(silent=True) or {}
+
+    messages = data.get("messages")
+    query = repair_text(data.get("query"))
+    if messages is None:
+        if not query:
+            return jsonify({"error": "'query' veya 'messages' zorunlu"}), 400
+        messages = [{"role": "user", "content": query}]
+
+    if not isinstance(messages, list):
+        return jsonify({"error": "'messages' bos olmayan liste olmali"}), 400
+    messages = _normalize_messages(messages)
+    if not messages:
+        return jsonify({"error": "'messages' bos olmayan liste olmali"}), 400
+    messages = _inject_system_message(messages)
+
+    model = data.get("model")
+    temperature = data.get("temperature")
+    max_tokens = data.get("max_tokens")
+    use_fallback = _as_bool(data.get("use_fallback", True), default=True)
+
+    try:
+        if use_fallback:
+            result = gemini_chat_completion_with_fallback(
+                messages=messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+        else:
+            result = gemini_chat_completion(
+                messages=messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            result["tried_models"] = [result.get("model") or model or ""]
+        return jsonify({
+            "ok": True,
+            "model": repair_text(result.get("model")),
+            "text": repair_text(result.get("text", "")),
+            "usage": result.get("usage", {}),
+            "id": result.get("id"),
+            "tried_models": result.get("tried_models", []),
+        })
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 502
+    except Exception as exc:
+        return jsonify({"error": f"Sunucu hatasi: {exc}"}), 500
+
+
+@app.route("/api/llm/gemini/chat/stream", methods=["POST"])
+def api_gemini_chat_stream():
+    """Gemini canli akis (NDJSON), OpenRouter stream ile ayni satir formati."""
+    if not GEMINI_SERVICE_AVAILABLE:
+        return jsonify({"error": "Gemini servisi mevcut degil"}), 503
+
+    if not is_gemini_configured():
+        return jsonify({"error": "GEMINI_API_KEY veya GOOGLE_API_KEY tanimli degil"}), 503
+
+    data = request.get_json(silent=True) or {}
+
+    session_id = str(data.get("session_id", "") or "").strip()
+    session = None
+    if session_id:
+        session = get_chat_session(session_id)
+        if not session:
+            return jsonify({"error": "Gecerli bir session_id gerekli"}), 404
+        if int(session.get("archived") or 0) == 1:
+            return jsonify({"error": "Arsivlenmis oturuma mesaj yazilamaz"}), 400
+
+    raw_messages = data.get("messages")
+    query = repair_text(data.get("query"))
+
+    provided_messages: list[dict] = []
+    if raw_messages is not None:
+        if not isinstance(raw_messages, list):
+            return jsonify({"error": "'messages' bos olmayan liste olmali"}), 400
+        provided_messages = _normalize_messages(raw_messages)
+
+    if not query and not provided_messages:
+        return jsonify({"error": "'query' veya 'messages' zorunlu"}), 400
+
+    user_text = query or _extract_latest_user_text(provided_messages)
+    if not user_text:
+        return jsonify({"error": "Kullanici mesaji bos olamaz"}), 400
+
+    if session_id:
+        llm_messages = _inject_system_message(
+            _chat_context_from_session(session_id, context_limit=40) + [{"role": "user", "content": user_text}]
+        )
+    else:
+        llm_messages = provided_messages or [{"role": "user", "content": user_text}]
+        llm_messages = _inject_system_message(llm_messages)
+
+    model = data.get("model")
+    temperature = data.get("temperature")
+    max_tokens = data.get("max_tokens")
+    use_fallback = _as_bool(data.get("use_fallback", True), default=True)
+
+    @stream_with_context
+    def _generator():
+        collected_tokens: list[str] = []
+        final_model = repair_text(model)
+        token_total = None
+        stream_error = ""
+        error_type = ""
+        try:
+            if use_fallback:
+                stream_iter = gemini_chat_completion_stream_with_fallback(
+                    messages=llm_messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+            else:
+                stream_iter = gemini_chat_completion_stream(
+                    messages=llm_messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                yield json.dumps(
+                    {"type": "meta", "phase": "start", "model": model, "tried_models": [model]},
+                    ensure_ascii=False,
+                ) + "\n"
+
+            for chunk in stream_iter:
+                if chunk.get("type") == "token":
+                    clean_text = repair_text(chunk.get("text"))
+                    if clean_text:
+                        collected_tokens.append(clean_text)
+                    chunk = {"type": "token", "text": clean_text}
+                elif chunk.get("type") == "meta":
+                    if chunk.get("model"):
+                        final_model = repair_text(chunk.get("model"))
+                    usage = chunk.get("usage") or {}
+                    try:
+                        if usage.get("total_tokens") is not None:
+                            token_total = int(usage.get("total_tokens"))
+                    except (TypeError, ValueError):
+                        token_total = None
+                    chunk = dict(chunk)
+                    if final_model:
+                        chunk["model"] = final_model
+                yield json.dumps(chunk, ensure_ascii=False) + "\n"
+        except ValueError as exc:
+            stream_error = repair_text(str(exc))
+            error_type = _classify_llm_error(stream_error)
+            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
+        except RuntimeError as exc:
+            stream_error = repair_text(str(exc))
+            error_type = _classify_llm_error(stream_error)
+            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
+        except Exception as exc:
+            stream_error = repair_text(f"Sunucu hatasi: {exc}")
+            error_type = _classify_llm_error(stream_error)
+            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
+        finally:
+            if not session_id:
+                return
+            assistant_text = repair_text("".join(collected_tokens))
+            if stream_error and not assistant_text:
+                assistant_text = f"[Hata] {stream_error}"
+            if not assistant_text:
+                assistant_text = "[Bos yanit]"
+            try:
+                save_chat_turn(
+                    session_id=session_id,
+                    user_text=user_text,
+                    assistant_text=assistant_text,
+                    model=final_model or "",
+                    token_total=token_total,
+                    error_type=error_type,
+                )
+            except Exception as persist_exc:
+                warn_text = repair_text(f"Sohbet kaydi yazilamadi: {persist_exc}")
+                yield json.dumps({"type": "meta", "phase": "persist_warn", "error": warn_text}, ensure_ascii=False) + "\n"
+
+    return Response(_generator(), mimetype="application/x-ndjson")
+
+
+@app.route("/api/llm/gemini/models", methods=["GET"])
+def api_gemini_models():
+    """ENV'deki varsayilan + fallback Gemini model id'lerini listeler."""
+    if not GEMINI_SERVICE_AVAILABLE:
+        return jsonify({"error": "Gemini servisi mevcut degil"}), 503
+
+    try:
+        st = gemini_status()
+        seen: set[str] = set()
+        models: list[str] = []
+        for mid in [st["default_model"]] + list(st.get("fallback_models") or []):
+            m = str(mid or "").strip()
+            if m and m not in seen:
+                seen.add(m)
+                models.append(m)
+        return jsonify({"ok": True, "models": models})
     except Exception as exc:
         return jsonify({"ok": False, "error": f"Sunucu hatasi: {exc}", "models": []}), 500
 
