@@ -2,6 +2,14 @@
 
 Bu bolum, bugun tamamlanan teknik degisiklikleri ve bir sonraki sprintte uygulanacak net yol haritasini resmi kayit olarak tutar.
 
+## 0) Ek tamamlananlar — POI cache, arsiv ve stabilizasyon
+- POI yumusak TTL yaklasik **14 gun** olacak sekilde ayarlandi (`POI_CACHE_SOFT_TTL_DAYS = 14`); hard/empty TTL ve mevcut stale-while-revalidate akisi korunuyor.
+- Ana POI cache (`pois` tablosu) **yenilenmeden once** eski JSON + zaman damgasi, ayni `pois.db` icindeki **`pois_archive`** tablosuna kopyalaniyor; yer+kategori basina son **N** surum tutuluyor (`POI_ARCHIVE_MAX_PER_KEY`, varsayilan 5). Silmeden once tekrar kullanim / ileride geri yukleme API icin zemin.
+- Genis idari alanlarda (il/ilce) **parcali grid tarama + birlestirme** eklendi; cok buyuk bbox icin tek sorgu yerine hucre bazli sorgu ve dedup (`POI_BOUNDARY_CHUNK_*` anahtarlari `route_config.py`).
+- Frontend `app.js` icinde kalan bozuk `??` / ikon metinleri **Unicode escape** ile duzeltildi; `index.html` icinde `app.js` cache kirma surumu guncellendi.
+- `docs/CACHE_REPOLITIKASI.md` eklendi; `docs/VERITABANI_BILGILENDIRME.md` POI arsivi ve TTL ozetiyle guncellendi.
+- `.gitignore` altinda `backend/cache/*` + `.gitkeep` ve istege bagli repoya alinacak dosyalar icin **yorumlu ornek** `!` satirlari netlestirildi.
+
 ## 1) Bugun yapilanlar (tamamlanan)
 - Harita yuklenmeme problemi frontend tarafinda giderildi.
 - Turkce metinlerdeki gorunum/encoding bozulmalarina yonelik duzeltmeler yapildi.
@@ -74,6 +82,104 @@ Ek dokumantasyon:
 ## 7) Bu oturum commit ozeti (kisa)
 - Yapilan: Progress kayitlarinin detaylandirilmasi, LLM/BERT/DB yol haritasinin netlestirilmesi, veritabani bilgilendirme dokumaninin duzenlenmesi.
 - Siradaki adim: Chatbot entegrasyonu + BERT parse pipeline kalitesi + veri katmani kararlarinin teknik parcali implementasyonu.
+
+## 8) Bugun devam edilen teknik degisiklikler (detayli)
+- Ana ekrana sag dock chat paneli eklendi: ac/kapa davranisi, mobilde drawer benzeri akis, masaustunde harita alaninin chat paneline gore yeniden boyutlanmasi.
+- Ana ekrandaki LLM kutusu iki moda ayrildi ve birlikte korundu:
+  - otomatik fallback modu
+  - manuel tek model modu
+- Manuel model seciminde kategori bazli filtreleme netlestirildi:
+  - sorunsuz calisanlar
+  - tikananlar
+  - limit hatasi (429)
+  - para/kredi gerektiren (402)
+  - embedding/vl (chat uyumsuz)
+- LLM sohbet oturumlari kalici hale getirildi:
+  - backend'de `chat_sessions` ve `chat_messages` semasi,
+  - frontend'de oturum secimi/yeni oturum/arsivleme,
+  - mesajlarin tekrar yuklenmesi ve local cache ile hizli geri acilis.
+- Stream endpointleri oturum bazli calisacak sekilde genisletildi (`session_id`):
+  - OpenRouter stream sonunda user+assistant mesaji DB'ye yaziliyor.
+  - Gemini stream sonunda user+assistant mesaji DB'ye yaziliyor.
+  - LLM context penceresi son 40 mesaj olacak sekilde kullaniliyor.
+- JSON mirror senkronu eklendi:
+  - `backend/data/chat_history.sync.json` uretimi,
+  - acilista JSON -> DB rebuild/sync akisi,
+  - coklu cihazda Git merge kolayligi.
+- Turkce karakter/encoding tarafinda runtime onarim katmani eklendi:
+  - `backend/text_utils.py` ile `repair_text`,
+  - API giris/cikislarinda ve stream token birlestirmede metin temizligi,
+  - frontend tarafinda da benzer metin onarimlari.
+- POI/cache tarafindaki onceki iyilestirmeler korunarak bugunle uyumlu hale getirildi (dokumantasyonla birlikte).
+
+## 9) Gemini notu (Google AI Studio + yedek anahtar stratejisi)
+- Gemini entegrasyonu icin Google AI Studio uzerinden alinan API anahtari akisi kullanildi.
+- Projede Gemini anahtar okumasi iki isimden yapiliyor:
+  - `GEMINI_API_KEY`
+  - `GOOGLE_API_KEY`
+- Varsayilan model + fallback model listesi ENV ile yonetilecek sekilde ayarlandi.
+- Operasyon notu:
+  - Gemini tarafinda farkli key'ler kullanilacagi icin yedek anahtar stratejisi zorunlu.
+  - Limit veya kota durumunda anahtar rotasyonu yapilacak sekilde ortam degiskenlerinin guncel tutulmasi gerekiyor.
+  - Ileride Gemini modellerini daha efektif kullanmak icin model/fallback sirasi ve key rotasyonu birlikte optimize edilecek.
+
+## 10) Degisen 19 dosya icin 5 commit hazirlik plani (sablon uyumlu taslak)
+Not: Asagidaki plan "hazirlik" amaclidir; commit atilmadan once son diff kontrolu yapilacaktir.
+
+1) fix: ana ekran chat panel yerlesimi + ui davranis duzeltmeleri
+- Dosyalar:
+  - `frontend/index.html`
+  - `frontend/css/style.css`
+  - `frontend/js/app.js`
+  - `frontend/openrouter-chat.html`
+- Kazanim:
+  - sag dock panel akisinin stabil hale gelmesi
+  - model secim ekraninin daha okunur ve kategorik kullanimi
+  - panel ac/kapa ve mobil davranislarinin toparlanmasi
+
+2) feat: kalici sohbet oturumu (session + message) ve stream kaliciligi
+- Dosyalar:
+  - `backend/chat_storage.py`
+  - `backend/storage_db.py`
+  - `backend/app.py`
+  - `backend/data/chat_history.sync.json`
+- Kazanim:
+  - cok oturumlu sohbet
+  - session bazli gecmis yukleme/arsivleme
+  - stream sonunda mesajlarin DB + JSON mirror'a yazilmasi
+
+3) feat: Gemini servis entegrasyonu (chat + stream + fallback)
+- Dosyalar:
+  - `backend/gemini_env.py`
+  - `backend/gemini_service.py`
+  - `backend/app.py`
+  - `.env.example`
+- Kazanim:
+  - OpenRouter yanina Gemini provider secenegi
+  - Gemini model/fallback sirasi ile daha dayanikli akis
+  - ENV tarafinda net Gemini konfigurasyonu
+
+4) fix/chore: turkce karakter onarimi + cache/git politikasi netlestirme
+- Dosyalar:
+  - `backend/text_utils.py`
+  - `backend/app.py`
+  - `backend/route_config.py`
+  - `backend/graph_manager.py`
+  - `.gitignore`
+  - `docs/CACHE_REPOLITIKASI.md`
+  - `docs/VERITABANI_BILGILENDIRME.md`
+- Kazanim:
+  - mojibake/encoding bozulmalarina karsi koruma
+  - cache artefaktlarinin repoda nasil yonetileceginin netlestirilmesi
+  - POI cache/arsiv davranisinin dokumante edilmesi
+
+5) test/docs: API testleri + progress kaydinin guncel teknik ozetle tamamlanmasi
+- Dosyalar:
+  - `tests/test_api/test_llm_chat_sessions_api.py`
+  - `progress.md`
+- Kazanim:
+  - chat session endpointleri ve stream kaliciligi icin test guvencesi
+  - bugun yapilanlarin proje kaydina net ve izlenebilir sekilde eklenmesi
 
 ---
 
