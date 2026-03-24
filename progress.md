@@ -1,3 +1,82 @@
+# 2026-03-24 - Ucuncu Asama Plani (LLM + BERT + Veritabani)
+
+Bu bolum, bugun tamamlanan teknik degisiklikleri ve bir sonraki sprintte uygulanacak net yol haritasini resmi kayit olarak tutar.
+
+## 1) Bugun yapilanlar (tamamlanan)
+- Harita yuklenmeme problemi frontend tarafinda giderildi.
+- Turkce metinlerdeki gorunum/encoding bozulmalarina yonelik duzeltmeler yapildi.
+- POI arama tarafinda il/ilce secimi ile kapsam davranisi iyilestirildi.
+- POI cache yonetimine soft TTL, hard TTL ve empty TTL stratejileri eklendi.
+- API testleri guncel endpoint davranisiyla hizalandi.
+
+## 2) Dun yapilan LLM calismalari (durum)
+- OpenRouter tabanli canli test sayfasi eklendi.
+- Free modeller tek tek test edildi.
+- Sonuclar model bazinda asagidaki siniflara ayrildi:
+  - Sorunsuz cevap donen modeller
+  - 429 rate limit veren modeller
+  - 402 kredi isteyen modeller
+  - 400 endpoint uyumsuz modeller (ornek: embedding modeli chat endpointinde)
+- Bu sayfa sayesinde modelin calisip calismadigi, neden hata verdigi ve hangi kodla hata verdigi canli gorulebiliyor.
+
+## 3) Birinci oncelik: LLM chatbotu ana uygulamaya entegre etme
+Hedef:
+- Test ekranindaki LLM altyapisini ana uygulama akisina tasimak.
+- Kullanici tarafinda model secimi, model durumu ve hata sinifini net gostermek.
+
+Planlanan moduller:
+1. Ana arayuze chatbot paneli/sekmesi eklenmesi.
+2. Model secim ekraninin kategorik hale getirilmesi:
+   - calisanlar
+   - limitli/tikananlar
+   - kredi isteyenler
+   - uyumsuz endpoint gerektirenler (embedding/video vb)
+3. Fallback kullanan panel ile manuel model secim panelinin ayrilmasi.
+4. Sistem prompt yonetiminin merkezilestirilmesi.
+5. Hata mesajlarinin teknik ama okunur formatta siniflandirilmasi.
+
+## 4) Ikinci oncelik: BERT/NLP motorunu guclendirme
+Problem:
+- BERT tek basina yeterli degil; preprocess, regex guard, kok/ek normalizasyonu ve semantic eslestirme birlikte calismali.
+
+Hedeflenen parse akisi (ornek: "Kadikoyde cami ariyorum"):
+1. Cumle girisi alinir.
+2. On isleme yapilir (normalizasyon, unicode temizlik, noktalama sadeleme).
+3. Aday varliklar cikartilir (lokasyon adayi + mekan adayi).
+4. Kok-ek ayristirma ve kelime kanoniklestirme yapilir.
+5. Mekan adayi Overpass/OSM tag setine maplenir.
+6. Lokasyon adayi geocoder veya yerel place verisi ile dogrulanir.
+7. Arama plani secilir (il/ilce secimine gore boundary bazli arama).
+8. Sonuc skoru + confidence + iz kaydi uretilir.
+
+Not:
+- Regex tek basina ana motor degil; BERT ve semantic katman icin emniyet agi olmalidir.
+- Embedding skoru tek karar noktasi olmamali; kural tabanli sinyallerle birlikte kullanilmalidir.
+
+## 5) Ucuncu oncelik: Veritabani stratejisi
+Mevcut:
+- Uygulama SQLite3 ile calisiyor.
+- Veriler lokal `.db` dosyalarinda tutuluyor.
+
+Gelecek:
+- Ihtiyac buyurse PostgreSQL gibi dis SQL veritabanina gecis planlanabilir.
+- Mevcut tablo yapisi duzenli oldugu icin SQL tabanli migration teknik olarak uygundur.
+
+Ek dokumantasyon:
+- `docs/VERITABANI_BILGILENDIRME.md` dosyasi bu kapsamda olusturuldu/guncellendi.
+- Bu dosya "hangi veri nerede tutuluyor" sorusunun teknik referans dokumani olarak kullanilacaktir.
+
+## 6) Coklu bilgisayar / ekip calisma notu
+- Merkezi bir dis veritabani olmadigi icin belirli cache dosyalarinin da repoda tasinabilir olmasi gerekiyor.
+- Bu nedenle kritik cache artefaktlari (ozellikle `backend/cache/*.json` ve `backend/cache/geocodes.db`) surum kontrolune alinmistir.
+- Amac: farkli bilgisayarda acildiginda ilk sorgularda ayni veri tabanina yakin davranis elde etmek.
+
+## 7) Bu oturum commit ozeti (kisa)
+- Yapilan: Progress kayitlarinin detaylandirilmasi, LLM/BERT/DB yol haritasinin netlestirilmesi, veritabani bilgilendirme dokumaninin duzenlenmesi.
+- Siradaki adim: Chatbot entegrasyonu + BERT parse pipeline kalitesi + veri katmani kararlarinin teknik parcali implementasyonu.
+
+---
+
 # Progress - Tum Proje Derin Analiz Raporu
 
 Uretim Tarihi: 2026-03-24 01:14
