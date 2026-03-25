@@ -399,20 +399,31 @@ function drawRoute(data) {
         dashArray: null,
     }).addTo(map);
 
+<<<<<<< Updated upstream
     // Rota ÃƒÂ§izgisi ÃƒÂ¼stÃƒÂ¼ne glow efekti
     const glow = L.polyline(data.route_coords, {
+=======
+    // Rota çizgisi üstüne glow efekti
+    const glowLine = L.polyline(data.route_coords, {
+>>>>>>> Stashed changes
         color: "#a594f9",
         weight: 10,
         opacity: 0.2,
         smoothFactor: 1,
     }).addTo(map);
+<<<<<<< Updated upstream
     routeGlowPolylines.push(glow);
+=======
+    routeGlowPolylines.push(glowLine);
+>>>>>>> Stashed changes
 
     // HaritayÃ„Â± rotaya sÃ„Â±Ã„Å¸dÃ„Â±r
     map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
 }
 
 function clearRoute() {
+    clearTransitRoute();
+
     if (routePolyline) {
         map.removeLayer(routePolyline);
         routePolyline = null;
@@ -2050,6 +2061,7 @@ function displayAlternativeRoutes(alternatives) {
  * SeÃƒÂ§ilen alternatif rotayÃ„Â± haritada gÃƒÂ¶sterir
  */
 function selectAlternativeRoute(routeType, routeCoords) {
+    const prevRouteData = currentRouteData ? { ...currentRouteData } : null;
     clearRoute();
 
     // Rota renklerini belirle - basit sistem
@@ -2074,14 +2086,29 @@ function selectAlternativeRoute(routeType, routeCoords) {
         smoothFactor: 1,
     }).addTo(map);
 
+<<<<<<< Updated upstream
     // Glow efekti - tracking listesine ekle
     const glow = L.polyline(routeCoords, {
+=======
+    // Glow efekti
+    const glowLine = L.polyline(routeCoords, {
+>>>>>>> Stashed changes
         color: color,
         weight: 10,
         opacity: 0.2,
         smoothFactor: 1,
     }).addTo(map);
+<<<<<<< Updated upstream
     routeGlowPolylines.push(glow);
+=======
+    routeGlowPolylines.push(glowLine);
+
+    currentRouteData = {
+        ...(prevRouteData || {}),
+        route_coords: routeCoords,
+        route_type: routeType,
+    };
+>>>>>>> Stashed changes
 
     // HaritayÃ„Â± rotaya sÃ„Â±Ã„Å¸dÃ„Â±r
     map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
@@ -2819,9 +2846,19 @@ function toggleSavedLocationsVisibility() {
     }
 }
 
+<<<<<<< Updated upstream
 // ========== EVENT DELEGATION - XSS GÃƒÂ¼venlik DÃƒÂ¼zeltmeleri ==========
 // TÃƒÂ¼m inline onclick handlers yerine tek bir event listener kullanÃ„Â±lÃ„Â±r
 // Bu, XSS saldÃ„Â±rÃ„Â±larÃ„Â±nÃ„Â± ÃƒÂ¶nler ve daha iyi performans saÃ„Å¸lar
+=======
+        } else if (seg.mode === "bus") {
+            const stopCoords = (Array.isArray(seg.stop_coords) && seg.stop_coords.length >= 2)
+                ? seg.stop_coords
+                : seg.coords;
+            const stopLatLngs = stopCoords.map(c => [c[0], c[1]]);
+
+            // ---- OTOBUS SEGMENTI ----
+>>>>>>> Stashed changes
 
 document.addEventListener("click", function(e) {
     // Find closest element with data attribute (handles nested clicks)
@@ -2840,6 +2877,7 @@ document.addEventListener("click", function(e) {
         return;
     }
 
+<<<<<<< Updated upstream
     // Save location from marker popup
     if (e.target.matches("[data-action-save-location]")) {
         const lat = parseFloat(e.target.dataset.lat);
@@ -2862,6 +2900,67 @@ document.addEventListener("click", function(e) {
         loadRoute(id);
         return;
     }
+=======
+            // 3. Ara durak noktalari (kucuk beyaz daireler)
+            const stride = stopLatLngs.length > 60 ? 3 : 1;
+            stopLatLngs.forEach((coord, i) => {
+                const isEndpoint = (i === 0 || i === stopLatLngs.length - 1);
+                if (!isEndpoint) {
+                    if (stride > 1 && i % stride !== 0) {
+                        return;
+                    }
+                    const stopDot = L.circleMarker([coord[0], coord[1]], {
+                        radius: 3,
+                        color: "#00cec9",
+                        fillColor: "white",
+                        fillOpacity: 1,
+                        weight: 1,
+                    });
+                    stopDot.addTo(map);
+                    transitRouteLayers.push(stopDot);
+                }
+            });
+
+            // 4. BINIS duragi (buyuk yesil numarali marker)
+            const boardCoord = stopLatLngs[0] || latlngs[0];
+            const boardMarker = L.marker(boardCoord, {
+                icon: L.divIcon({
+                    className: "transit-step-icon",
+                    html: `<div class="step-circle step-board">${stepNum}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                }),
+            });
+            boardMarker.bindTooltip(`Bin: ${seg.from_stop || "Durak"}`, {
+                permanent: true,
+                direction: "top",
+                offset: [0, -16],
+                className: "transit-route-tooltip transit-tooltip-board",
+            });
+            boardMarker.addTo(map);
+            transitRouteLayers.push(boardMarker);
+            stepNum++;
+
+            // 5. INIS duragi (buyuk kirmizi numarali marker)
+            const alightCoord = stopLatLngs[stopLatLngs.length - 1] || latlngs[latlngs.length - 1];
+            const alightMarker = L.marker(alightCoord, {
+                icon: L.divIcon({
+                    className: "transit-step-icon",
+                    html: `<div class="step-circle step-alight">${stepNum}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                }),
+            });
+            alightMarker.bindTooltip(`In: ${seg.to_stop || "Durak"}`, {
+                permanent: true,
+                direction: "top",
+                offset: [0, -16],
+                className: "transit-route-tooltip transit-tooltip-alight",
+            });
+            alightMarker.addTo(map);
+            transitRouteLayers.push(alightMarker);
+            stepNum++;
+>>>>>>> Stashed changes
 
     // Delete saved route
     if (e.target.matches("[data-action-delete-route]")) {
