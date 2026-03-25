@@ -440,6 +440,20 @@ def _merge_geo_frames(gdfs):
     return merged
 
 
+def _is_no_matching_features_error(exc: Exception) -> bool:
+    """
+    OSMnx/Overpass tarafinda "sonuc yok" durumunu teknik hata degil, bos sonuc kabul eder.
+    """
+    msg = str(exc or "").lower()
+    markers = (
+        "no matching features",
+        "found no results",
+        "no data elements in server response",
+        "nothing returned",
+    )
+    return any(m in msg for m in markers)
+
+
 def _fetch_pois_chunked_grid(place_name: str, normalized_tags: dict, gdf_place) -> object:
     """
     Buyuk idari alan icin bbox'i hucrelere bolup features_from_point ile tarar.
@@ -474,6 +488,9 @@ def _fetch_pois_chunked_grid(place_name: str, normalized_tags: dict, gdf_place) 
     )
 
     collected = []
+    total_cells = n_lat * n_lon
+    no_match_cells = 0
+    error_cells = 0
     for i in range(n_lat):
         for j in range(n_lon):
             lo_lat = miny + (i / n_lat) * lat_deg
@@ -490,7 +507,16 @@ def _fetch_pois_chunked_grid(place_name: str, normalized_tags: dict, gdf_place) 
                 if gdf_cell is not None and len(gdf_cell) > 0:
                     collected.append(gdf_cell)
             except Exception as exc:
-                print(f"[POI] Parca ({i},{j}) hata: {exc}")
+                if _is_no_matching_features_error(exc):
+                    no_match_cells += 1
+                    continue
+                error_cells += 1
+                print(f"[POI] Parca ({i},{j}) teknik hata: {exc}")
+
+    print(
+        f"[POI] Parcali grid ozet: dolu_hucre={len(collected)}, "
+        f"bos_hucre={no_match_cells}, teknik_hata={error_cells}, toplam={total_cells}"
+    )
 
     return _merge_geo_frames(collected)
 
@@ -508,7 +534,8 @@ def _fetch_pois_with_fallback(
     """
     search_mode = (search_mode or "auto").strip().lower()
 
-    # Idari sinir (il veya ilce): once tek sorgu; cok genis bbox'ta parcali grid; bos/hata -> parcali fallback.
+    # Idari sinir (il veya ilce): once tek place-boundary sorgu.
+    # Sadece teknik hata olursa (timeout/provider vb.) buyuk bbox icin parcali grid fallback calisir.
     if search_mode == "place_boundary_only":
         gdf_place = None
         try:
@@ -522,26 +549,24 @@ def _fetch_pois_with_fallback(
             bx = gdf_place.total_bounds
             span_km = _bbox_span_km(bx[0], bx[1], bx[2], bx[3])
 
-        if span_km > min_km and pd is not None and gdf_place is not None and len(gdf_place) > 0:
-            print(f"[POI] place_boundary_only: bbox genis (~{span_km:.1f} km) -> parcali tarama")
-            gdf_chunked = _fetch_pois_chunked_grid(place_name, normalized_tags, gdf_place)
-            if gdf_chunked is not None and len(gdf_chunked) > 0:
-                return gdf_chunked, False
-
+        had_error = False
         try:
             print("[POI] Search mode: place_boundary_only (idari sinir, tek sorgu)")
             gdf = ox.features_from_place(place_name, tags=normalized_tags)
             if gdf is not None and len(gdf) > 0:
                 return gdf, False
+            print("[POI] place_boundary_only: tek sorgu tamamlandi, sonuc bos")
+            return None, False
         except Exception as exc:
             print(f"[POI] place-boundary tek sorgu hatasi: {exc}")
+            had_error = True
 
-        if gdf_place is not None and len(gdf_place) > 0 and pd is not None:
-            print("[POI] place_boundary_only: tek sorgu bos/hata -> parcali fallback")
+        if had_error and span_km > min_km and gdf_place is not None and len(gdf_place) > 0 and pd is not None:
+            print(f"[POI] place_boundary_only: teknik hata -> parcali fallback (~{span_km:.1f} km)")
             gdf_chunked = _fetch_pois_chunked_grid(place_name, normalized_tags, gdf_place)
             if gdf_chunked is not None and len(gdf_chunked) > 0:
                 return gdf_chunked, False
-        return None, True
+        return None, had_error
 
     center = _resolve_search_center(place_name)
     if center is None:
