@@ -92,6 +92,9 @@ const elBtnShowTimeline = document.getElementById("btnShowTimeline");
 const elTimelinePanel = document.getElementById("timelinePanel");
 const elBtnGenerateTimeline = document.getElementById("btnGenerateTimeline");
 const elTimelineDisplay = document.getElementById("timelineDisplay");
+const elBtnCompareRoutes = document.getElementById("btnCompareRoutes");
+const elMultimodalPanel = document.getElementById("multimodalPanel");
+const elMultimodalResults = document.getElementById("multimodalResults");
 
 // Saved Locations elements
 const elSavedLocationsList = document.getElementById("savedLocationsList");
@@ -332,6 +335,9 @@ function updateButtons() {
     elBtnCalculate.disabled = selectedPoints.length < 2;
     elBtnShowAlternatives.disabled = selectedPoints.length < 2;
     elBtnShowTimeline.disabled = selectedPoints.length < 2 || !currentRouteData;
+    if (elBtnCompareRoutes) {
+        elBtnCompareRoutes.disabled = selectedPoints.length < 2;
+    }
 }
 
 // ========== ROUTE CALCULATION ==========
