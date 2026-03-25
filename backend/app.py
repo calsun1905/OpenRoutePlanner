@@ -864,9 +864,259 @@ def api_optimize_timeline():
         return jsonify({"error": f"Sunucu hatası: {str(e)}"}), 500
 
 
+# =============================================================================
+# TOPLU ULASIM API'LERI
+# =============================================================================
+
+try:
+    from ibb_transit import (
+        initialize_transit_data,
+        get_stops_in_area,
+        search_stops as search_transit_stops,
+        get_route_info as get_transit_route_info,
+        get_routes_for_stop,
+        get_statistics as get_transit_statistics,
+    )
+    _transit_available = True
+except ImportError:
+    _transit_available = False
+    print("[API] ibb_transit modulu yuklenemedi, transit API devre disi")
+
+
+@app.route("/api/transit/stops", methods=["GET"])
+def api_transit_stops():
+    """
+    Belirtilen koordinat etrafindaki toplu tasima duraklarini doner.
+
+    Query Parameters:
+        lat: Enlem
+        lon: Boylam
+        radius: Yaricap (metre, varsayilan 500)
+    """
+    if not _transit_available:
+        return jsonify({"error": "Transit modulu yuklu degil"}), 503
+
+    try:
+        lat = request.args.get("lat", type=float)
+        lon = request.args.get("lon", type=float)
+        radius = request.args.get("radius", 500, type=float)
+
+        if lat is None or lon is None:
+            return jsonify({"error": "'lat' ve 'lon' parametreleri gerekli"}), 400
+
+        stops = get_stops_in_area(lat, lon, radius)
+
+        return jsonify({
+            "stops": stops,
+            "count": len(stops),
+            "center": {"lat": lat, "lon": lon},
+            "radius_m": radius,
+        })
+
+    except Exception as e:
+        print(f"[API] Transit stops hatasi: {e}")
+        return jsonify({"error": f"Sunucu hatasi: {str(e)}"}), 500
+
+
+@app.route("/api/transit/search", methods=["GET"])
+def api_transit_search():
+    """
+    Durak adi ile arama yapar.
+
+    Query Parameters:
+        q: Arama metni
+        limit: Maks sonuc (varsayilan 20)
+    """
+    if not _transit_available:
+        return jsonify({"error": "Transit modulu yuklu degil"}), 503
+
+    try:
+        query = request.args.get("q", "")
+        limit = request.args.get("limit", 20, type=int)
+
+        if not query or len(query) < 2:
+            return jsonify({"error": "En az 2 karakter gerekli"}), 400
+
+        results = search_transit_stops(query, limit)
+
+        return jsonify({
+            "stops": results,
+            "count": len(results),
+            "query": query,
+        })
+
+    except Exception as e:
+        print(f"[API] Transit arama hatasi: {e}")
+        return jsonify({"error": f"Sunucu hatasi: {str(e)}"}), 500
+
+
+@app.route("/api/transit/route", methods=["GET"])
+def api_transit_route():
+    """
+    Hat detay bilgisi doner.
+
+    Query Parameters:
+        code: Hat kodu (orn: 500T)
+    """
+    if not _transit_available:
+        return jsonify({"error": "Transit modulu yuklu degil"}), 503
+
+    try:
+        code = request.args.get("code", "")
+
+        if not code:
+            return jsonify({"error": "'code' parametresi gerekli"}), 400
+
+        route = get_transit_route_info(code)
+
+        if not route:
+            return jsonify({"error": f"Hat bulunamadi: {code}"}), 404
+
+        return jsonify({"route": route})
+
+    except Exception as e:
+        print(f"[API] Transit route hatasi: {e}")
+        return jsonify({"error": f"Sunucu hatasi: {str(e)}"}), 500
+
+
+@app.route("/api/transit/stop-routes", methods=["GET"])
+def api_transit_stop_routes():
+    """
+    Bir duraktan gecen hatlari doner.
+
+    Query Parameters:
+        code: Durak kodu
+    """
+    if not _transit_available:
+        return jsonify({"error": "Transit modulu yuklu degil"}), 503
+
+    try:
+        code = request.args.get("code", type=int)
+
+        if code is None:
+            return jsonify({"error": "'code' parametresi gerekli"}), 400
+
+        routes = get_routes_for_stop(code)
+
+        return jsonify({
+            "routes": routes,
+            "count": len(routes),
+            "stop_code": code,
+        })
+
+    except Exception as e:
+        print(f"[API] Transit stop-routes hatasi: {e}")
+        return jsonify({"error": f"Sunucu hatasi: {str(e)}"}), 500
+
+
+@app.route("/api/transit/stats", methods=["GET"])
+def api_transit_stats():
+    """Transit veri istatistikleri."""
+    if not _transit_available:
+        return jsonify({"error": "Transit modulu yuklu degil"}), 503
+
+    try:
+        stats = get_transit_statistics()
+        return jsonify(stats)
+
+    except Exception as e:
+        print(f"[API] Transit stats hatasi: {e}")
+        return jsonify({"error": f"Sunucu hatasi: {str(e)}"}), 500
+
+
+@app.route("/api/transit/init", methods=["POST"])
+def api_transit_init():
+    """
+    Transit verilerini baslatir/gunceller.
+    Ilk calistirmada ~30 saniye surebilir.
+    """
+    if not _transit_available:
+        return jsonify({"error": "Transit modulu yuklu degil"}), 503
+
+    try:
+        force = request.args.get("force", "false").lower() == "true"
+        result = initialize_transit_data(force=force)
+
+        return jsonify({
+            "status": "success",
+            "message": f"{result['stops']} durak, {result['routes']} hat yuklendi",
+            **result,
+        })
+
+    except Exception as e:
+        print(f"[API] Transit init hatasi: {e}")
+        return jsonify({"error": f"Sunucu hatasi: {str(e)}"}), 500
+
+
+# =============================================================================
+# MULTIMODAL ROTA API
+# =============================================================================
+
+try:
+    from multimodal_engine import compare_routes as multimodal_compare
+    _multimodal_available = True
+except ImportError:
+    _multimodal_available = False
+    print("[API] multimodal_engine yuklenemedi")
+
+
+@app.route("/api/multimodal/compare", methods=["POST"])
+def api_multimodal_compare():
+    """
+    Yuruyus ve toplu tasima seceneklerini karsilastirir.
+
+    Request Body:
+        {
+            "origin": [lat, lon],
+            "destination": [lat, lon]
+        }
+
+    Response:
+        {
+            "options": [...],
+            "recommended": "transit" | "walking",
+            "recommendation_reason": "..."
+        }
+    """
+    if not _multimodal_available:
+        return jsonify({"error": "Multimodal motor yuklu degil"}), 503
+
+    try:
+        data = request.get_json()
+
+        if not data or "origin" not in data or "destination" not in data:
+            return jsonify({"error": "'origin' ve 'destination' alanlari gerekli"}), 400
+
+        origin = data["origin"]
+        destination = data["destination"]
+
+        if not (isinstance(origin, list) and len(origin) == 2):
+            return jsonify({"error": "origin [lat, lon] formatinda olmali"}), 400
+        if not (isinstance(destination, list) and len(destination) == 2):
+            return jsonify({"error": "destination [lat, lon] formatinda olmali"}), 400
+
+        result = multimodal_compare(
+            origin[0], origin[1],
+            destination[0], destination[1],
+        )
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"[API] Multimodal hatasi: {e}")
+        return jsonify({"error": f"Sunucu hatasi: {str(e)}"}), 500
+
+
 if __name__ == "__main__":
+    # Transit verilerini arka planda yukle
+    if _transit_available:
+        try:
+            initialize_transit_data()
+        except Exception as e:
+            print(f"[Transit] Baslangic yukleme hatasi: {e}")
+
     print("=" * 50)
-    print("  OpenTrip API Sunucusu Başlatılıyor...")
+    print("  OpenTrip API Sunucusu Baslatiliyor...")
     print("  http://localhost:5000")
     print("=" * 50)
     app.run(debug=True, port=5000)

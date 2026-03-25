@@ -1,0 +1,808 @@
+"""
+ibb_transit.py - İBB Toplu Ulaşım Veri Modülü
+
+İETT SOAP API ile otobüs durak ve hat verilerini çeker,
+SQLite veritabanına kaydeder ve hızlı sorgulama sağlar.
+
+API: https://api.ibb.gov.tr/iett/UlasimAnaVeri/HatDurakGuzergah.asmx
+Format: SOAP → JSON
+"""
+
+import os
+import re
+import json
+import math
+import time
+import sqlite3
+import requests
+from typing import List, Dict, Optional, Tuple
+
+# ============================================================================
+# AYARLAR
+# ============================================================================
+
+CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+TRANSIT_DB = os.path.join(CACHE_DIR, "transit.db")
+
+IBB_API_URL = "https://api.ibb.gov.tr/iett/UlasimAnaVeri/HatDurakGuzergah.asmx"
+
+# Rate limiting (IBB API aşırı yüklenmesin)
+_last_request_time = 0.0
+RATE_LIMIT_SECONDS = 0.3
+
+
+# ============================================================================
+# SOAP XML TEMPLATELERİ
+# ============================================================================
+
+def _soap_envelope(method: str, params: dict = None) -> str:
+    """SOAP XML zarfı oluşturur."""
+    params_xml = ""
+    if params:
+        for key, value in params.items():
+            params_xml += f"<tns:{key}>{value}</tns:{key}>"
+
+    return f"""<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+               xmlns:tns="http://tempuri.org/">
+  <soap:Body>
+    <tns:{method}>
+      {params_xml}
+    </tns:{method}>
+  </soap:Body>
+</soap:Envelope>"""
+
+
+def _call_ibb_api(method: str, params: dict = None) -> str:
+    """
+    İBB SOAP API'ye istek gönderir.
+
+    Args:
+        method: SOAP metot adı (ör: GetDurak_json)
+        params: Parametreler
+
+    Returns:
+        str: SOAP response body metni
+    """
+    global _last_request_time
+
+    # Rate limiting
+    elapsed = time.time() - _last_request_time
+    if elapsed < RATE_LIMIT_SECONDS:
+        time.sleep(RATE_LIMIT_SECONDS - elapsed)
+
+    headers = {
+        "Content-Type": "text/xml; charset=utf-8",
+        "SOAPAction": f"http://tempuri.org/{method}",
+    }
+
+    body = _soap_envelope(method, params)
+
+    try:
+        response = requests.post(
+            IBB_API_URL,
+            data=body.encode("utf-8"),
+            headers=headers,
+            timeout=30,
+        )
+        _last_request_time = time.time()
+
+        if response.status_code != 200:
+            print(f"[IBB API] HTTP {response.status_code}: {method}")
+            return ""
+
+        return response.text
+
+    except requests.Timeout:
+        print(f"[IBB API] Timeout: {method}")
+        return ""
+    except requests.ConnectionError:
+        print(f"[IBB API] Bağlantı hatası: {method}")
+        return ""
+    except Exception as e:
+        print(f"[IBB API] Hata: {e}")
+        return ""
+
+
+def _parse_json_from_soap(soap_response: str) -> list:
+    """SOAP response'undan JSON verisini çıkarır."""
+    if not soap_response:
+        return []
+
+    # JSON arrayı bul: [...] veya tekil {...}
+    start = soap_response.find("[")
+    end = soap_response.rfind("]") + 1
+
+    if start < 0 or end <= start:
+        # Tekil obje dene
+        start = soap_response.find("{")
+        end = soap_response.rfind("}") + 1
+        if start < 0 or end <= start:
+            return []
+        json_str = soap_response[start:end]
+        try:
+            return [json.loads(json_str)]
+        except json.JSONDecodeError:
+            return []
+
+    json_str = soap_response[start:end]
+
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        print(f"[IBB API] JSON parse hatası: {e}")
+        return []
+
+
+# ============================================================================
+# KOORDİNAT PARSE
+# ============================================================================
+
+def _parse_wkt_point(wkt: str) -> Tuple[float, float]:
+    """
+    WKT POINT formatını (lat, lon) tuple'a çevirir.
+    Giriş:  "POINT (28.879 41.088)"  → (lon, lat) sırasında
+    Çıkış:  (41.088, 28.879)         → (lat, lon) sırasında
+    """
+    if not wkt:
+        return (0.0, 0.0)
+
+    match = re.search(r"POINT\s*\(\s*([\d.]+)\s+([\d.]+)\s*\)", wkt)
+    if match:
+        lon = float(match.group(1))
+        lat = float(match.group(2))
+        return (lat, lon)
+
+    return (0.0, 0.0)
+
+
+def _fix_encoding(text: str) -> str:
+    """İBB API'den gelen bozuk Türkçe karakterleri düzeltir."""
+    if not text:
+        return ""
+
+    # Latin-1 → UTF-8 dönüşümü dene
+    try:
+        fixed = text.encode("latin-1").decode("utf-8")
+        return fixed
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        pass
+
+    return text
+
+
+# ============================================================================
+# SQLITE VERİTABANI
+# ============================================================================
+
+def _get_db_connection() -> sqlite3.Connection:
+    """SQLite bağlantısı döner ve gerekli tabloları oluşturur."""
+    conn = sqlite3.connect(TRANSIT_DB)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stops (
+            code INTEGER PRIMARY KEY,
+            name TEXT,
+            lat REAL,
+            lon REAL,
+            district TEXT,
+            direction TEXT,
+            stop_type TEXT,
+            smart TEXT,
+            accessible TEXT,
+            physical TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS routes (
+            code TEXT PRIMARY KEY,
+            name TEXT,
+            fare_type TEXT,
+            length_km REAL,
+            duration_min REAL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS route_stops (
+            route_code TEXT,
+            stop_code INTEGER,
+            stop_order INTEGER,
+            direction TEXT,
+            PRIMARY KEY (route_code, stop_code, direction),
+            FOREIGN KEY (route_code) REFERENCES routes(code),
+            FOREIGN KEY (stop_code) REFERENCES stops(code)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+
+    # Spatial index (yakın durak sorgusu için)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_stops_lat ON stops(lat)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_stops_lon ON stops(lon)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_stops_district ON stops(district)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_route_stops_route ON route_stops(route_code)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_route_stops_stop ON route_stops(stop_code)")
+
+    conn.commit()
+    return conn
+
+
+def _is_data_fresh(max_age_hours: int = 24) -> bool:
+    """Veritabanındaki veri yeterince güncel mi kontrol eder."""
+    try:
+        conn = _get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM meta WHERE key = 'last_download'")
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return False
+
+        last_download = float(row["value"])
+        age_hours = (time.time() - last_download) / 3600
+        return age_hours < max_age_hours
+
+    except Exception:
+        return False
+
+
+def _get_stop_count() -> int:
+    """Veritabanındaki durak sayısını döner."""
+    try:
+        conn = _get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as cnt FROM stops")
+        row = cursor.fetchone()
+        conn.close()
+        return row["cnt"] if row else 0
+    except Exception:
+        return 0
+
+
+# ============================================================================
+# VERİ İNDİRME
+# ============================================================================
+
+def download_all_stops(force: bool = False) -> int:
+    """
+    İBB API'den tüm İETT duraklarını indirir ve SQLite'a kaydeder.
+
+    Args:
+        force: True ise cache'i yoksay, yeniden indir
+
+    Returns:
+        int: Kaydedilen durak sayısı
+    """
+    # Cache kontrolü
+    if not force and _is_data_fresh(max_age_hours=24):
+        count = _get_stop_count()
+        if count > 0:
+            print(f"[Transit] Veri güncel: {count} durak mevcut")
+            return count
+
+    print("[Transit] Tüm duraklar indiriliyor...")
+
+    # Tüm durakları çek (DurakKodu boş → tümü)
+    raw = _call_ibb_api("GetDurak_json", {"DurakKodu": ""})
+    stops_data = _parse_json_from_soap(raw)
+
+    if not stops_data:
+        print("[Transit] HATA: Durak verisi alınamadı!")
+        return 0
+
+    print(f"[Transit] {len(stops_data)} durak alındı, SQLite'a yazılıyor...")
+
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    # Mevcut verileri temizle
+    cursor.execute("DELETE FROM stops")
+
+    saved_count = 0
+    for stop in stops_data:
+        try:
+            code = int(stop.get("SDURAKKODU", 0))
+            name = _fix_encoding(str(stop.get("SDURAKADI", "")))
+            koordinat = str(stop.get("KOORDINAT", ""))
+            lat, lon = _parse_wkt_point(koordinat)
+
+            if code == 0 or (lat == 0 and lon == 0):
+                continue
+
+            district = _fix_encoding(str(stop.get("ILCEADI", "")))
+            direction = _fix_encoding(str(stop.get("SYON", "")))
+            stop_type = _fix_encoding(str(stop.get("DURAK_TIPI", "")))
+            smart = str(stop.get("AKILLI", ""))
+            accessible = _fix_encoding(str(stop.get("ENGELLIKULLANIM", "")))
+            physical = _fix_encoding(str(stop.get("FIZIKI", "")))
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO stops
+                (code, name, lat, lon, district, direction, stop_type, smart, accessible, physical)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (code, name, lat, lon, district, direction, stop_type, smart, accessible, physical))
+
+            saved_count += 1
+        except Exception as e:
+            continue
+
+    # Meta bilgisi güncelle
+    cursor.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+        ("last_download", str(time.time()))
+    )
+    cursor.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+        ("stop_count", str(saved_count))
+    )
+
+    conn.commit()
+    conn.close()
+
+    print(f"[Transit] [OK] {saved_count} durak SQLite'a kaydedildi!")
+    return saved_count
+
+
+def download_all_routes(force: bool = False) -> int:
+    """
+    İBB API'den tüm İETT hat bilgilerini indirir.
+
+    Returns:
+        int: Kaydedilen hat sayısı
+    """
+    print("[Transit] Tüm hatlar indiriliyor...")
+
+    raw = _call_ibb_api("GetHat_json", {"HatKodu": ""})
+    routes_data = _parse_json_from_soap(raw)
+
+    if not routes_data:
+        print("[Transit] HATA: Hat verisi alınamadı!")
+        return 0
+
+    print(f"[Transit] {len(routes_data)} hat alındı, SQLite'a yazılıyor...")
+
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM routes")
+
+    saved_count = 0
+    for route in routes_data:
+        try:
+            code = str(route.get("SHATKODU", ""))
+            name = _fix_encoding(str(route.get("SHATADI", "")))
+            fare = _fix_encoding(str(route.get("TARIFE", "")))
+            length_km = float(route.get("HAT_UZUNLUGU", 0) or 0)
+            duration_min = float(route.get("SEFER_SURESI", 0) or 0)
+
+            if not code:
+                continue
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO routes
+                (code, name, fare_type, length_km, duration_min)
+                VALUES (?, ?, ?, ?, ?)
+            """, (code, name, fare, length_km, duration_min))
+
+            saved_count += 1
+        except Exception:
+            continue
+
+    conn.commit()
+    conn.close()
+
+    print(f"[Transit] [OK] {saved_count} hat SQLite'a kaydedildi!")
+    return saved_count
+
+
+def download_route_stops(max_routes: int = 200, force: bool = False) -> int:
+    """
+    Her hat icin durak siralamasini indirir ve route_stops tablosuna kaydeder.
+    IBB ibb.asmx/DurakDetay_GYY endpointini kullanir (XML format).
+
+    Args:
+        max_routes: Maksimum islenecek hat sayisi
+        force: True ise mevcut verileri sil ve yeniden indir
+
+    Returns:
+        int: Kaydedilen route_stop kayit sayisi
+    """
+    IBB_API_URL2 = "https://api.ibb.gov.tr/iett/ibb/ibb.asmx"
+
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    # Mevcut veri kontrolu
+    if not force:
+        cursor.execute("SELECT COUNT(*) as cnt FROM route_stops")
+        existing = cursor.fetchone()["cnt"]
+        if existing > 0:
+            print(f"[Transit] route_stops verisi mevcut: {existing} kayit")
+            conn.close()
+            return existing
+
+    print(f"[Transit] Hat-durak eslesmeleri indiriliyor (max {max_routes} hat)...")
+
+    # En uzun hatlari once isle (daha fazla durak kapsar)
+    cursor.execute("""
+        SELECT code FROM routes
+        ORDER BY length_km DESC
+        LIMIT ?
+    """, (max_routes,))
+    route_codes = [row["code"] for row in cursor.fetchall()]
+
+    if not route_codes:
+        print("[Transit] HATA: routes tablosu bos!")
+        conn.close()
+        return 0
+
+    # Mevcut route_stops verilerini temizle
+    cursor.execute("DELETE FROM route_stops")
+    conn.commit()
+
+    saved_count = 0
+    processed = 0
+
+    for route_code in route_codes:
+        processed += 1
+
+        # Her 50 hatta bir ilerleme goster
+        if processed % 50 == 0:
+            print(f"[Transit]   {processed}/{len(route_codes)} hat islendi ({saved_count} kayit)")
+
+        try:
+            # Rate limiting
+            global _last_request_time
+            elapsed = time.time() - _last_request_time
+            if elapsed < RATE_LIMIT_SECONDS:
+                time.sleep(RATE_LIMIT_SECONDS - elapsed)
+
+            # SOAP request to ibb.asmx
+            soap_body = f"""<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+               xmlns:tns="http://tempuri.org/">
+  <soap:Body>
+    <tns:DurakDetay_GYY>
+      <tns:hat_kodu>{route_code}</tns:hat_kodu>
+    </tns:DurakDetay_GYY>
+  </soap:Body>
+</soap:Envelope>"""
+
+            headers = {
+                "Content-Type": "text/xml; charset=utf-8",
+                "SOAPAction": "http://tempuri.org/DurakDetay_GYY",
+            }
+
+            response = requests.post(
+                IBB_API_URL2,
+                data=soap_body.encode("utf-8"),
+                headers=headers,
+                timeout=15,
+            )
+            _last_request_time = time.time()
+
+            if response.status_code != 200:
+                continue
+
+            xml_text = response.text
+
+            # XML'den durak bilgilerini regex ile cek
+            # Her <Table>...</Table> bir durak
+            tables = re.findall(r"<Table>(.*?)</Table>", xml_text, re.DOTALL)
+
+            for table in tables:
+                try:
+                    code_match = re.search(r"<DURAKKODU>(\d+)</DURAKKODU>", table)
+                    order_match = re.search(r"<SIRANO>(\d+)</SIRANO>", table)
+                    dir_match = re.search(r"<YON>([^<]+)</YON>", table)
+
+                    if not code_match:
+                        continue
+
+                    stop_code = int(code_match.group(1))
+                    stop_order = int(order_match.group(1)) if order_match else 0
+                    direction = dir_match.group(1) if dir_match else "G"
+
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO route_stops
+                        (route_code, stop_code, stop_order, direction)
+                        VALUES (?, ?, ?, ?)
+                    """, (route_code, stop_code, stop_order, direction))
+
+                    saved_count += 1
+                except Exception:
+                    continue
+
+            # Her 10 hatta bir commit
+            if processed % 10 == 0:
+                conn.commit()
+
+        except Exception as e:
+            continue
+
+    conn.commit()
+    conn.close()
+
+    print(f"[Transit] [OK] {saved_count} hat-durak eslesmesi kaydedildi!")
+    return saved_count
+
+
+def initialize_transit_data(force: bool = False) -> dict:
+    """
+    Transit verilerini baslatir (duraklar + hatlar + hat-durak eslesmeleri).
+    Ilk calistirmada 1-2 dakika surebilir.
+
+    Returns:
+        dict: {"stops": int, "routes": int, "route_stops": int}
+    """
+    print("=" * 50)
+    print("  IBB Transit Verileri Yukleniyor...")
+    print("=" * 50)
+
+    start_time = time.time()
+
+    stop_count = download_all_stops(force=force)
+    route_count = download_all_routes(force=force)
+    route_stop_count = download_route_stops(max_routes=900, force=force)
+
+    elapsed = round(time.time() - start_time, 1)
+    print(f"[Transit] Toplam sure: {elapsed}s")
+    print(f"[Transit] {stop_count} durak, {route_count} hat, {route_stop_count} esleme yuklendi")
+
+    return {"stops": stop_count, "routes": route_count, "route_stops": route_stop_count}
+
+
+# ============================================================================
+# SORGULAMA FONKSİYONLARI
+# ============================================================================
+
+def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """İki koordinat arası mesafe (metre)."""
+    R = 6371000
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    c = 2 * math.asin(math.sqrt(a))
+    return R * c
+
+
+def get_stops_in_area(lat: float, lon: float, radius_m: float = 500) -> List[Dict]:
+    """
+    Belirtilen koordinat etrafındaki durakları döner.
+
+    Args:
+        lat, lon: Merkez koordinat
+        radius_m: Yarıçap (metre)
+
+    Returns:
+        Yakındaki duraklar listesi (mesafeye göre sıralı)
+    """
+    # Bounding box hesapla (hızlı ön filtreleme)
+    delta_lat = radius_m / 111000  # ~111km per degree
+    delta_lon = radius_m / (111000 * math.cos(math.radians(lat)))
+
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT code, name, lat, lon, district, direction, stop_type, smart, accessible
+        FROM stops
+        WHERE lat BETWEEN ? AND ?
+          AND lon BETWEEN ? AND ?
+    """, (lat - delta_lat, lat + delta_lat, lon - delta_lon, lon + delta_lon))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    # Haversine ile gerçek mesafe filtrele
+    results = []
+    for row in rows:
+        dist = _haversine_distance(lat, lon, row["lat"], row["lon"])
+        if dist <= radius_m:
+            results.append({
+                "code": row["code"],
+                "name": row["name"],
+                "lat": row["lat"],
+                "lon": row["lon"],
+                "district": row["district"],
+                "direction": row["direction"],
+                "stop_type": row["stop_type"],
+                "smart": row["smart"],
+                "accessible": row["accessible"],
+                "distance_m": round(dist),
+            })
+
+    # Mesafeye göre sırala
+    results.sort(key=lambda x: x["distance_m"])
+    return results
+
+
+def search_stops(query: str, limit: int = 20) -> List[Dict]:
+    """
+    Durak adı ile arama yapar.
+
+    Args:
+        query: Arama metni
+        limit: Maksimum sonuç
+
+    Returns:
+        Eşleşen duraklar listesi
+    """
+    if not query or len(query) < 2:
+        return []
+
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT code, name, lat, lon, district, direction, stop_type
+        FROM stops
+        WHERE name LIKE ? OR district LIKE ?
+        LIMIT ?
+    """, (f"%{query}%", f"%{query}%", limit))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
+
+
+def get_route_info(route_code: str) -> Optional[Dict]:
+    """
+    Hat detay bilgisini döner.
+
+    Args:
+        route_code: Hat kodu (ör: "500T")
+
+    Returns:
+        Hat bilgileri veya None
+    """
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM routes WHERE code = ?", (route_code,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return dict(row)
+
+    # Cache'te yoksa API'den çek
+    raw = _call_ibb_api("GetHat_json", {"HatKodu": route_code})
+    data = _parse_json_from_soap(raw)
+
+    if data:
+        route = data[0]
+        return {
+            "code": str(route.get("SHATKODU", "")),
+            "name": _fix_encoding(str(route.get("SHATADI", ""))),
+            "fare_type": _fix_encoding(str(route.get("TARIFE", ""))),
+            "length_km": float(route.get("HAT_UZUNLUGU", 0) or 0),
+            "duration_min": float(route.get("SEFER_SURESI", 0) or 0),
+        }
+
+    return None
+
+
+def get_routes_for_stop(stop_code: int) -> List[Dict]:
+    """
+    Bir duraktan geçen tüm hatları döner.
+
+    Önce route_stops tablosuna bakar, yoksa API'den çeker.
+    """
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT r.code, r.name, r.fare_type, r.length_km, r.duration_min
+        FROM route_stops rs
+        JOIN routes r ON rs.route_code = r.code
+        WHERE rs.stop_code = ?
+        ORDER BY r.code
+    """, (stop_code,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    if rows:
+        return [dict(row) for row in rows]
+
+    # Cache'te yoksa bilgi yok, boş döndür
+    return []
+
+
+def find_connecting_routes(stop_a: int, stop_b: int) -> List[Dict]:
+    """
+    İki durak arası direkt bağlantı olan hatları bulur.
+
+    Args:
+        stop_a: Başlangıç durak kodu
+        stop_b: Bitiş durak kodu
+
+    Returns:
+        Ortak hatlar listesi
+    """
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT DISTINCT rs1.route_code, r.name, r.length_km, r.duration_min
+        FROM route_stops rs1
+        JOIN route_stops rs2 ON rs1.route_code = rs2.route_code
+        JOIN routes r ON rs1.route_code = r.code
+        WHERE rs1.stop_code = ? AND rs2.stop_code = ?
+    """, (stop_a, stop_b))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
+
+
+def get_statistics() -> dict:
+    """Transit verisi istatistikleri."""
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) as cnt FROM stops")
+    stop_count = cursor.fetchone()["cnt"]
+
+    cursor.execute("SELECT COUNT(*) as cnt FROM routes")
+    route_count = cursor.fetchone()["cnt"]
+
+    cursor.execute("SELECT COUNT(DISTINCT district) as cnt FROM stops WHERE district != ''")
+    district_count = cursor.fetchone()["cnt"]
+
+    cursor.execute("SELECT value FROM meta WHERE key = 'last_download'")
+    row = cursor.fetchone()
+    last_download = float(row["value"]) if row else 0
+
+    conn.close()
+
+    return {
+        "stops": stop_count,
+        "routes": route_count,
+        "districts": district_count,
+        "last_download": last_download,
+        "data_fresh": _is_data_fresh(),
+    }
+
+
+# ============================================================================
+# TEST
+# ============================================================================
+
+if __name__ == "__main__":
+    print("IBB Transit Test")
+    print("=" * 50)
+
+    # 1. Veri indir
+    result = initialize_transit_data()
+    print(f"\nSonuç: {result}")
+
+    # 2. Yakın durak sorgusu (Kadıköy)
+    print("\n--- Kadıköy yakını duraklar ---")
+    stops = get_stops_in_area(40.9903, 29.0291, 300)
+    for s in stops[:5]:
+        print(f"  {s['code']} | {s['name']} | {s['distance_m']}m | {s['district']}")
+
+    # 3. Durak arama
+    print("\n--- 'moda' araması ---")
+    results = search_stops("moda")
+    for r in results[:5]:
+        print(f"  {r['code']} | {r['name']} | {r['district']}")
+
+    # 4. İstatistik
+    print(f"\nİstatistik: {get_statistics()}")

@@ -61,6 +61,9 @@ const elBtnShowTimeline = document.getElementById("btnShowTimeline");
 const elTimelinePanel = document.getElementById("timelinePanel");
 const elBtnGenerateTimeline = document.getElementById("btnGenerateTimeline");
 const elTimelineDisplay = document.getElementById("timelineDisplay");
+const elBtnCompareRoutes = document.getElementById("btnCompareRoutes");
+const elMultimodalPanel = document.getElementById("multimodalPanel");
+const elMultimodalResults = document.getElementById("multimodalResults");
 
 // ========== CUSTOM MARKER ICON ==========
 function createNumberedIcon(number) {
@@ -169,6 +172,9 @@ function updateButtons() {
     elBtnCalculate.disabled = selectedPoints.length < 2;
     elBtnShowAlternatives.disabled = selectedPoints.length < 2;
     elBtnShowTimeline.disabled = selectedPoints.length < 2 || !currentRouteData;
+    if (elBtnCompareRoutes) {
+        elBtnCompareRoutes.disabled = selectedPoints.length < 2;
+    }
 }
 
 // ========== ROUTE CALCULATION ==========
@@ -1093,4 +1099,635 @@ function displayTimeline(timeline) {
     html += `</div>`;
 
     elTimelineDisplay.innerHTML = html;
+}
+
+
+// ========== TRANSIT (TOPLU ULASIM) ==========
+
+// Transit state
+let transitStopMarkers = null;  // MarkerClusterGroup
+let transitEnabled = false;
+let _transitDebounceTimer = null;
+
+// Transit DOM elements
+const elChkShowStops = document.getElementById("chkShowStops");
+const elTransitPanel = document.getElementById("transitPanel");
+const elTransitSearchInput = document.getElementById("transitSearchInput");
+const elBtnSearchTransit = document.getElementById("btnSearchTransit");
+const elTransitSearchResults = document.getElementById("transitSearchResults");
+const elNearbyStopsList = document.getElementById("nearbyStopsList");
+
+// Transit stop icon
+function createStopIcon() {
+    return L.divIcon({
+        className: "transit-stop-icon",
+        html: '<div class="stop-marker">&#x1F68F;</div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12],
+    });
+}
+
+// Toggle transit stops
+if (elChkShowStops) {
+    elChkShowStops.addEventListener("change", function () {
+        transitEnabled = this.checked;
+        elTransitPanel.style.display = transitEnabled ? "block" : "none";
+
+        if (transitEnabled) {
+            // Initialize cluster group
+            if (!transitStopMarkers) {
+                transitStopMarkers = L.markerClusterGroup({
+                    maxClusterRadius: 50,
+                    disableClusteringAtZoom: 16,
+                    spiderfyOnMaxZoom: true,
+                    showCoverageOnHover: false,
+                    iconCreateFunction: function (cluster) {
+                        const count = cluster.getChildCount();
+                        let size = "small";
+                        if (count > 50) size = "large";
+                        else if (count > 20) size = "medium";
+                        return L.divIcon({
+                            html: `<div class="transit-cluster transit-cluster-${size}"><span>${count}</span></div>`,
+                            className: "transit-cluster-wrapper",
+                            iconSize: [40, 40],
+                        });
+                    },
+                });
+                map.addLayer(transitStopMarkers);
+            }
+            loadNearbyStops();
+        } else {
+            if (transitStopMarkers) {
+                transitStopMarkers.clearLayers();
+            }
+            elNearbyStopsList.innerHTML = '<div class="empty-state"><p>Toplu ulasim kapali</p></div>';
+        }
+    });
+}
+
+// Load nearby stops when map moves
+map.on("moveend", function () {
+    if (transitEnabled) {
+        // Debounce
+        clearTimeout(_transitDebounceTimer);
+        _transitDebounceTimer = setTimeout(loadNearbyStops, 300);
+    }
+});
+
+/**
+ * Haritanin merkezine yakin duraklari yukler
+ */
+async function loadNearbyStops() {
+    if (!transitEnabled) return;
+
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+
+    // Zoom seviyesine gore yaricap hesapla
+    let radius = 500;
+    if (zoom >= 16) radius = 300;
+    else if (zoom >= 14) radius = 600;
+    else if (zoom >= 12) radius = 1500;
+    else radius = 3000;
+
+    try {
+        const response = await fetch(
+            `${API_BASE}/transit/stops?lat=${center.lat}&lon=${center.lng}&radius=${radius}`
+        );
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error("Transit API hatasi:", data.error);
+            return;
+        }
+
+        // Marker cluster guncelle
+        if (transitStopMarkers) {
+            transitStopMarkers.clearLayers();
+        }
+
+        const stops = data.stops || [];
+
+        stops.forEach((stop) => {
+            const marker = L.marker([stop.lat, stop.lon], {
+                icon: createStopIcon(),
+            });
+
+            const popupContent = buildStopPopup(stop);
+            marker.bindPopup(popupContent, {
+                maxWidth: 280,
+                minWidth: 200,
+                className: "transit-popup",
+            });
+
+            transitStopMarkers.addLayer(marker);
+        });
+
+        // Sidebar listesini guncelle
+        updateNearbyStopsList(stops);
+
+    } catch (error) {
+        console.error("Nearby stops hatasi:", error);
+    }
+}
+
+/**
+ * Durak popup olusturur
+ */
+function buildStopPopup(stop) {
+    let html = '<div class="stop-popup-card">';
+    html += `<div class="stop-popup-header">`;
+    html += `<span class="stop-popup-emoji">&#x1F68F;</span>`;
+    html += `<div>`;
+    html += `<h3 class="stop-popup-name">${stop.name || "Durak"}</h3>`;
+    html += `<span class="stop-popup-district">${stop.district || ""}</span>`;
+    html += `</div></div>`;
+
+    html += `<div class="stop-popup-details">`;
+    html += `<div class="stop-detail"><span class="stop-detail-label">Kod:</span> ${stop.code}</div>`;
+    if (stop.direction) {
+        html += `<div class="stop-detail"><span class="stop-detail-label">Yon:</span> ${stop.direction}</div>`;
+    }
+    if (stop.distance_m !== undefined) {
+        html += `<div class="stop-detail"><span class="stop-detail-label">Mesafe:</span> ${stop.distance_m}m</div>`;
+    }
+    if (stop.accessible && stop.accessible !== "Uygun Degil") {
+        html += `<div class="stop-detail"><span class="stop-detail-label">Engelli:</span> Uygun</div>`;
+    }
+    html += `</div>`;
+
+    // Rotaya ekle butonu
+    html += `<button class="stop-popup-btn" onclick="addPoint(${stop.lat}, ${stop.lon})">+ Rotaya Ekle</button>`;
+
+    html += `</div>`;
+    return html;
+}
+
+/**
+ * Sidebar yakin duraklar listesini gunceller
+ */
+function updateNearbyStopsList(stops) {
+    if (!stops || stops.length === 0) {
+        elNearbyStopsList.innerHTML = '<div class="empty-state"><p>Bu alanda durak bulunamadi</p></div>';
+        return;
+    }
+
+    // Max 10 durak goster
+    const displayStops = stops.slice(0, 10);
+
+    let html = "";
+    displayStops.forEach((stop) => {
+        html += `
+            <div class="nearby-stop-item" onclick="map.setView([${stop.lat}, ${stop.lon}], 17)">
+                <div class="nearby-stop-info">
+                    <span class="nearby-stop-name">${stop.name || "Durak"}</span>
+                    <span class="nearby-stop-district">${stop.district || ""}</span>
+                </div>
+                <span class="nearby-stop-distance">${stop.distance_m}m</span>
+            </div>
+        `;
+    });
+
+    if (stops.length > 10) {
+        html += `<div class="nearby-stop-more">${stops.length - 10} durak daha...</div>`;
+    }
+
+    elNearbyStopsList.innerHTML = html;
+}
+
+/**
+ * Transit durak arama
+ */
+async function searchTransitStops() {
+    const query = elTransitSearchInput.value.trim();
+
+    if (!query || query.length < 2) {
+        showToast("En az 2 karakter girin", "error");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/transit/search?q=${encodeURIComponent(query)}&limit=10`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Arama hatasi");
+        }
+
+        displayTransitSearchResults(data.stops);
+
+    } catch (error) {
+        console.error("Transit arama hatasi:", error);
+        showToast(`Arama hatasi: ${error.message}`, "error");
+    }
+}
+
+/**
+ * Transit arama sonuclarini gosterir
+ */
+function displayTransitSearchResults(stops) {
+    elTransitSearchResults.style.display = "block";
+
+    if (!stops || stops.length === 0) {
+        elTransitSearchResults.innerHTML = '<div class="empty-state"><p>Sonuc bulunamadi</p></div>';
+        return;
+    }
+
+    let html = "";
+    stops.forEach((stop) => {
+        html += `
+            <div class="transit-result-item" onclick="selectTransitStop(${stop.lat}, ${stop.lon}, '${(stop.name || '').replace(/'/g, "\\'")}')">
+                <span class="transit-result-icon">&#x1F68F;</span>
+                <div class="transit-result-info">
+                    <span class="transit-result-name">${stop.name || "Durak"}</span>
+                    <span class="transit-result-district">${stop.district || ""} - Kod: ${stop.code}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    elTransitSearchResults.innerHTML = html;
+}
+
+/**
+ * Transit arama sonucuna tiklaninca haritaya gider
+ */
+function selectTransitStop(lat, lon, name) {
+    map.setView([lat, lon], 17);
+    elTransitSearchInput.value = "";
+    elTransitSearchResults.style.display = "none";
+    showToast(`${name} duragi konumuna gidildi`, "info");
+}
+
+// Transit event listeners
+if (elBtnSearchTransit) {
+    elBtnSearchTransit.addEventListener("click", searchTransitStops);
+}
+if (elTransitSearchInput) {
+    elTransitSearchInput.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") searchTransitStops();
+    });
+}
+
+
+// ========== MULTIMODAL ROUTE COMPARISON ==========
+
+if (elBtnCompareRoutes) {
+    elBtnCompareRoutes.addEventListener("click", compareMultimodalRoutes);
+}
+
+/**
+ * Yuruyus ve toplu tasima seceneklerini karsilastirir
+ */
+async function compareMultimodalRoutes() {
+    if (selectedPoints.length < 2) {
+        showToast("En az 2 nokta secmelisiniz!", "error");
+        return;
+    }
+
+    // Ilk ve son nokta arasini karsilastir
+    const origin = selectedPoints[0];
+    const destination = selectedPoints[selectedPoints.length - 1];
+
+    showLoading("Toplu tasima secenekleri hesaplaniyor...");
+
+    try {
+        const response = await fetch(`${API_BASE}/multimodal/compare`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                origin: origin,
+                destination: destination,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Bilinmeyen hata");
+        }
+
+        displayMultimodalResults(data);
+        showToast("Rota secenekleri hesaplandi!", "success");
+
+    } catch (error) {
+        console.error("Multimodal hatasi:", error);
+        showToast(`Hata: ${error.message}`, "error");
+    } finally {
+        hideLoading();
+    }
+}
+
+// Transit route polyline layer
+let transitRouteLayers = [];
+let _multimodalData = null;
+
+/**
+ * Multimodal sonuclarini gosterir ve ilk secili rotayi haritada cizer
+ */
+function displayMultimodalResults(data) {
+    elMultimodalPanel.style.display = "block";
+    _multimodalData = data;
+
+    const options = data.options || [];
+    const recommended = data.recommended;
+
+    let html = "";
+
+    // Recommendation banner
+    if (data.recommendation_reason) {
+        const recClass = recommended === "transit" ? "rec-transit" : "rec-walking";
+        const recIcon = recommended === "transit" ? "&#x1F68C;" : "&#x1F6B6;";
+        html += `
+            <div class="multimodal-rec ${recClass}">
+                <span class="rec-icon">${recIcon}</span>
+                <span class="rec-text">${data.recommendation_reason}</span>
+            </div>
+        `;
+    }
+
+    // Nearby routes info
+    const nr = data.nearby_routes;
+    if (nr && (nr.origin?.length || nr.destination?.length)) {
+        html += `<div class="nearby-routes-info">`;
+        if (nr.origin?.length) {
+            html += `<div class="nearby-route-line"><span class="nearby-label">Baslangic hatlari:</span> ${nr.origin.map(r => `<span class="route-badge">${r.route_code}</span>`).join(" ")}</div>`;
+        }
+        if (nr.destination?.length) {
+            html += `<div class="nearby-route-line"><span class="nearby-label">Hedef hatlari:</span> ${nr.destination.map(r => `<span class="route-badge">${r.route_code}</span>`).join(" ")}</div>`;
+        }
+        html += `</div>`;
+    }
+
+    options.forEach((opt, index) => {
+        const isRec = (opt.type === recommended);
+        const iconHtml = opt.type === "transit" ? "&#x1F68C;" : "&#x1F6B6;";
+
+        html += `
+            <div class="multimodal-option ${isRec ? 'recommended' : ''}" onclick="showTransitRoute(${index})" style="cursor:pointer;">
+                <div class="multimodal-option-header">
+                    <span class="multimodal-icon">${iconHtml}</span>
+                    <div class="multimodal-option-info">
+                        <h3 class="multimodal-option-name">${opt.name}</h3>
+                        <p class="multimodal-option-desc">${opt.description}</p>
+                    </div>
+                    <div class="multimodal-option-time">
+                        <span class="multimodal-time-value">${opt.total_time_min}</span>
+                        <span class="multimodal-time-unit">dk</span>
+                    </div>
+                </div>
+                <div class="multimodal-segments">
+        `;
+
+        // Segments (walk, bus, walk)
+        if (opt.segments) {
+            opt.segments.forEach((seg) => {
+                const segIcon = seg.mode === "bus" ? "&#x1F68C;" : "&#x1F6B6;";
+                const segClass = seg.mode === "bus" ? "seg-bus" : "seg-walk";
+
+                html += `
+                    <div class="multimodal-segment ${segClass}">
+                        <span class="seg-icon">${segIcon}</span>
+                        <span class="seg-desc">${seg.description || seg.mode}</span>
+                        <span class="seg-time">${seg.duration_min} dk</span>
+                    </div>
+                `;
+
+                if (seg.mode === "bus" && seg.wait_min) {
+                    html += `
+                        <div class="multimodal-segment seg-wait">
+                            <span class="seg-icon">&#x23F3;</span>
+                            <span class="seg-desc">Bekleme</span>
+                            <span class="seg-time">~${seg.wait_min} dk</span>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        html += `
+                    <div class="multimodal-show-map">
+                        &#x1F5FA; Haritada Goster
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    if (options.length === 0) {
+        html = '<div class="empty-state"><p>Secenek bulunamadi</p></div>';
+    }
+
+    elMultimodalResults.innerHTML = html;
+
+    // Otomatik olarak onerilen rotayi haritada goster
+    const recIndex = options.findIndex(o => o.type === recommended);
+    if (recIndex >= 0) {
+        showTransitRoute(recIndex);
+    }
+
+    // Scroll to panel
+    elMultimodalPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/**
+ * Secilen transit rotasini haritada cizer.
+ * Tam yolculuk gosterilir: Yuru -> Otobuse bin -> Otobus guzergahi -> In -> Yuru
+ * Mevcut graf rotasina dokunmaz.
+ */
+function showTransitRoute(optionIndex) {
+    if (!_multimodalData || !_multimodalData.options) return;
+
+    const opt = _multimodalData.options[optionIndex];
+    if (!opt || !opt.segments) return;
+
+    // Onceki transit cizimlerini temizle
+    clearTransitRoute();
+
+    const allBounds = [];
+    let stepNum = 1;
+
+    // Her segment icin ciz
+    opt.segments.forEach((seg) => {
+        if (!seg.coords || seg.coords.length < 2) return;
+
+        const latlngs = seg.coords.map(c => [c[0], c[1]]);
+        latlngs.forEach(ll => allBounds.push(ll));
+
+        if (seg.mode === "walk") {
+            // ---- YURUME SEGMENTI ----
+            // Turuncu kesikli ince cizgi
+            const walkLine = L.polyline(latlngs, {
+                color: "#e17055",
+                weight: 4,
+                opacity: 0.85,
+                dashArray: "6, 10",
+                lineCap: "round",
+            });
+            walkLine.addTo(map);
+            transitRouteLayers.push(walkLine);
+
+            // Baslangic noktasi icin numarali marker
+            const startCoord = latlngs[0];
+            const startLabel = stepNum === 1 ? "Baslangic" : "Hedefe yuru";
+            const startMarker = L.marker(startCoord, {
+                icon: L.divIcon({
+                    className: "transit-step-icon",
+                    html: `<div class="step-circle step-walk">${stepNum}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                }),
+            });
+            startMarker.bindTooltip(startLabel, {
+                direction: "top",
+                offset: [0, -16],
+                className: "transit-route-tooltip",
+            });
+            startMarker.addTo(map);
+            transitRouteLayers.push(startMarker);
+            stepNum++;
+
+        } else if (seg.mode === "bus") {
+            // ---- OTOBUS SEGMENTI ----
+
+            // 1. Glow efekti
+            const busGlow = L.polyline(latlngs, {
+                color: "#00cec9",
+                weight: 14,
+                opacity: 0.2,
+                lineCap: "round",
+                lineJoin: "round",
+            });
+            busGlow.addTo(map);
+            transitRouteLayers.push(busGlow);
+
+            // 2. Ana otobus cizgisi
+            const busLine = L.polyline(latlngs, {
+                color: "#00b894",
+                weight: 5,
+                opacity: 0.95,
+                lineCap: "round",
+                lineJoin: "round",
+            });
+            busLine.addTo(map);
+            transitRouteLayers.push(busLine);
+
+            // 3. Ara durak noktalari (kucuk beyaz daireler)
+            seg.coords.forEach((coord, i) => {
+                const isEndpoint = (i === 0 || i === seg.coords.length - 1);
+                if (!isEndpoint) {
+                    const stopDot = L.circleMarker([coord[0], coord[1]], {
+                        radius: 3,
+                        color: "#00cec9",
+                        fillColor: "white",
+                        fillOpacity: 1,
+                        weight: 1,
+                    });
+                    stopDot.addTo(map);
+                    transitRouteLayers.push(stopDot);
+                }
+            });
+
+            // 4. BINIS duragi (buyuk yesil numarali marker)
+            const boardCoord = latlngs[0];
+            const boardMarker = L.marker(boardCoord, {
+                icon: L.divIcon({
+                    className: "transit-step-icon",
+                    html: `<div class="step-circle step-board">${stepNum}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                }),
+            });
+            boardMarker.bindTooltip(`Bin: ${seg.from_stop || "Durak"}`, {
+                permanent: true,
+                direction: "top",
+                offset: [0, -16],
+                className: "transit-route-tooltip transit-tooltip-board",
+            });
+            boardMarker.addTo(map);
+            transitRouteLayers.push(boardMarker);
+            stepNum++;
+
+            // 5. INIS duragi (buyuk kirmizi numarali marker)
+            const alightCoord = latlngs[latlngs.length - 1];
+            const alightMarker = L.marker(alightCoord, {
+                icon: L.divIcon({
+                    className: "transit-step-icon",
+                    html: `<div class="step-circle step-alight">${stepNum}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                }),
+            });
+            alightMarker.bindTooltip(`In: ${seg.to_stop || "Durak"}`, {
+                permanent: true,
+                direction: "top",
+                offset: [0, -16],
+                className: "transit-route-tooltip transit-tooltip-alight",
+            });
+            alightMarker.addTo(map);
+            transitRouteLayers.push(alightMarker);
+            stepNum++;
+
+            // 6. Hat kodu etiketi (ortada)
+            if (seg.route_code && latlngs.length > 2) {
+                const midIdx = Math.floor(latlngs.length / 2);
+                const routeLabel = L.marker(latlngs[midIdx], {
+                    icon: L.divIcon({
+                        className: "transit-route-label",
+                        html: `<div class="route-label-tag">${seg.route_code}</div>`,
+                        iconSize: [60, 24],
+                        iconAnchor: [30, 12],
+                    }),
+                });
+                routeLabel.addTo(map);
+                transitRouteLayers.push(routeLabel);
+            }
+        }
+    });
+
+    // Son segment'in bitis noktasina hedef marker ekle
+    const lastSeg = opt.segments[opt.segments.length - 1];
+    if (lastSeg && lastSeg.coords && lastSeg.coords.length > 0) {
+        const endCoord = lastSeg.coords[lastSeg.coords.length - 1];
+        const endMarker = L.marker([endCoord[0], endCoord[1]], {
+            icon: L.divIcon({
+                className: "transit-step-icon",
+                html: `<div class="step-circle step-end">${stepNum}</div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+            }),
+        });
+        endMarker.bindTooltip("Hedef", {
+            direction: "top",
+            offset: [0, -16],
+            className: "transit-route-tooltip",
+        });
+        endMarker.addTo(map);
+        transitRouteLayers.push(endMarker);
+    }
+
+    // Haritayi tum rotaya sigdir
+    if (allBounds.length > 0) {
+        selectedPoints.forEach(p => allBounds.push(p));
+        const bounds = L.latLngBounds(allBounds);
+        map.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+    // Aktif karti vurgula
+    document.querySelectorAll(".multimodal-option").forEach((el, i) => {
+        el.classList.toggle("active-route", i === optionIndex);
+    });
+
+    showToast(`${opt.name} - tam guzergah haritada`, "info");
+}
+
+/**
+ * Transit rota cizimlerini temizler (mevcut yuruyus rotasina dokunmaz)
+ */
+function clearTransitRoute() {
+    transitRouteLayers.forEach(layer => {
+        map.removeLayer(layer);
+    });
+    transitRouteLayers = [];
 }
