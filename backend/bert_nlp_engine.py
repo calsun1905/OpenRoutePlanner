@@ -74,15 +74,27 @@ except ImportError:
         OSM_POI_MAPPING = {}
 
 try:
-    from nlp_concept_resolver import resolve_poi_from_tokens, PoiResolution
+    from nlp_concept_resolver import (
+        resolve_poi_from_tokens,
+        resolve_poi_from_tokens_with_debug,
+        map_concept_to_osm_queries,
+        PoiResolution,
+    )
 except ImportError:
     try:
         import sys
         from pathlib import Path
         sys.path.insert(0, str(Path(__file__).parent))
-        from nlp_concept_resolver import resolve_poi_from_tokens, PoiResolution
+        from nlp_concept_resolver import (
+            resolve_poi_from_tokens,
+            resolve_poi_from_tokens_with_debug,
+            map_concept_to_osm_queries,
+            PoiResolution,
+        )
     except ImportError:
         resolve_poi_from_tokens = None
+        resolve_poi_from_tokens_with_debug = None
+        map_concept_to_osm_queries = None
         PoiResolution = None
 
 
@@ -443,20 +455,37 @@ def extract_poi_concept_with_meta(query: str, detected_places: Optional[List[Dic
     """
     concept_tokens = _collect_poi_tokens(query, detected_places)
     if not concept_tokens:
-        return {"concept": "", "source": "unknown", "confidence": 0.0, "status": "unknown"}
+        return {
+            "concept": "",
+            "source": "unknown",
+            "confidence": 0.0,
+            "status": "unknown",
+            "tokens": [],
+            "candidates": [],
+            "debug_plan": {"tokens": [], "ngrams": [], "attempts": [], "selected": {}},
+            "osm_queries": [],
+        }
 
     # Yeni resolver varsa önce onu kullan (faz-1 hibrit akış)
     if resolve_poi_from_tokens is not None:
         try:
-            resolved = resolve_poi_from_tokens(concept_tokens)
+            debug_plan = None
+            if resolve_poi_from_tokens_with_debug is not None:
+                resolved, debug_plan = resolve_poi_from_tokens_with_debug(concept_tokens)
+            else:
+                resolved = resolve_poi_from_tokens(concept_tokens)
             concept = (resolved.concept or "").strip() if resolved else ""
             if concept:
+                osm_queries = map_concept_to_osm_queries(concept) if map_concept_to_osm_queries is not None else []
                 return {
                     "concept": concept,
                     "source": getattr(resolved, "source", "morph+dict"),
                     "confidence": float(getattr(resolved, "confidence", 0.9) or 0.9),
                     "status": getattr(resolved, "status", "success"),
                     "candidates": getattr(resolved, "candidates", []),
+                    "tokens": concept_tokens,
+                    "debug_plan": debug_plan or {},
+                    "osm_queries": osm_queries,
                 }
         except Exception:
             pass
@@ -467,9 +496,33 @@ def extract_poi_concept_with_meta(query: str, detected_places: Optional[List[Dic
     ordered = prioritized + remaining
     concept = " ".join(ordered[:4]).strip()
     if concept:
-        return {"concept": concept, "source": "legacy", "confidence": 0.70, "status": "success"}
+        osm_queries = map_concept_to_osm_queries(concept) if map_concept_to_osm_queries is not None else []
+        return {
+            "concept": concept,
+            "source": "legacy",
+            "confidence": 0.70,
+            "status": "success",
+            "tokens": concept_tokens,
+            "candidates": ordered,
+            "debug_plan": {
+                "tokens": concept_tokens,
+                "ngrams": [],
+                "attempts": [],
+                "selected": {"concept": concept, "source": "legacy", "confidence": 0.70, "status": "success"},
+            },
+            "osm_queries": osm_queries,
+        }
 
-    return {"concept": "", "source": "unknown", "confidence": 0.0, "status": "unknown"}
+    return {
+        "concept": "",
+        "source": "unknown",
+        "confidence": 0.0,
+        "status": "unknown",
+        "tokens": concept_tokens,
+        "candidates": ordered,
+        "debug_plan": {"tokens": concept_tokens, "ngrams": [], "attempts": [], "selected": {}},
+        "osm_queries": [],
+    }
 
 
 def extract_poi_concept(query: str, detected_places: Optional[List[Dict[str, Any]]] = None) -> str:
@@ -1696,6 +1749,7 @@ class BertNLPEngine:
         low_margin = score_margin < INTENT_MARGIN_MIN
         poi_resolution = extract_poi_concept_with_meta(query, ordered_places)
         poi_concept = (poi_resolution.get("concept") or "").strip()
+        poi_osm_queries = poi_resolution.get("osm_queries") or []
         has_poi_cue = bool(poi_concept)
         has_multi_cue = (
             (explicit_multi_delimiter and len(unique_place_names) >= 2 and not direction_hints)
@@ -1771,7 +1825,11 @@ class BertNLPEngine:
                 "poi_resolution_source": poi_resolution.get("source"),
                 "poi_resolution_confidence": round(float(poi_resolution.get("confidence", 0.0)), 4),
                 "poi_resolution_status": poi_resolution.get("status"),
+                "poi_token_candidates": poi_resolution.get("tokens", []),
+                "poi_candidate_count": len(poi_resolution.get("candidates", []) or []),
+                "poi_osm_queries_count": len(poi_osm_queries),
             }
+            trace_data["poi_resolution_plan"] = poi_resolution.get("debug_plan", {})
             trace_data["intent_conflict_matrix"] = intent_matrix_meta
 
         # 3. Numpy değerlerini Python native türlere çevir (JSON için)
@@ -1814,9 +1872,17 @@ class BertNLPEngine:
             result["poi_concept"] = poi_concept or None
             result["poi_resolution_source"] = poi_resolution.get("source")
             result["poi_resolution_confidence"] = float(poi_resolution.get("confidence", 0.0))
+            result["poi_resolution_status"] = poi_resolution.get("status")
+            result["poi_token_candidates"] = poi_resolution.get("tokens", [])
+            result["poi_resolution_plan"] = poi_resolution.get("debug_plan", {})
+            result["poi_osm_queries"] = poi_osm_queries
             concept_key = normalize_place_key(poi_concept) if poi_concept else ""
             if concept_key and concept_key in NORMALIZED_POI_MAPPING:
                 result["poi_tags_hint"] = dict(NORMALIZED_POI_MAPPING[concept_key])
+            elif poi_osm_queries:
+                first_query = poi_osm_queries[0]
+                if isinstance(first_query, dict):
+                    result["poi_tags_hint"] = dict(first_query)
             result["query_type"] = "search"
 
             # Lokasyon sinyali çok zayıfsa POI'den unknown'a düş.
@@ -1865,9 +1931,17 @@ class BertNLPEngine:
                     result["poi_concept"] = poi_concept or None
                     result["poi_resolution_source"] = poi_resolution.get("source")
                     result["poi_resolution_confidence"] = float(poi_resolution.get("confidence", 0.0))
+                    result["poi_resolution_status"] = poi_resolution.get("status")
+                    result["poi_token_candidates"] = poi_resolution.get("tokens", [])
+                    result["poi_resolution_plan"] = poi_resolution.get("debug_plan", {})
+                    result["poi_osm_queries"] = poi_osm_queries
                     concept_key = normalize_place_key(poi_concept) if poi_concept else ""
                     if concept_key and concept_key in NORMALIZED_POI_MAPPING:
                         result["poi_tags_hint"] = dict(NORMALIZED_POI_MAPPING[concept_key])
+                    elif poi_osm_queries:
+                        first_query = poi_osm_queries[0]
+                        if isinstance(first_query, dict):
+                            result["poi_tags_hint"] = dict(first_query)
                     result["query_type"] = "search"
                 else:
                     result["type"] = "unknown"
@@ -1934,7 +2008,9 @@ class BertNLPEngine:
                 "poi_concept": result.get("poi_concept"),
                 "poi_resolution_source": result.get("poi_resolution_source"),
                 "poi_resolution_confidence": result.get("poi_resolution_confidence"),
+                "poi_resolution_status": result.get("poi_resolution_status"),
                 "poi_tags_hint": result.get("poi_tags_hint"),
+                "poi_osm_queries": result.get("poi_osm_queries"),
             }
             result["trace"] = trace_data
 

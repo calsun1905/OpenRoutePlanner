@@ -15,7 +15,7 @@ import math
 import time
 import sqlite3
 import requests
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 
 # ============================================================================
 # AYARLAR
@@ -27,6 +27,7 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 TRANSIT_DB = os.path.join(CACHE_DIR, "transit.db")
 
 IBB_API_URL = "https://api.ibb.gov.tr/iett/UlasimAnaVeri/HatDurakGuzergah.asmx"
+METRO_API_BASE = "https://api.ibb.gov.tr/MetroIstanbul/api/MetroMobile/V2"
 
 # Rate limiting (IBB API aşırı yüklenmesin)
 _last_request_time = 0.0
@@ -227,12 +228,55 @@ def _get_db_connection() -> sqlite3.Connection:
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS metro_lines (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            short_description TEXT,
+            long_description TEXT,
+            functional_code TEXT,
+            is_active INTEGER,
+            first_time TEXT,
+            last_time TEXT,
+            color_r INTEGER,
+            color_g INTEGER,
+            color_b INTEGER,
+            line_type TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS metro_stations (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            description TEXT,
+            lat REAL,
+            lon REAL,
+            is_active INTEGER
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS metro_line_stations (
+            line_id INTEGER,
+            station_id INTEGER,
+            station_order INTEGER,
+            PRIMARY KEY (line_id, station_id),
+            FOREIGN KEY (line_id) REFERENCES metro_lines(id),
+            FOREIGN KEY (station_id) REFERENCES metro_stations(id)
+        )
+    """)
+
     # Spatial index (yakın durak sorgusu için)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_stops_lat ON stops(lat)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_stops_lon ON stops(lon)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_stops_district ON stops(district)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_route_stops_route ON route_stops(route_code)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_route_stops_stop ON route_stops(stop_code)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_stations_lat ON metro_stations(lat)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_stations_lon ON metro_stations(lon)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_ls_line ON metro_line_stations(line_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_ls_station ON metro_line_stations(station_id)")
 
     conn.commit()
     return conn
@@ -539,6 +583,165 @@ def download_route_stops(max_routes: int = 200, force: bool = False) -> int:
     return saved_count
 
 
+def _metro_api_get(path: str, timeout: int = 35) -> Dict[str, Any]:
+    """Metro API JSON response doner."""
+    try:
+        resp = requests.get(f"{METRO_API_BASE}/{path}", timeout=timeout)
+        resp.raise_for_status()
+        data = resp.json()
+        if not isinstance(data, dict):
+            return {}
+        if not data.get("Success", False):
+            return {}
+        return data
+    except Exception as e:
+        print(f"[Metro API] GET {path} hatasi: {e}")
+        return {}
+
+
+def _derive_line_type(line_name: str) -> str:
+    if not line_name:
+        return "other"
+    name = line_name.upper()
+    if name.startswith("M"):
+        return "metro"
+    if name.startswith("T"):
+        return "tram"
+    if name.startswith("F") or name.startswith("TF"):
+        return "funicular"
+    return "other"
+
+
+def download_metro_data(force: bool = False) -> Dict[str, int]:
+    """
+    Metro Istanbul API'den tum rayli sistem hat ve istasyonlarini indirir.
+    """
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    if not force:
+        cursor.execute("SELECT value FROM meta WHERE key = 'metro_last_download'")
+        row = cursor.fetchone()
+        if row:
+            try:
+                age_hours = (time.time() - float(row["value"])) / 3600
+                if age_hours < 24:
+                    cursor.execute("SELECT COUNT(*) as c FROM metro_lines")
+                    line_count = cursor.fetchone()["c"]
+                    cursor.execute("SELECT COUNT(*) as c FROM metro_stations")
+                    station_count = cursor.fetchone()["c"]
+                    if line_count > 0 and station_count > 0:
+                        conn.close()
+                        return {
+                            "metro_lines": int(line_count),
+                            "metro_stations": int(station_count),
+                            "metro_line_stations": 0,
+                        }
+            except Exception:
+                pass
+
+    lines_resp = _metro_api_get("GetLines")
+    stations_resp = _metro_api_get("GetStations")
+    lines = lines_resp.get("Data", []) if lines_resp else []
+    stations = stations_resp.get("Data", []) if stations_resp else []
+
+    if not lines or not stations:
+        conn.close()
+        return {"metro_lines": 0, "metro_stations": 0, "metro_line_stations": 0}
+
+    cursor.execute("DELETE FROM metro_line_stations")
+    cursor.execute("DELETE FROM metro_stations")
+    cursor.execute("DELETE FROM metro_lines")
+
+    inserted_lines = 0
+    for line in lines:
+        try:
+            line_id = int(line.get("Id"))
+            name = str(line.get("Name", "")).strip()
+            color = line.get("Color") or {}
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO metro_lines
+                (id, name, short_description, long_description, functional_code, is_active,
+                 first_time, last_time, color_r, color_g, color_b, line_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    line_id,
+                    name,
+                    str(line.get("ShortDescription", "")),
+                    str(line.get("LongDescription", "")),
+                    str(line.get("FunctionalCode", "")),
+                    1 if bool(line.get("IsActive", True)) else 0,
+                    str(line.get("FirstTime", "")),
+                    str(line.get("LastTime", "")),
+                    int(color.get("Color_R", 0) or 0),
+                    int(color.get("Color_G", 0) or 0),
+                    int(color.get("Color_B", 0) or 0),
+                    _derive_line_type(name),
+                ),
+            )
+            inserted_lines += 1
+        except Exception:
+            continue
+
+    inserted_stations = 0
+    inserted_links = 0
+    for st in stations:
+        try:
+            station_id = int(st.get("Id"))
+            line_id = int(st.get("LineId"))
+            detail = st.get("DetailInfo") or {}
+            lat = float(detail.get("Latitude", 0) or 0)
+            lon = float(detail.get("Longitude", 0) or 0)
+            if lat == 0 or lon == 0:
+                continue
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO metro_stations
+                (id, name, description, lat, lon, is_active)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    station_id,
+                    str(st.get("Name", "")),
+                    str(st.get("Description", "")),
+                    lat,
+                    lon,
+                    1 if bool(st.get("IsActive", True)) else 0,
+                ),
+            )
+            inserted_stations += 1
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO metro_line_stations
+                (line_id, station_id, station_order)
+                VALUES (?, ?, ?)
+                """,
+                (line_id, station_id, int(st.get("Order", 0) or 0)),
+            )
+            inserted_links += 1
+        except Exception:
+            continue
+
+    cursor.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+        ("metro_last_download", str(time.time())),
+    )
+    conn.commit()
+    conn.close()
+
+    print(
+        f"[Metro] [OK] {inserted_lines} hat, {inserted_stations} istasyon, "
+        f"{inserted_links} baglanti kaydedildi"
+    )
+    return {
+        "metro_lines": inserted_lines,
+        "metro_stations": inserted_stations,
+        "metro_line_stations": inserted_links,
+    }
+
+
 def initialize_transit_data(force: bool = False) -> dict:
     """
     Transit verilerini baslatir (duraklar + hatlar + hat-durak eslesmeleri).
@@ -556,12 +759,21 @@ def initialize_transit_data(force: bool = False) -> dict:
     stop_count = download_all_stops(force=force)
     route_count = download_all_routes(force=force)
     route_stop_count = download_route_stops(max_routes=900, force=force)
+    metro_result = download_metro_data(force=force)
 
     elapsed = round(time.time() - start_time, 1)
     print(f"[Transit] Toplam sure: {elapsed}s")
-    print(f"[Transit] {stop_count} durak, {route_count} hat, {route_stop_count} esleme yuklendi")
+    print(
+        f"[Transit] {stop_count} durak, {route_count} hat, {route_stop_count} esleme, "
+        f"{metro_result.get('metro_lines', 0)} metro hatti yuklendi"
+    )
 
-    return {"stops": stop_count, "routes": route_count, "route_stops": route_stop_count}
+    return {
+        "stops": stop_count,
+        "routes": route_count,
+        "route_stops": route_stop_count,
+        **metro_result,
+    }
 
 
 # ============================================================================
@@ -751,6 +963,79 @@ def find_connecting_routes(stop_a: int, stop_b: int) -> List[Dict]:
     return [dict(row) for row in rows]
 
 
+def get_metro_stations_in_area(lat: float, lon: float, radius_m: float = 800) -> List[Dict]:
+    """Belirtilen koordinata yakin metro/rayli sistem istasyonlarini doner."""
+    delta_lat = radius_m / 111000
+    delta_lon = radius_m / (111000 * max(0.1, math.cos(math.radians(lat))))
+
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT ms.id, ms.name, ms.description, ms.lat, ms.lon
+        FROM metro_stations ms
+        WHERE ms.lat BETWEEN ? AND ?
+          AND ms.lon BETWEEN ? AND ?
+        """,
+        (lat - delta_lat, lat + delta_lat, lon - delta_lon, lon + delta_lon),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    out = []
+    for row in rows:
+        dist = _haversine_distance(lat, lon, row["lat"], row["lon"])
+        if dist <= radius_m:
+            out.append(
+                {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "description": row["description"],
+                    "lat": row["lat"],
+                    "lon": row["lon"],
+                    "distance_m": round(dist),
+                }
+            )
+    out.sort(key=lambda x: x["distance_m"])
+    return out
+
+
+def get_metro_lines_for_station(station_id: int) -> List[Dict]:
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT ml.id, ml.name, ml.long_description, ml.line_type, ml.is_active
+        FROM metro_line_stations mls
+        JOIN metro_lines ml ON ml.id = mls.line_id
+        WHERE mls.station_id = ?
+        ORDER BY ml.name
+        """,
+        (station_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_metro_line_stations(line_id: int) -> List[Dict]:
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT ms.id, ms.name, ms.description, ms.lat, ms.lon, mls.station_order
+        FROM metro_line_stations mls
+        JOIN metro_stations ms ON ms.id = mls.station_id
+        WHERE mls.line_id = ?
+        ORDER BY mls.station_order
+        """,
+        (line_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def get_statistics() -> dict:
     """Transit verisi istatistikleri."""
     conn = _get_db_connection()
@@ -769,12 +1054,19 @@ def get_statistics() -> dict:
     row = cursor.fetchone()
     last_download = float(row["value"]) if row else 0
 
+    cursor.execute("SELECT COUNT(*) as cnt FROM metro_lines")
+    metro_line_count = cursor.fetchone()["cnt"]
+    cursor.execute("SELECT COUNT(*) as cnt FROM metro_stations")
+    metro_station_count = cursor.fetchone()["cnt"]
+
     conn.close()
 
     return {
         "stops": stop_count,
         "routes": route_count,
         "districts": district_count,
+        "metro_lines": metro_line_count,
+        "metro_stations": metro_station_count,
         "last_download": last_download,
         "data_fresh": _is_data_fresh(),
     }

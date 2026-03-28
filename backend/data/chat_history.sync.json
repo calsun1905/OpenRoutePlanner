@@ -141,172 +141,80 @@
       "token_total": 1229
     },
     {
-      "content": "İyiyim, teşekkür ederim. Sen nasılsın?",
-      "created_at": "2026-03-25T11:15:08Z",
+      "content": "Deniz",
+      "created_at": "2026-03-28T15:02:56Z",
       "error_type": "",
-      "id": "47200846-5857-4dca-8bb4-a5dbadf74cd7",
+      "id": "09b1c2be-61f4-4e8a-97fb-4a707420073e",
       "model": "gemini-2.5-flash",
       "role": "assistant",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 90
+      "session_id": "7e5ace5d-88c7-4236-920d-36842df2bde3",
+      "token_total": 134
     },
     {
-      "content": "NABER",
-      "created_at": "2026-03-25T11:15:08Z",
+      "content": "sea",
+      "created_at": "2026-03-28T15:02:56Z",
       "error_type": "",
-      "id": "7d30d1d9-bfe1-4e6d-bfa4-94b3db1eab1d",
+      "id": "d5a51f98-814e-487e-83d9-7bcba6691d0d",
       "model": "gemini-2.5-flash",
       "role": "user",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 90
+      "session_id": "7e5ace5d-88c7-4236-920d-36842df2bde3",
+      "token_total": 134
     },
     {
-      "content": "Evet, \"Naber İstanbul\" adlı bir YouTube kanalını biliyorum. İstanbul'da sokak röportajları yapan bir kanal.",
-      "created_at": "2026-03-25T11:15:28Z",
+      "content": "sea",
+      "created_at": "2026-03-28T15:02:28Z",
       "error_type": "",
-      "id": "5ea46050-9515-4ca4-b079-ab97bc4f8256",
-      "model": "gemini-2.5-flash",
-      "role": "assistant",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 130
-    },
-    {
-      "content": "İSTANBULU BİLİYOR MUSUN",
-      "created_at": "2026-03-25T11:15:28Z",
-      "error_type": "",
-      "id": "88f82d88-b3b3-4099-86d2-e74e884e1593",
-      "model": "gemini-2.5-flash",
-      "role": "user",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 130
-    },
-    {
-      "content": "[Hata] Gemini hatasi (404):",
-      "created_at": "2026-03-25T11:15:58Z",
-      "error_type": "other",
-      "id": "ae7ca2ee-821b-42c3-9ad3-82bb31f6ccf9",
-      "model": "nvidia/nemotron-3-super-120b-a12b:free",
-      "role": "assistant",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": null
-    },
-    {
-      "content": "naber",
-      "created_at": "2026-03-25T11:15:58Z",
-      "error_type": "",
-      "id": "e570a218-636f-4513-90d5-8f77b8b699f3",
-      "model": "nvidia/nemotron-3-super-120b-a12b:free",
-      "role": "user",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": null
-    },
-    {
-      "content": "naber",
-      "created_at": "2026-03-25T11:16:09Z",
-      "error_type": "",
-      "id": "e197f8c1-7dc7-4ae1-bb0c-b5bfecb5cd68",
+      "id": "432b218f-9965-48d2-85c1-bf94ffcd6745",
       "model": "arcee-ai/trinity-mini-20251201:free",
       "role": "user",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 485
+      "session_id": "b83e6a97-eb60-4166-b00b-03ea35b5af75",
+      "token_total": 525
     },
     {
-      "content": "Evet, \"naber\"demek. Nasılsın?",
-      "created_at": "2026-03-25T11:16:09Z",
+      "content": "Turkiye'nin kuzeyinde bulunan Ege Denizi, Yunanistan ile sınırındadır.",
+      "created_at": "2026-03-28T15:02:28Z",
       "error_type": "",
-      "id": "fd86f499-0e77-444f-b6ed-94b28147a20e",
+      "id": "867abe4f-75ac-484f-a932-abf3c50fdd96",
       "model": "arcee-ai/trinity-mini-20251201:free",
       "role": "assistant",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 485
-    },
-    {
-      "content": "Selam! Nasılsın?",
-      "created_at": "2026-03-25T11:16:19Z",
-      "error_type": "",
-      "id": "575d1d3b-f905-4791-a599-95b3528daf7e",
-      "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
-      "role": "assistant",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 300
-    },
-    {
-      "content": "selam",
-      "created_at": "2026-03-25T11:16:19Z",
-      "error_type": "",
-      "id": "e4580a80-9637-4e60-a26d-40072f56c37e",
-      "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
-      "role": "user",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 300
-    },
-    {
-      "content": "Testtamam!ð",
-      "created_at": "2026-03-25T11:17:03Z",
-      "error_type": "",
-      "id": "edde94b0-8c43-48ce-ade1-e766cc7dbe62",
-      "model": "z-ai/glm-4.5-air:free",
-      "role": "assistant",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 528
-    },
-    {
-      "content": "test",
-      "created_at": "2026-03-25T11:17:03Z",
-      "error_type": "",
-      "id": "fb285373-74b6-47f8-8272-52025264de84",
-      "model": "z-ai/glm-4.5-air:free",
-      "role": "user",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 528
-    },
-    {
-      "content": "what are you doing",
-      "created_at": "2026-03-25T11:17:35Z",
-      "error_type": "",
-      "id": "5948a259-6ef0-4664-a18e-6fce13e3edfb",
-      "model": "z-ai/glm-4.5-air:free",
-      "role": "user",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 506
-    },
-    {
-      "content": "I'mcurrentlyrespondingtoyourmessage!Howaboutyou?",
-      "created_at": "2026-03-25T11:17:35Z",
-      "error_type": "",
-      "id": "faa223ae-7756-457e-9182-afc2c6dc544e",
-      "model": "z-ai/glm-4.5-air:free",
-      "role": "assistant",
-      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "token_total": 506
+      "session_id": "b83e6a97-eb60-4166-b00b-03ea35b5af75",
+      "token_total": 525
     }
   ],
   "sessions": [
     {
       "archived": 0,
-      "created_at": "2026-03-25T11:13:12Z",
-      "id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
-      "message_count": 14,
-      "title": "NABER",
-      "updated_at": "2026-03-25T11:17:35Z"
+      "created_at": "2026-03-28T15:02:54Z",
+      "id": "7e5ace5d-88c7-4236-920d-36842df2bde3",
+      "message_count": 2,
+      "title": "sea",
+      "updated_at": "2026-03-28T15:02:56Z"
     },
     {
-      "archived": 1,
-      "created_at": "2026-03-25T11:13:11Z",
-      "id": "7487079f-14a7-4827-9c7a-e9c5816c3e0a",
+      "archived": 0,
+      "created_at": "2026-03-28T15:02:16Z",
+      "id": "b83e6a97-eb60-4166-b00b-03ea35b5af75",
+      "message_count": 2,
+      "title": "sea",
+      "updated_at": "2026-03-28T15:02:28Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-03-27T21:52:21Z",
+      "id": "0a429b88-201a-4397-8ff0-bdf12a456dd6",
       "message_count": 0,
       "title": "Yeni Sohbet",
-      "updated_at": "2026-03-25T11:13:12Z"
+      "updated_at": "2026-03-27T21:52:21Z"
     },
     {
-      "archived": 1,
+      "archived": 0,
       "created_at": "2026-03-24T16:01:55Z",
       "id": "04001315-fa7f-4600-8392-4630c5a7c20c",
       "message_count": 14,
       "title": "selam",
-      "updated_at": "2026-03-25T11:13:11Z"
+      "updated_at": "2026-03-24T21:19:54Z"
     }
   ],
-  "updated_at": "2026-03-25T11:17:35Z",
+  "updated_at": "2026-03-28T15:02:56Z",
   "version": 1
 }

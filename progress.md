@@ -1,3 +1,111 @@
+# 2026-03-28 - Guncel Durum ve Yeni Ucuncu Asama Notlari
+
+Bu bolum bugun yapilanlari ve ekipten gelen yeni 3 ana istegi sirali sekilde resmi kayda alir.
+
+## A) Bugun yapilanlar (toplu tasima + metro)
+- Toplu tasima ciziminde sapma kontrolu iyilestirildi:
+  - Otobus ciziminde OSRM sonucu asiri saparsa durak polyline fallback mekanizmasi eklendi.
+  - Waypoint ornekleme ile gereksiz zigzag/detour etkisi azaltildi.
+- Toplu tasima katman temizligi ve harita adim gostergeleri sadeletirildi:
+  - Destination marker her segmentte degil, rota sonunda bir kez gosteriliyor.
+- Metro seceneklerini bulma guclendirildi:
+  - Arama yaricapi genisletildi.
+  - Sure/mesafe filtreleri daha gercekci esiklere cekildi.
+  - Aktarma tespiti sadece istasyon adi ile degil fiziksel yakinlik ile de desteklendi.
+  - Ayni metro kombinasyonlari tekilleştirildi (tekrarli kartlar azaltildi).
+
+## B) Ekipten gelen yeni 3 oncelik (sirali islenecek)
+1. LLM chatbotu ana uygulamaya entegre etme (birinci oncelik).
+2. BERT/NLP motorunu akis bazli guclendirme (ikinci oncelik).
+3. Veritabani stratejisini netlestirme ve yazili hale getirme (ucuncu oncelik).
+
+## C) 1. Oncelik - LLM Chatbot entegrasyonu (yeni net hedef)
+Durum:
+- Dun eklenen free LLM anahtarlari var; bir kismi stabil, bir kismi bozuk veya rate-limitli.
+- LLM test sayfasi ile "calisiyor / calismiyor" kontrolu zaten yapilabiliyor.
+
+Hedef:
+- Test ekranindaki yetenegi urunun ana chatbot akisina tasimak.
+- Kullaniciya model sagligi ve hata sinifi gorunur hale getirmek.
+
+Uygulama adimlari:
+1. Ana arayuze chatbot panelini kalici olarak bagla.
+2. Model secimini "stabil / rate-limit / kredi / uyumsuz endpoint" kategorilerine ayir.
+3. Otomatik fallback + manuel model secimi modlarini ayni panelde koru.
+4. Istek bazli log ile model saglik puani uretilsin (basari orani, ortalama gecikme, son hata kodu).
+5. "Bozuk key/model" otomatik devreden cikarilsin, bir sure sonra tekrar denensin (cooldown).
+
+Bugun bu baslikta tamamlanan teknik adimlar:
+- `backend/llm_health.py` eklendi:
+  - model bazli basari/basarisizlik takibi
+  - ardiskik hata sayisi
+  - cooldown suresi ve gecici bloklama
+- API genisletmeleri:
+  - `GET /api/llm/model-health?provider=openrouter|gemini`
+  - provider status endpointlerinde `blocked_models` ve `health_count` alanlari
+- Chat stream akisi guncellendi (OpenRouter + Gemini):
+  - fallback denemelerinde cooldown aktif modeller otomatik atlanir
+  - her deneme sonucu health tablosuna yazilir (success/failure, error_type, latency)
+- Frontend chatbot paneli guncellendi:
+  - model listesinde cooldown'daki modeller ayri grupta gosterilir
+  - manuel modda cooldown'daki model secimi engellenir
+  - durum satirinda cooldown model sayisi gosterilir
+
+## D) 2. Oncelik - BERT/NLP motorunu guclendirme (arkadas notlarinin resmi kaydi)
+Temel problem:
+- BERT tek basina yeterli degil; preprocess + regex guard + kok/ek normalize + semantic eslestirme birlikte calismali.
+
+Hedef akis (ornek: "Kadikoyde cami ariyorum"):
+1. Cumle alinir ve normalize edilir (unicode/encoding/punktuasyon/harf duzeltme).
+2. Tokenizasyon + kok/ek ayristirma yapilir.
+3. Lokasyon adayi ve mekan adayi birlikte cikartilir.
+4. Mekan adayi OSM/Overpass tag adaylarina maplenir (synonym + turkce varyant destekli).
+5. Lokasyon adayi geocoder veya lokal place verisiyle dogrulanir.
+6. BERT embedding skoruyla adaylar siralanir; regex/kural sinyali ile birlestirilir.
+7. En iyi sorgu plani secilir ve confidence ile birlikte calistirilir.
+8. Ciktiya "neden bu etiket secildi" iz kaydi eklenir.
+
+Teknik not:
+- Embedding tek karar verici olmayacak.
+- Regex tek basina motor olmayacak.
+- Hibrit skor (kural + embedding + sozluk eslesmesi) esas alinacak.
+
+Bugun bu baslikta tamamlanan teknik adimlar:
+- POI concept resolver debug katmani eklendi:
+  - `resolve_poi_from_tokens_with_debug(...)` ile ngram denemeleri, adaylar ve secilen sonuc adim adim kaydediliyor.
+- BERT parse sonucuna query-plan gorunurlugu eklendi:
+  - `poi_token_candidates`
+  - `poi_resolution_plan`
+  - `poi_osm_queries`
+  - `poi_resolution_status`
+- POI etiket ipucunda fallback guclendirildi:
+  - Sozlukten dogrudan `poi_tags_hint` yoksa `poi_osm_queries` ilk adayindan etiket ipucu uretiliyor.
+- Debug trace iyilestirildi:
+  - Parse trace logunda POI plan denemelerinin ilk adimlari gorunur hale getirildi.
+
+## E) 3. Oncelik - Veritabani basligi (yeni oturumda detaylandirilacak)
+- Bu basliga ekipten gelecek yeni veritabani dusunceleri eklenerek net karar dokumani cikarilacak.
+- Ozellikle su kararlar netlestirilecek:
+  - SQLite ile devam + optimizasyon mu?
+  - Yoksa PostgreSQL gecis planlamasi mi?
+  - Cache/arsiv tablolarinin saklama politikasi ve ekip ici senkron kurallari.
+
+Bugun bu baslikta tamamlanan teknik adimlar:
+- NLP parse audit katmani eklendi:
+  - Yeni modul: `backend/nlp_audit.py`
+  - Tablo: `nlp_parse_audit`
+  - Kaydedilen alanlar: query_redacted, query_type, confidence, parse_time_ms,
+    origin/destination/location, detected_places, poi_concept, poi_tags_hint,
+    poi_resolution_source/confidence/status, poi_osm_queries, error_text, trace metadata.
+- Runtime baslatmada audit semasi otomatik garanti edildi (`initialize_runtime` icinde).
+- `/api/nlp/parse` endpointi basarili parse sonuclarini audit tablosuna yazar hale getirildi;
+  donuste `audit_id` alani eklendi.
+- Parse endpointinde hata olursa da audit kaydi (minimal payload + error_text) yaziliyor.
+- Son kayitlari UI/test tarafinda hizli gorebilmek icin endpoint eklendi:
+  - `GET /api/nlp/audit/recent?limit=50`
+
+---
+
 # 2026-03-24 - Ucuncu Asama Plani (LLM + BERT + Veritabani)
 
 Bu bolum, bugun tamamlanan teknik degisiklikleri ve bir sonraki sprintte uygulanacak net yol haritasini resmi kayit olarak tutar.

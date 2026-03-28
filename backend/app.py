@@ -116,6 +116,30 @@ def _classify_llm_error(text: str) -> str:
     return "other"
 
 
+def _unique_models(items: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in items or []:
+        model = str(raw or "").strip()
+        if not model or model in seen:
+            continue
+        seen.add(model)
+        out.append(model)
+    return out
+
+
+def _llm_candidate_models(provider: str, preferred_model: str | None = None) -> list[str]:
+    prov = str(provider or "").strip().lower()
+    first = str(preferred_model or "").strip()
+    if prov == "gemini":
+        st = gemini_status()
+    else:
+        st = openrouter_status()
+    defaults = [first, st.get("default_model", "")]
+    fallbacks = list(st.get("fallback_models") or [])
+    return _unique_models(defaults + fallbacks)
+
+
 def _chat_context_from_session(session_id: str, context_limit: int = 40) -> list[dict]:
     history = list_chat_messages(session_id, limit=context_limit)
     context: list[dict] = []
@@ -218,6 +242,17 @@ from chat_storage import (
     archive_session as archive_chat_session,
     list_messages as list_chat_messages,
     save_turn as save_chat_turn,
+)
+from llm_health import (
+    ensure_llm_health_schema,
+    record_attempt as record_llm_attempt,
+    list_provider_health,
+    is_model_blocked,
+)
+from nlp_audit import (
+    ensure_nlp_audit_schema,
+    log_nlp_parse_audit,
+    list_recent_nlp_parse_audits,
 )
 from text_utils import repair_text
 from nlp_engine import parse_query as regex_parse_query
@@ -438,6 +473,11 @@ def _log_bert_parse_trace(trace: dict) -> None:
 
         selected = trace.get("selected") or {}
         print(f"[BERT TRACE] Secilen cikti: {json.dumps(selected, ensure_ascii=False)}")
+        plan = trace.get("poi_resolution_plan") or {}
+        attempts = plan.get("attempts") or []
+        if attempts:
+            preview = attempts[:3]
+            print(f"[BERT TRACE] POI plan denemeleri (ilk {len(preview)}): {json.dumps(preview, ensure_ascii=False)}")
         print(f"[BERT TRACE] Parse sure: {trace.get('parse_time_ms', '-') } ms")
         print("[BERT TRACE] --------------------------")
     except Exception as trace_exc:
@@ -454,6 +494,8 @@ def initialize_runtime() -> None:
 
     ensure_db(run_analyze=True)
     ensure_chat_schema()
+    ensure_llm_health_schema()
+    ensure_nlp_audit_schema()
     rebuild_db_from_sync_json(force=False)
     run_sqlite_maintenance(checkpoint_mode="PASSIVE")
     purge_old_geocodes(days=90)
@@ -1845,6 +1887,7 @@ def api_nlp_parse():
             "error": null
         }
     """
+    query = ""
     try:
         trace_prefix = _request_trace_prefix()
         print(f"\n{'='*60}")
@@ -1916,11 +1959,33 @@ def api_nlp_parse():
             safe_result["raw_query"] = _redact_pii_text(safe_result.get("raw_query"))
         print(f"{trace_prefix} [NLP API] ?? DÃ¶nen response: {safe_result}")
         print(f"{'='*60}\n")
+        try:
+            audit_id = log_nlp_parse_audit(
+                query_redacted=_redact_pii_text(query),
+                result=result,
+                request_id=getattr(g, "request_id", "") or "",
+                correlation_id=getattr(g, "correlation_id", "") or "",
+                error_text="",
+            )
+            result["audit_id"] = audit_id
+        except Exception as audit_exc:
+            print(f"{trace_prefix} [NLP API] audit yazilamadi: {audit_exc}")
 
         return jsonify(result)
 
     except Exception as e:
-        print(f"{_request_trace_prefix()} [NLP ERROR] {str(e)}")
+        err_text = str(e)
+        print(f"{_request_trace_prefix()} [NLP ERROR] {err_text}")
+        try:
+            log_nlp_parse_audit(
+                query_redacted=_redact_pii_text(query),
+                result={"type": "unknown", "engine": "bert-nlp", "confidence": 0.0, "parse_time": 0.0},
+                request_id=getattr(g, "request_id", "") or "",
+                correlation_id=getattr(g, "correlation_id", "") or "",
+                error_text=err_text,
+            )
+        except Exception:
+            pass
         return jsonify({"error": f"NLP hatasÄ±: {str(e)}"}), 500
 
 
@@ -1943,6 +2008,21 @@ def api_nlp_status():
         "bert_available": BERT_NLP_AVAILABLE,
         "last_error": _BERT_NLP_ERROR
     })
+
+
+@app.route("/api/nlp/audit/recent", methods=["GET"])
+def api_nlp_audit_recent():
+    """Son NLP parse audit kayitlarini dondurur."""
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "Gecersiz limit"}), 400
+
+    try:
+        rows = list_recent_nlp_parse_audits(limit=limit)
+        return jsonify({"ok": True, "count": len(rows), "items": rows})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Sunucu hatasi: {str(e)}", "items": []}), 500
 
 
 @app.route("/api/nlp/similarity", methods=["POST"])
@@ -2406,6 +2486,21 @@ def api_archive_llm_chat_session(session_id: str):
     return jsonify({"ok": True, "session_id": session_id, "archived": True})
 
 
+@app.route("/api/llm/model-health", methods=["GET"])
+def api_llm_model_health():
+    provider = str(request.args.get("provider", "openrouter") or "openrouter").strip().lower()
+    if provider not in {"openrouter", "gemini"}:
+        return jsonify({"ok": False, "error": "Gecersiz provider"}), 400
+    rows = list_provider_health(provider)
+    blocked = [r["model"] for r in rows if r.get("blocked")]
+    return jsonify({
+        "ok": True,
+        "provider": provider,
+        "blocked_models": blocked,
+        "models": rows,
+    })
+
+
 @app.route("/api/llm/openrouter/status", methods=["GET"])
 def api_openrouter_status():
     """
@@ -2419,6 +2514,8 @@ def api_openrouter_status():
         }), 503
 
     status = openrouter_status()
+    health_rows = list_provider_health("openrouter")
+    blocked = [r["model"] for r in health_rows if r.get("blocked")]
     return jsonify({
         "available": True,
         "configured": status["configured"],
@@ -2426,6 +2523,8 @@ def api_openrouter_status():
         "default_model": status["default_model"],
         "fallback_models": status.get("fallback_models", []),
         "timeout_sec": status["timeout_sec"],
+        "blocked_models": blocked,
+        "health_count": len(health_rows),
     })
 
 
@@ -2555,86 +2654,170 @@ def api_openrouter_chat_stream():
     temperature = data.get("temperature")
     max_tokens = data.get("max_tokens")
     use_fallback = _as_bool(data.get("use_fallback", True), default=True)
+    default_model = openrouter_status().get("default_model", "")
+    requested_model = str(model or "").strip()
+    if use_fallback:
+        candidate_models = _llm_candidate_models("openrouter", requested_model or default_model)
+        candidate_models = [m for m in candidate_models if not is_model_blocked("openrouter", m)]
+        if not candidate_models:
+            return jsonify({"error": "Kullanilabilir model yok (cooldown aktif)"}), 503
+    else:
+        candidate_models = [requested_model or default_model]
 
     @stream_with_context
     def _generator():
         collected_tokens: list[str] = []
-        final_model = repair_text(model)
+        final_model = repair_text(requested_model or default_model)
         token_total = None
         stream_error = ""
         error_type = ""
-        try:
-            if use_fallback:
-                stream_iter = openrouter_chat_completion_stream_with_fallback(
-                    messages=llm_messages,
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
-            else:
+        tried_models: list[str] = []
+        for idx, candidate in enumerate(candidate_models):
+            tried_models.append(candidate)
+            final_model = repair_text(candidate)
+            attempt_start = time.time()
+
+            yield json.dumps(
+                {"type": "meta", "phase": "start", "model": candidate, "tried_models": tried_models},
+                ensure_ascii=False,
+            ) + "\n"
+
+            try:
                 stream_iter = openrouter_chat_completion_stream(
                     messages=llm_messages,
-                    model=model,
+                    model=candidate,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
-                # UI tek model denendigini gorebilsin
-                yield json.dumps(
-                    {"type": "meta", "phase": "start", "model": model, "tried_models": [model]},
-                    ensure_ascii=False,
-                ) + "\n"
 
-            for chunk in stream_iter:
-                if chunk.get("type") == "token":
-                    clean_text = repair_text(chunk.get("text"))
-                    if clean_text:
-                        collected_tokens.append(clean_text)
-                    chunk = {"type": "token", "text": clean_text}
-                elif chunk.get("type") == "meta":
-                    if chunk.get("model"):
-                        final_model = repair_text(chunk.get("model"))
-                    usage = chunk.get("usage") or {}
-                    try:
-                        if usage.get("total_tokens") is not None:
-                            token_total = int(usage.get("total_tokens"))
-                    except (TypeError, ValueError):
-                        token_total = None
-                    chunk = dict(chunk)
-                    if final_model:
-                        chunk["model"] = final_model
-                yield json.dumps(chunk, ensure_ascii=False) + "\n"
-        except ValueError as exc:
-            stream_error = repair_text(str(exc))
-            error_type = _classify_llm_error(stream_error)
-            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
-        except RuntimeError as exc:
-            stream_error = repair_text(str(exc))
-            error_type = _classify_llm_error(stream_error)
-            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
-        except Exception as exc:
-            stream_error = repair_text(f"Sunucu hatasi: {exc}")
-            error_type = _classify_llm_error(stream_error)
-            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
-        finally:
-            if not session_id:
-                return
-            assistant_text = repair_text("".join(collected_tokens))
-            if stream_error and not assistant_text:
-                assistant_text = f"[Hata] {stream_error}"
-            if not assistant_text:
-                assistant_text = "[Bos yanit]"
-            try:
-                save_chat_turn(
-                    session_id=session_id,
-                    user_text=user_text,
-                    assistant_text=assistant_text,
-                    model=final_model or "",
-                    token_total=token_total,
+                attempt_done = False
+                got_tokens = False
+                for chunk in stream_iter:
+                    ctype = chunk.get("type")
+                    if ctype == "done":
+                        attempt_done = True
+                        continue
+                    if ctype == "token":
+                        clean_text = repair_text(chunk.get("text"))
+                        if clean_text:
+                            collected_tokens.append(clean_text)
+                            got_tokens = True
+                        chunk = {"type": "token", "text": clean_text}
+                    elif ctype == "meta":
+                        if chunk.get("model"):
+                            final_model = repair_text(chunk.get("model"))
+                        usage = chunk.get("usage") or {}
+                        try:
+                            if usage.get("total_tokens") is not None:
+                                token_total = int(usage.get("total_tokens"))
+                        except (TypeError, ValueError):
+                            token_total = None
+                        chunk = dict(chunk)
+                        if final_model:
+                            chunk["model"] = final_model
+                        chunk["tried_models"] = tried_models
+                    yield json.dumps(chunk, ensure_ascii=False) + "\n"
+
+                if attempt_done or got_tokens:
+                    latency_ms = int((time.time() - attempt_start) * 1000)
+                    record_llm_attempt(
+                        provider="openrouter",
+                        model=candidate,
+                        success=True,
+                        latency_ms=latency_ms,
+                    )
+                    yield json.dumps(
+                        {"type": "meta", "phase": "success", "model": candidate, "tried_models": tried_models},
+                        ensure_ascii=False,
+                    ) + "\n"
+                    yield json.dumps({"type": "done"}, ensure_ascii=False) + "\n"
+                    stream_error = ""
+                    error_type = ""
+                    break
+
+                stream_error = "Model bos dondu"
+                error_type = "other"
+                raise RuntimeError(stream_error)
+            except ValueError as exc:
+                stream_error = repair_text(str(exc))
+                error_type = _classify_llm_error(stream_error)
+                record_llm_attempt(
+                    provider="openrouter",
+                    model=candidate,
+                    success=False,
                     error_type=error_type,
+                    error_text=stream_error,
+                    latency_ms=int((time.time() - attempt_start) * 1000),
                 )
-            except Exception as persist_exc:
-                warn_text = repair_text(f"Sohbet kaydi yazilamadi: {persist_exc}")
-                yield json.dumps({"type": "meta", "phase": "persist_warn", "error": warn_text}, ensure_ascii=False) + "\n"
+                has_next = use_fallback and (idx < len(candidate_models) - 1)
+                if has_next:
+                    yield json.dumps(
+                        {"type": "meta", "phase": "fallback", "model": candidate, "error": stream_error, "tried_models": tried_models},
+                        ensure_ascii=False,
+                    ) + "\n"
+                    continue
+                yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
+            except RuntimeError as exc:
+                stream_error = repair_text(str(exc))
+                error_type = _classify_llm_error(stream_error)
+                record_llm_attempt(
+                    provider="openrouter",
+                    model=candidate,
+                    success=False,
+                    error_type=error_type,
+                    error_text=stream_error,
+                    latency_ms=int((time.time() - attempt_start) * 1000),
+                )
+                has_next = use_fallback and (idx < len(candidate_models) - 1)
+                if has_next:
+                    yield json.dumps(
+                        {"type": "meta", "phase": "fallback", "model": candidate, "error": stream_error, "tried_models": tried_models},
+                        ensure_ascii=False,
+                    ) + "\n"
+                    continue
+                yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
+            except Exception as exc:
+                stream_error = repair_text(f"Sunucu hatasi: {exc}")
+                error_type = _classify_llm_error(stream_error)
+                record_llm_attempt(
+                    provider="openrouter",
+                    model=candidate,
+                    success=False,
+                    error_type=error_type,
+                    error_text=stream_error,
+                    latency_ms=int((time.time() - attempt_start) * 1000),
+                )
+                has_next = use_fallback and (idx < len(candidate_models) - 1)
+                if has_next:
+                    yield json.dumps(
+                        {"type": "meta", "phase": "fallback", "model": candidate, "error": stream_error, "tried_models": tried_models},
+                        ensure_ascii=False,
+                    ) + "\n"
+                    continue
+                yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
+
+            # This attempt failed and no fallback remains.
+            break
+
+        if not session_id:
+            return
+        assistant_text = repair_text("".join(collected_tokens))
+        if stream_error and not assistant_text:
+            assistant_text = f"[Hata] {stream_error}"
+        if not assistant_text:
+            assistant_text = "[Bos yanit]"
+        try:
+            save_chat_turn(
+                session_id=session_id,
+                user_text=user_text,
+                assistant_text=assistant_text,
+                model=final_model or "",
+                token_total=token_total,
+                error_type=error_type,
+            )
+        except Exception as persist_exc:
+            warn_text = repair_text(f"Sohbet kaydi yazilamadi: {persist_exc}")
+            yield json.dumps({"type": "meta", "phase": "persist_warn", "error": warn_text}, ensure_ascii=False) + "\n"
 
     return Response(_generator(), mimetype="application/x-ndjson")
 
@@ -2667,6 +2850,8 @@ def api_gemini_status():
         }), 503
 
     status = gemini_status()
+    health_rows = list_provider_health("gemini")
+    blocked = [r["model"] for r in health_rows if r.get("blocked")]
     return jsonify({
         "available": True,
         "configured": status["configured"],
@@ -2674,6 +2859,8 @@ def api_gemini_status():
         "default_model": status["default_model"],
         "fallback_models": status.get("fallback_models", []),
         "timeout_sec": status["timeout_sec"],
+        "blocked_models": blocked,
+        "health_count": len(health_rows),
     })
 
 
@@ -2790,85 +2977,169 @@ def api_gemini_chat_stream():
     temperature = data.get("temperature")
     max_tokens = data.get("max_tokens")
     use_fallback = _as_bool(data.get("use_fallback", True), default=True)
+    default_model = gemini_status().get("default_model", "")
+    requested_model = str(model or "").strip()
+    if use_fallback:
+        candidate_models = _llm_candidate_models("gemini", requested_model or default_model)
+        candidate_models = [m for m in candidate_models if not is_model_blocked("gemini", m)]
+        if not candidate_models:
+            return jsonify({"error": "Kullanilabilir model yok (cooldown aktif)"}), 503
+    else:
+        candidate_models = [requested_model or default_model]
 
     @stream_with_context
     def _generator():
         collected_tokens: list[str] = []
-        final_model = repair_text(model)
+        final_model = repair_text(requested_model or default_model)
         token_total = None
         stream_error = ""
         error_type = ""
-        try:
-            if use_fallback:
-                stream_iter = gemini_chat_completion_stream_with_fallback(
-                    messages=llm_messages,
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
-            else:
+        tried_models: list[str] = []
+        for idx, candidate in enumerate(candidate_models):
+            tried_models.append(candidate)
+            final_model = repair_text(candidate)
+            attempt_start = time.time()
+
+            yield json.dumps(
+                {"type": "meta", "phase": "start", "model": candidate, "tried_models": tried_models},
+                ensure_ascii=False,
+            ) + "\n"
+
+            try:
                 stream_iter = gemini_chat_completion_stream(
                     messages=llm_messages,
-                    model=model,
+                    model=candidate,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
-                yield json.dumps(
-                    {"type": "meta", "phase": "start", "model": model, "tried_models": [model]},
-                    ensure_ascii=False,
-                ) + "\n"
 
-            for chunk in stream_iter:
-                if chunk.get("type") == "token":
-                    clean_text = repair_text(chunk.get("text"))
-                    if clean_text:
-                        collected_tokens.append(clean_text)
-                    chunk = {"type": "token", "text": clean_text}
-                elif chunk.get("type") == "meta":
-                    if chunk.get("model"):
-                        final_model = repair_text(chunk.get("model"))
-                    usage = chunk.get("usage") or {}
-                    try:
-                        if usage.get("total_tokens") is not None:
-                            token_total = int(usage.get("total_tokens"))
-                    except (TypeError, ValueError):
-                        token_total = None
-                    chunk = dict(chunk)
-                    if final_model:
-                        chunk["model"] = final_model
-                yield json.dumps(chunk, ensure_ascii=False) + "\n"
-        except ValueError as exc:
-            stream_error = repair_text(str(exc))
-            error_type = _classify_llm_error(stream_error)
-            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
-        except RuntimeError as exc:
-            stream_error = repair_text(str(exc))
-            error_type = _classify_llm_error(stream_error)
-            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
-        except Exception as exc:
-            stream_error = repair_text(f"Sunucu hatasi: {exc}")
-            error_type = _classify_llm_error(stream_error)
-            yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
-        finally:
-            if not session_id:
-                return
-            assistant_text = repair_text("".join(collected_tokens))
-            if stream_error and not assistant_text:
-                assistant_text = f"[Hata] {stream_error}"
-            if not assistant_text:
-                assistant_text = "[Bos yanit]"
-            try:
-                save_chat_turn(
-                    session_id=session_id,
-                    user_text=user_text,
-                    assistant_text=assistant_text,
-                    model=final_model or "",
-                    token_total=token_total,
+                attempt_done = False
+                got_tokens = False
+                for chunk in stream_iter:
+                    ctype = chunk.get("type")
+                    if ctype == "done":
+                        attempt_done = True
+                        continue
+                    if ctype == "token":
+                        clean_text = repair_text(chunk.get("text"))
+                        if clean_text:
+                            collected_tokens.append(clean_text)
+                            got_tokens = True
+                        chunk = {"type": "token", "text": clean_text}
+                    elif ctype == "meta":
+                        if chunk.get("model"):
+                            final_model = repair_text(chunk.get("model"))
+                        usage = chunk.get("usage") or {}
+                        try:
+                            if usage.get("total_tokens") is not None:
+                                token_total = int(usage.get("total_tokens"))
+                        except (TypeError, ValueError):
+                            token_total = None
+                        chunk = dict(chunk)
+                        if final_model:
+                            chunk["model"] = final_model
+                        chunk["tried_models"] = tried_models
+                    yield json.dumps(chunk, ensure_ascii=False) + "\n"
+
+                if attempt_done or got_tokens:
+                    latency_ms = int((time.time() - attempt_start) * 1000)
+                    record_llm_attempt(
+                        provider="gemini",
+                        model=candidate,
+                        success=True,
+                        latency_ms=latency_ms,
+                    )
+                    yield json.dumps(
+                        {"type": "meta", "phase": "success", "model": candidate, "tried_models": tried_models},
+                        ensure_ascii=False,
+                    ) + "\n"
+                    yield json.dumps({"type": "done"}, ensure_ascii=False) + "\n"
+                    stream_error = ""
+                    error_type = ""
+                    break
+
+                stream_error = "Model bos dondu"
+                error_type = "other"
+                raise RuntimeError(stream_error)
+            except ValueError as exc:
+                stream_error = repair_text(str(exc))
+                error_type = _classify_llm_error(stream_error)
+                record_llm_attempt(
+                    provider="gemini",
+                    model=candidate,
+                    success=False,
                     error_type=error_type,
+                    error_text=stream_error,
+                    latency_ms=int((time.time() - attempt_start) * 1000),
                 )
-            except Exception as persist_exc:
-                warn_text = repair_text(f"Sohbet kaydi yazilamadi: {persist_exc}")
-                yield json.dumps({"type": "meta", "phase": "persist_warn", "error": warn_text}, ensure_ascii=False) + "\n"
+                has_next = use_fallback and (idx < len(candidate_models) - 1)
+                if has_next:
+                    yield json.dumps(
+                        {"type": "meta", "phase": "fallback", "model": candidate, "error": stream_error, "tried_models": tried_models},
+                        ensure_ascii=False,
+                    ) + "\n"
+                    continue
+                yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
+            except RuntimeError as exc:
+                stream_error = repair_text(str(exc))
+                error_type = _classify_llm_error(stream_error)
+                record_llm_attempt(
+                    provider="gemini",
+                    model=candidate,
+                    success=False,
+                    error_type=error_type,
+                    error_text=stream_error,
+                    latency_ms=int((time.time() - attempt_start) * 1000),
+                )
+                has_next = use_fallback and (idx < len(candidate_models) - 1)
+                if has_next:
+                    yield json.dumps(
+                        {"type": "meta", "phase": "fallback", "model": candidate, "error": stream_error, "tried_models": tried_models},
+                        ensure_ascii=False,
+                    ) + "\n"
+                    continue
+                yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
+            except Exception as exc:
+                stream_error = repair_text(f"Sunucu hatasi: {exc}")
+                error_type = _classify_llm_error(stream_error)
+                record_llm_attempt(
+                    provider="gemini",
+                    model=candidate,
+                    success=False,
+                    error_type=error_type,
+                    error_text=stream_error,
+                    latency_ms=int((time.time() - attempt_start) * 1000),
+                )
+                has_next = use_fallback and (idx < len(candidate_models) - 1)
+                if has_next:
+                    yield json.dumps(
+                        {"type": "meta", "phase": "fallback", "model": candidate, "error": stream_error, "tried_models": tried_models},
+                        ensure_ascii=False,
+                    ) + "\n"
+                    continue
+                yield json.dumps({"type": "error", "error": stream_error}, ensure_ascii=False) + "\n"
+
+            break
+
+        if not session_id:
+            return
+        assistant_text = repair_text("".join(collected_tokens))
+        if stream_error and not assistant_text:
+            assistant_text = f"[Hata] {stream_error}"
+        if not assistant_text:
+            assistant_text = "[Bos yanit]"
+        try:
+            save_chat_turn(
+                session_id=session_id,
+                user_text=user_text,
+                assistant_text=assistant_text,
+                model=final_model or "",
+                token_total=token_total,
+                error_type=error_type,
+            )
+        except Exception as persist_exc:
+            warn_text = repair_text(f"Sohbet kaydi yazilamadi: {persist_exc}")
+            yield json.dumps({"type": "meta", "phase": "persist_warn", "error": warn_text}, ensure_ascii=False) + "\n"
 
     return Response(_generator(), mimetype="application/x-ndjson")
 

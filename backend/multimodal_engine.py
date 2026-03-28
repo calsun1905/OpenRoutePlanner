@@ -20,6 +20,9 @@ from ibb_transit import (
     get_stops_in_area,
     find_connecting_routes,
     get_route_info,
+    get_metro_stations_in_area,
+    get_metro_lines_for_station,
+    get_metro_line_stations,
     _haversine_distance,
     _get_db_connection,
 )
@@ -37,6 +40,7 @@ AVG_BUS_WAIT_MIN = 5
 
 # Ortalama otobus hizi (trafik dahil, km/s)
 AVG_BUS_SPEED_KMH = 18
+AVG_METRO_SPEED_KMH = 34
 
 # Maksimum yurume mesafesi duraga (metre)
 MAX_WALK_TO_STOP_M = 800
@@ -103,24 +107,47 @@ def _get_bus_road_coords(stop_coords: List[List[float]]) -> List[List[float]]:
     if len(stop_coords) < 2:
         return stop_coords
 
-    # Durak sayisina gore batch buyuklugu ayarla
-    # OSRM max ~25 waypoint kabul eder
+    def _sample_waypoints(coords: List[List[float]], max_waypoints: int = 20) -> List[List[float]]:
+        if len(coords) <= max_waypoints:
+            return coords
+        # OSRM'e tum duraklari dayatmak bazen sacma zigzag uretir.
+        # Bu nedenle esit aralikli ornekleyip ilk/son duragi koruyoruz.
+        sampled = [coords[0]]
+        step = max(1, int((len(coords) - 2) / max(1, (max_waypoints - 2))))
+        idx = step
+        while idx < len(coords) - 1 and len(sampled) < (max_waypoints - 1):
+            sampled.append(coords[idx])
+            idx += step
+        sampled.append(coords[-1])
+        return sampled
+
+    stop_path_dist = _path_distance_m(stop_coords)
+
     if len(stop_coords) <= 25:
-        # Tum duraklari tek seferde OSRM'e gonder
-        return _osrm_multi_waypoint(stop_coords)
+        query_coords = _sample_waypoints(stop_coords, max_waypoints=20)
+        road_coords = _osrm_multi_waypoint(query_coords)
     else:
-        # 20'li gruplara bol ve birlestir
         all_coords = []
         for i in range(0, len(stop_coords), 19):
             chunk = stop_coords[i:i + 20]
             if len(chunk) < 2:
                 all_coords.extend(chunk)
                 continue
-            road_coords = _osrm_multi_waypoint(chunk)
-            if all_coords and road_coords:
-                road_coords = road_coords[1:]  # Overlap noktasini atla
-            all_coords.extend(road_coords)
-        return all_coords
+            query_chunk = _sample_waypoints(chunk, max_waypoints=16)
+            road_chunk = _osrm_multi_waypoint(query_chunk)
+            if all_coords and road_chunk:
+                road_chunk = road_chunk[1:]  # Overlap noktasini atla
+            all_coords.extend(road_chunk)
+        road_coords = all_coords if len(all_coords) >= 2 else stop_coords
+
+    road_dist = _path_distance_m(road_coords)
+    # Google Maps benzeri, asiri sapmayan bir cizim icin kalite kontrolu.
+    # OSRM detour'u cok buyukse veya cok kucukse durak polyline'ina geri don.
+    if stop_path_dist > 0:
+        if road_dist > (stop_path_dist * 1.85) or road_dist < (stop_path_dist * 0.55):
+            return stop_coords
+
+    return road_coords if len(road_coords) >= 2 else stop_coords
 
 
 def _osrm_multi_waypoint(coords: List[List[float]]) -> List[List[float]]:
@@ -172,6 +199,13 @@ def _bus_travel_time_minutes(distance_km: float) -> float:
     if distance_km <= 0:
         return 0
     return round((distance_km / AVG_BUS_SPEED_KMH) * 60, 1)
+
+
+def _metro_travel_time_minutes(distance_km: float) -> float:
+    """Metro/tram/funikuler ortalama sure (dakika)."""
+    if distance_km <= 0:
+        return 0
+    return round((distance_km / AVG_METRO_SPEED_KMH) * 60, 1)
 
 
 def _path_distance_m(coords: List[List[float]]) -> float:
@@ -321,6 +355,318 @@ def _get_nearby_routes(lat: float, lon: float, radius: int = 500) -> List[Dict]:
                     "distance_m": stop["distance_m"],
                 }
     return list(route_set.values())
+
+
+def _normalize_station_name(name: str) -> str:
+    if not name:
+        return ""
+    return (
+        name.lower()
+        .replace("-", " ")
+        .replace("_", " ")
+        .replace("ı", "i")
+        .replace("ö", "o")
+        .replace("ü", "u")
+        .replace("ş", "s")
+        .replace("ç", "c")
+        .replace("ğ", "g")
+        .strip()
+    )
+
+
+def _get_line_path_between_stations(line_id: int, from_station_id: int, to_station_id: int) -> List[Dict]:
+    stations = get_metro_line_stations(line_id)
+    if len(stations) < 2:
+        return []
+    from_idx = None
+    to_idx = None
+    for i, st in enumerate(stations):
+        if st["id"] == from_station_id:
+            from_idx = i
+        if st["id"] == to_station_id:
+            to_idx = i
+    if from_idx is None or to_idx is None:
+        return []
+    if from_idx <= to_idx:
+        return stations[from_idx:to_idx + 1]
+    seg = stations[to_idx:from_idx + 1]
+    seg.reverse()
+    return seg
+
+
+def _find_metro_transfer_pairs(
+    line_a_stations: List[Dict],
+    line_b_stations: List[Dict],
+    max_distance_m: float = 260.0,
+) -> List[Tuple[Dict, Dict]]:
+    """
+    Iki farkli metro hatti arasinda aktarma olabilecek istasyon ciftlerini bulur.
+    Once isim eslesmesini, sonra fiziksel yakinligi kullanir.
+    """
+    a_name_map = {_normalize_station_name(s.get("description") or s.get("name")): s for s in line_a_stations}
+    b_name_map = {_normalize_station_name(s.get("description") or s.get("name")): s for s in line_b_stations}
+
+    pairs: List[Tuple[Dict, Dict]] = []
+    seen_ids = set()
+
+    # 1) Isim bazli guclu eslesme
+    for nm, a_st in a_name_map.items():
+        if not nm or nm not in b_name_map:
+            continue
+        b_st = b_name_map[nm]
+        key = (a_st["id"], b_st["id"])
+        if key in seen_ids:
+            continue
+        seen_ids.add(key)
+        pairs.append((a_st, b_st))
+
+    # 2) Fiziksel yakinlik bazli eslesme
+    # Interchange istasyon isimleri her zaman birebir ayni gelmeyebiliyor.
+    close_pairs = []
+    for a_st in line_a_stations:
+        for b_st in line_b_stations:
+            dist = _haversine_distance(a_st["lat"], a_st["lon"], b_st["lat"], b_st["lon"])
+            if dist <= max_distance_m:
+                close_pairs.append((dist, a_st, b_st))
+
+    close_pairs.sort(key=lambda x: x[0])
+    for _, a_st, b_st in close_pairs[:4]:
+        key = (a_st["id"], b_st["id"])
+        if key in seen_ids:
+            continue
+        seen_ids.add(key)
+        pairs.append((a_st, b_st))
+        if len(pairs) >= 5:
+            break
+
+    return pairs
+
+
+def _build_metro_options(
+    origin_lat: float,
+    origin_lon: float,
+    dest_lat: float,
+    dest_lon: float,
+    direct_walk_min: float,
+    direct_walk_m: float,
+    max_results: int = 4,
+) -> List[Dict]:
+    """Metro API verisinden direkt ve tek aktarmali secenekler uretir."""
+    options = []
+    search_radii = [900, 1600, 2600, 4000, 5500]
+
+    origin_candidates = []
+    dest_candidates = []
+    for radius in search_radii:
+        origin_candidates = get_metro_stations_in_area(origin_lat, origin_lon, radius)
+        dest_candidates = get_metro_stations_in_area(dest_lat, dest_lon, radius)
+        if origin_candidates and dest_candidates:
+            break
+
+    if not origin_candidates or not dest_candidates:
+        return []
+
+    origin_candidates = origin_candidates[:15]
+    dest_candidates = dest_candidates[:15]
+
+    seen = set()
+    for o in origin_candidates:
+        for d in dest_candidates:
+            o_lines = get_metro_lines_for_station(o["id"])
+            d_lines = get_metro_lines_for_station(d["id"])
+            if not o_lines or not d_lines:
+                continue
+
+            # Direkt ayni hat
+            d_lines_by_id = {ln["id"]: ln for ln in d_lines}
+            for o_line in o_lines:
+                line_id = o_line["id"]
+                if line_id not in d_lines_by_id:
+                    continue
+                line_path = _get_line_path_between_stations(line_id, o["id"], d["id"])
+                if len(line_path) < 2:
+                    continue
+                rail_coords = [[s["lat"], s["lon"]] for s in line_path]
+                rail_distance_m = _path_distance_m(rail_coords)
+                walk_to = _walking_time_minutes(o["distance_m"])
+                walk_from = _walking_time_minutes(d["distance_m"])
+                wait_time = 4.0
+                rail_time = _metro_travel_time_minutes(rail_distance_m / 1000)
+                total_time = walk_to + wait_time + rail_time + walk_from
+
+                if total_time > max(direct_walk_min * 2.5, 90):
+                    continue
+                if (o["distance_m"] + rail_distance_m + d["distance_m"]) > max(direct_walk_m * 5.5, 22000):
+                    continue
+
+                key = ("direct", line_id, o["id"], d["id"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                line_name = o_line.get("name", f"L{line_id}")
+                options.append({
+                    "type": "transit",
+                    "transit_mode": "metro",
+                    "icon": "metro",
+                    "name": f"{line_name} Metro",
+                    "description": f"{o['description']} -> {d['description']}",
+                    "total_time_min": round(total_time, 1),
+                    "total_distance_m": round(o["distance_m"] + rail_distance_m + d["distance_m"]),
+                    "route_code": line_name,
+                    "route_name": o_line.get("long_description", line_name),
+                    "transfer_count": 0,
+                    "segments": [
+                        {
+                            "mode": "walk",
+                            "description": f"Istasyona yuru: {o['description']}",
+                            "distance_m": o["distance_m"],
+                            "duration_min": walk_to,
+                            "coords": _get_walk_road_coords(origin_lat, origin_lon, o["lat"], o["lon"]),
+                        },
+                        {
+                            "mode": "rail",
+                            "description": f"{line_name} hatti",
+                            "route_code": line_name,
+                            "from_stop": o["description"],
+                            "to_stop": d["description"],
+                            "distance_m": round(rail_distance_m),
+                            "duration_min": rail_time,
+                            "wait_min": wait_time,
+                            "coords": rail_coords,
+                            "stop_coords": rail_coords,
+                        },
+                        {
+                            "mode": "walk",
+                            "description": "Istasyondan hedefe yuru",
+                            "distance_m": d["distance_m"],
+                            "duration_min": walk_from,
+                            "coords": _get_walk_road_coords(d["lat"], d["lon"], dest_lat, dest_lon),
+                        },
+                    ],
+                })
+
+            # Tek aktarma (isim bazli transfer)
+            o_lines_map = {ln["id"]: ln for ln in o_lines}
+            d_lines_map = {ln["id"]: ln for ln in d_lines}
+            for line_a_id, line_a in o_lines_map.items():
+                a_stations = get_metro_line_stations(line_a_id)
+                if len(a_stations) < 2:
+                    continue
+
+                for line_b_id, line_b in d_lines_map.items():
+                    if line_a_id == line_b_id:
+                        continue
+                    b_stations = get_metro_line_stations(line_b_id)
+                    if len(b_stations) < 2:
+                        continue
+                    transfer_pairs = _find_metro_transfer_pairs(a_stations, b_stations)
+                    if not transfer_pairs:
+                        continue
+
+                    for transfer_a, transfer_b in transfer_pairs[:3]:
+                        leg1 = _get_line_path_between_stations(line_a_id, o["id"], transfer_a["id"])
+                        leg2 = _get_line_path_between_stations(line_b_id, transfer_b["id"], d["id"])
+                        if len(leg1) < 2 or len(leg2) < 2:
+                            continue
+
+                        coords1 = [[s["lat"], s["lon"]] for s in leg1]
+                        coords2 = [[s["lat"], s["lon"]] for s in leg2]
+                        dist1 = _path_distance_m(coords1)
+                        dist2 = _path_distance_m(coords2)
+                        walk_to = _walking_time_minutes(o["distance_m"])
+                        walk_from = _walking_time_minutes(d["distance_m"])
+                        wait1 = 4.0
+                        wait2 = 4.0
+                        rail1 = _metro_travel_time_minutes(dist1 / 1000)
+                        rail2 = _metro_travel_time_minutes(dist2 / 1000)
+                        total_time = walk_to + wait1 + rail1 + wait2 + rail2 + walk_from
+
+                        total_distance = o["distance_m"] + dist1 + dist2 + d["distance_m"]
+                        if total_time > max(direct_walk_min * 3.1, 110):
+                            continue
+                        if total_distance > max(direct_walk_m * 6.2, 28000):
+                            continue
+
+                        key = ("transfer", line_a_id, line_b_id, o["id"], d["id"], transfer_a["id"], transfer_b["id"])
+                        if key in seen:
+                            continue
+                        seen.add(key)
+
+                        name_a = line_a.get("name", f"L{line_a_id}")
+                        name_b = line_b.get("name", f"L{line_b_id}")
+                        transfer_desc = transfer_a.get("description") or transfer_a.get("name") or "Transfer"
+                        options.append({
+                            "type": "transit",
+                            "transit_mode": "metro",
+                            "icon": "metro",
+                            "name": f"{name_a} + {name_b} Aktarmali",
+                            "description": f"{o['description']} -> {transfer_desc} -> {d['description']}",
+                            "total_time_min": round(total_time, 1),
+                            "total_distance_m": round(total_distance),
+                            "route_code": f"{name_a}->{name_b}",
+                            "route_name": f"{name_a} + {name_b}",
+                            "transfer_count": 1,
+                            "segments": [
+                                {
+                                    "mode": "walk",
+                                    "description": f"Istasyona yuru: {o['description']}",
+                                    "distance_m": o["distance_m"],
+                                    "duration_min": walk_to,
+                                    "coords": _get_walk_road_coords(origin_lat, origin_lon, o["lat"], o["lon"]),
+                                },
+                                {
+                                    "mode": "rail",
+                                    "description": f"{name_a} hatti",
+                                    "route_code": name_a,
+                                    "from_stop": o["description"],
+                                    "to_stop": transfer_desc,
+                                    "distance_m": round(dist1),
+                                    "duration_min": rail1,
+                                    "wait_min": wait1,
+                                    "coords": coords1,
+                                    "stop_coords": coords1,
+                                },
+                                {
+                                    "mode": "rail",
+                                    "description": f"{name_b} hatti",
+                                    "route_code": name_b,
+                                    "from_stop": transfer_desc,
+                                    "to_stop": d["description"],
+                                    "distance_m": round(dist2),
+                                    "duration_min": rail2,
+                                    "wait_min": wait2,
+                                    "coords": coords2,
+                                    "stop_coords": coords2,
+                                },
+                                {
+                                    "mode": "walk",
+                                    "description": "Istasyondan hedefe yuru",
+                                    "distance_m": d["distance_m"],
+                                    "duration_min": walk_from,
+                                    "coords": _get_walk_road_coords(d["lat"], d["lon"], dest_lat, dest_lon),
+                                },
+                            ],
+                        })
+
+    options.sort(key=lambda x: x["total_time_min"])
+
+    # Ayni hat kombinasyonunu farkli istasyon secimiyle tekrar gostermeyi azalt.
+    unique = []
+    seen = set()
+    for opt in options:
+        transfer_count = int(opt.get("transfer_count", 0))
+        if transfer_count == 0:
+            key = ("metro_direct", str(opt.get("route_code", "")))
+        else:
+            key = ("metro_transfer", str(opt.get("route_code", "")))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(opt)
+        if len(unique) >= max_results:
+            break
+
+    return unique
 
 
 def _is_reasonable_transit_time(total_time_min: float, direct_walk_min: float, with_transfer: bool = False) -> bool:
@@ -759,6 +1105,16 @@ def find_transit_routes(
                 ],
             })
 
+    metro_options = _build_metro_options(
+        origin_lat=origin_lat,
+        origin_lon=origin_lon,
+        dest_lat=dest_lat,
+        dest_lon=dest_lon,
+        direct_walk_min=direct_walk_min,
+        direct_walk_m=direct_walk_m,
+        max_results=5,
+    )
+    result.extend(metro_options)
     return result
 
 

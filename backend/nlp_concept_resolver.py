@@ -262,6 +262,49 @@ def resolve_poi_from_tokens(
     return best
 
 
+def resolve_poi_from_tokens_with_debug(
+    tokens: List[str],
+    bert_matcher: Optional[Callable[[str], Optional[Tuple[str, float]]]] = None,
+) -> Tuple[PoiResolution, Dict[str, object]]:
+    """
+    Token listesinden POI konseptini cozerken ara adimlari da dondurur.
+    """
+    normalized_tokens = [normalize_text(t) for t in (tokens or []) if normalize_text(t)]
+    ngrams = build_poi_ngrams(normalized_tokens, max_ngram=3)
+    attempts: List[Dict[str, object]] = []
+
+    best = PoiResolution(None, "unknown", 0.0, "unknown", [])
+    for gram in ngrams:
+        res = resolve_poi_concept(gram, bert_matcher=bert_matcher)
+        attempts.append(
+            {
+                "surface": gram,
+                "concept": res.concept,
+                "source": res.source,
+                "confidence": float(res.confidence),
+                "status": res.status,
+                "candidates": list(res.candidates or []),
+            }
+        )
+        if res.status == "success" and res.confidence > best.confidence:
+            best = res
+            if res.source == "morph+dict":
+                break
+
+    debug = {
+        "tokens": normalized_tokens,
+        "ngrams": ngrams,
+        "attempts": attempts,
+        "selected": {
+            "concept": best.concept,
+            "source": best.source,
+            "confidence": float(best.confidence),
+            "status": best.status,
+        },
+    }
+    return best, debug
+
+
 def extract_candidates(query: str) -> List[str]:
     """Sorgudan resolver için aday token/ngram listesi çıkarır."""
     normalized = normalize_text(query)

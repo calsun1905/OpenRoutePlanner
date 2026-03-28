@@ -209,14 +209,15 @@
 
     function drawSegmentLine(seg, coords) {
         const latlngs = coords.map((c) => [c[0], c[1]]);
-        if (seg.mode === "bus") {
+        if (seg.mode === "bus" || seg.mode === "rail") {
+            const isRail = seg.mode === "rail";
             const glow = L.polyline(latlngs, {
-                color: "#3b82f6",
+                color: isRail ? "#8b5cf6" : "#3b82f6",
                 weight: 10,
                 opacity: 0.18,
             }).addTo(map);
             const line = L.polyline(latlngs, {
-                color: "#2563eb",
+                color: isRail ? "#7c3aed" : "#2563eb",
                 weight: 5,
                 opacity: 0.95,
             }).addTo(map);
@@ -257,6 +258,7 @@
         clearTransitRoute();
         let step = 1;
         const allBounds = [];
+        let finalEnd = null;
 
         option.segments.forEach((seg) => {
             if (!Array.isArray(seg.coords) || seg.coords.length < 2) return;
@@ -265,10 +267,12 @@
 
             const start = seg.coords[0];
             const end = seg.coords[seg.coords.length - 1];
+            finalEnd = end;
             if (seg.mode === "walk") {
                 drawStepMarker(start[0], start[1], step++, "step-walk", seg.description || "Walk");
-            } else if (seg.mode === "bus") {
-                drawStepMarker(start[0], start[1], step++, "step-board", "Board bus");
+            } else if (seg.mode === "bus" || seg.mode === "rail") {
+                const boardText = seg.mode === "rail" ? "Board metro" : "Board bus";
+                drawStepMarker(start[0], start[1], step++, "step-board", boardText);
                 drawStepMarker(end[0], end[1], step++, "step-alight", "Get off");
                 if (seg.route_code) {
                     const mid = seg.coords[Math.floor(seg.coords.length / 2)];
@@ -283,8 +287,11 @@
                     transitRouteLayers.push(label);
                 }
             }
-            drawStepMarker(end[0], end[1], step++, "step-end", "Destination");
         });
+
+        if (finalEnd) {
+            drawStepMarker(finalEnd[0], finalEnd[1], step++, "step-end", "Destination");
+        }
 
         if (allBounds.length >= 2) {
             map.fitBounds(allBounds, { padding: [40, 40], maxZoom: 16 });
@@ -314,7 +321,10 @@
 
             options.forEach((opt, index) => {
                 const isRec = opt.type === recommended;
-                const iconHtml = opt.type === "transit" ? "&#x1F68C;" : "&#x1F6B6;";
+                const isMetro = opt.transit_mode === "metro";
+                const iconHtml = opt.type === "transit"
+                    ? (isMetro ? "&#x1F687;" : "&#x1F68C;")
+                    : "&#x1F6B6;";
                 html += `
                     <div class="multimodal-option ${isRec ? "recommended" : ""}" onclick="showTransitRoute(${index})" style="cursor:pointer;">
                         <div class="multimodal-option-header">
@@ -332,8 +342,9 @@
                 `;
 
                 (opt.segments || []).forEach((seg) => {
-                    const segIcon = seg.mode === "bus" ? "&#x1F68C;" : "&#x1F6B6;";
-                    const segClass = seg.mode === "bus" ? "seg-bus" : "seg-walk";
+                    const isRail = seg.mode === "rail";
+                    const segIcon = seg.mode === "bus" ? "&#x1F68C;" : (isRail ? "&#x1F687;" : "&#x1F6B6;");
+                    const segClass = (seg.mode === "bus" || isRail) ? "seg-bus" : "seg-walk";
                     html += `
                         <div class="multimodal-segment ${segClass}">
                             <span class="seg-icon">${segIcon}</span>
@@ -341,17 +352,17 @@
                             <span class="seg-time">${seg.duration_min || 0} dk</span>
                         </div>
                     `;
-                });
 
-                if (opt.wait_time_min) {
-                    html += `
-                        <div class="multimodal-segment seg-wait">
-                            <span class="seg-icon">&#x23F3;</span>
-                            <span class="seg-desc">Wait</span>
-                            <span class="seg-time">${opt.wait_time_min} dk</span>
-                        </div>
-                    `;
-                }
+                    if ((seg.mode === "bus" || seg.mode === "rail") && seg.wait_min) {
+                        html += `
+                            <div class="multimodal-segment seg-wait">
+                                <span class="seg-icon">&#x23F3;</span>
+                                <span class="seg-desc">Wait</span>
+                                <span class="seg-time">~${seg.wait_min} dk</span>
+                            </div>
+                        `;
+                    }
+                });
 
                 html += `
                         </div>
