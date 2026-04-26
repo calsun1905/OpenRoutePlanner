@@ -153,6 +153,18 @@ def test_geocode_reverse(client):
     assert 'address' in data
 
 
+def test_get_route_rejects_outside_istanbul(client):
+    rv = client.post(
+        '/api/get-route',
+        json={'points': [[41.0284, 29.0244], [39.9208, 32.8541]]},
+        content_type='application/json',
+    )
+    assert rv.status_code == 400
+    data = rv.get_json()
+    assert data.get('code') == 'outside_istanbul'
+    assert data.get('field') == 'points'
+
+
 def test_locations_list(client):
     """Kayıtlı konumlar listesi endpoint testi"""
     rv = client.get('/api/locations')

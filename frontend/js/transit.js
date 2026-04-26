@@ -12,6 +12,7 @@
     const elBtnCompareRoutes = document.getElementById("btnCompareRoutes");
     const elMultimodalPanel = document.getElementById("multimodalPanel");
     const elMultimodalResults = document.getElementById("multimodalResults");
+    const elTransitModeInputs = Array.from(document.querySelectorAll("input[data-transit-mode]"));
 
     let transitEnabled = false;
     let transitStopMarkers = null;
@@ -66,7 +67,7 @@
         let html = "";
         displayStops.forEach((stop) => {
             html += `
-                <div class="nearby-stop-item" onclick="map.setView([${stop.lat}, ${stop.lon}], 17)">
+                <div class="nearby-stop-item" onclick="focusMapInIstanbul(${stop.lat}, ${stop.lon}, 17)">
                     <div class="nearby-stop-info">
                         <span class="nearby-stop-name">${stop.name || "Stop"}</span>
                         <span class="nearby-stop-district">${stop.district || ""}</span>
@@ -164,7 +165,11 @@
     }
 
     window.selectTransitStop = function (lat, lon, name) {
-        map.setView([lat, lon], 17);
+        if (typeof window.focusMapInIstanbul === "function") {
+            if (!window.focusMapInIstanbul(lat, lon, 17)) return;
+        } else {
+            map.setView([lat, lon], 17);
+        }
         if (elTransitSearchInput) elTransitSearchInput.value = "";
         if (elTransitSearchResults) elTransitSearchResults.style.display = "none";
         if (typeof showToast === "function") {
@@ -207,29 +212,163 @@
         transitRouteLayers = [];
     }
 
+    function getSelectedTransitModes() {
+        if (!Array.isArray(elTransitModeInputs) || elTransitModeInputs.length === 0) {
+            return ["bus", "metro", "metrobus", "ferry"];
+        }
+        const selected = elTransitModeInputs
+            .filter((el) => el && el.checked)
+            .map((el) => String(el.dataset.transitMode || "").toLowerCase())
+            .filter((m) => m);
+        return selected;
+    }
+
+    function haversineMeters(a, b) {
+        const toRad = (deg) => (deg * Math.PI) / 180;
+        const lat1 = Number(a[0]);
+        const lon1 = Number(a[1]);
+        const lat2 = Number(b[0]);
+        const lon2 = Number(b[1]);
+        if (!Number.isFinite(lat1) || !Number.isFinite(lon1) || !Number.isFinite(lat2) || !Number.isFinite(lon2)) {
+            return Number.POSITIVE_INFINITY;
+        }
+        const R = 6371000;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const s1 = Math.sin(dLat / 2);
+        const s2 = Math.sin(dLon / 2);
+        const aa = s1 * s1 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * s2 * s2;
+        const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+        return R * c;
+    }
+
+    function splitSegmentCoords(coords, mode = "") {
+        const normalized = (coords || [])
+            .filter((c) => Array.isArray(c) && c.length >= 2)
+            .map((c) => [Number(c[0]), Number(c[1])])
+            .filter((c) => Number.isFinite(c[0]) && Number.isFinite(c[1]));
+
+        if (normalized.length < 2) return [];
+
+        const modeName = String(mode || "").toLowerCase();
+        const maxJumpMeters = modeName === "ferry"
+            ? 45000
+            : (modeName === "rail"
+                ? 9000
+                : (modeName === "bus" ? 5000 : (modeName === "walk" ? 3200 : 6000)));
+
+        const chunks = [];
+        let current = [normalized[0]];
+
+        for (let i = 1; i < normalized.length; i += 1) {
+            const prev = current[current.length - 1];
+            const next = normalized[i];
+            const jumpMeters = haversineMeters(prev, next);
+
+            if (jumpMeters > maxJumpMeters) {
+                if (current.length >= 2) chunks.push(current);
+                current = [next];
+                continue;
+            }
+            current.push(next);
+        }
+
+        if (current.length >= 2) chunks.push(current);
+        return chunks;
+    }
+
+    function sanitizeSegmentCoords(coords, mode = "") {
+        const chunks = splitSegmentCoords(coords, mode);
+        if (!chunks.length) return [];
+        let best = chunks[0];
+        let bestLen = 0;
+        chunks.forEach((chunk) => {
+            let len = 0;
+            for (let i = 1; i < chunk.length; i += 1) {
+                len += haversineMeters(chunk[i - 1], chunk[i]);
+            }
+            if (len > bestLen) {
+                bestLen = len;
+                best = chunk;
+            }
+        });
+        return best;
+    }
+
+    function isMetrobusSegment(seg) {
+        if (!seg || seg.mode !== "bus") return false;
+        const code = String(seg.route_code || "").toUpperCase().trim();
+        return /^34[A-Z0-9]*$/.test(code);
+    }
+
+    function getSegmentCoordsForDrawing(seg, transitOnlyView) {
+        const routeCoords = Array.isArray(seg?.coords) ? seg.coords : [];
+        const stopCoords = Array.isArray(seg?.stop_coords) ? seg.stop_coords : [];
+
+        if (!transitOnlyView) {
+            return routeCoords.length >= 2 ? routeCoords : stopCoords;
+        }
+
+        // Transit cizim algoritmasi yuruyusten ayrildi:
+        // bus/rail/ferry icin once stop-to-stop geometriyi kullan.
+        if (seg?.mode === "bus" || seg?.mode === "rail" || seg?.mode === "ferry") {
+            return stopCoords.length >= 2 ? stopCoords : routeCoords;
+        }
+
+        return routeCoords.length >= 2 ? routeCoords : stopCoords;
+    }
+
+    function segmentLengthMeters(coords, mode = "") {
+        const chunks = splitSegmentCoords(coords, mode);
+        if (!chunks.length) return 0;
+        let total = 0;
+        chunks.forEach((chunk) => {
+            for (let i = 1; i < chunk.length; i += 1) {
+                total += haversineMeters(chunk[i - 1], chunk[i]);
+            }
+        });
+        return total;
+    }
+
     function drawSegmentLine(seg, coords) {
-        const latlngs = coords.map((c) => [c[0], c[1]]);
-        if (seg.mode === "bus" || seg.mode === "rail") {
+        const chunks = splitSegmentCoords(coords, seg.mode);
+        if (!chunks.length) return;
+        if (seg.mode === "bus" || seg.mode === "rail" || seg.mode === "ferry") {
             const isRail = seg.mode === "rail";
-            const glow = L.polyline(latlngs, {
-                color: isRail ? "#8b5cf6" : "#3b82f6",
-                weight: 10,
-                opacity: 0.18,
-            }).addTo(map);
-            const line = L.polyline(latlngs, {
-                color: isRail ? "#7c3aed" : "#2563eb",
-                weight: 5,
-                opacity: 0.95,
-            }).addTo(map);
-            transitRouteLayers.push(glow, line);
+            const isFerry = seg.mode === "ferry";
+            const isMetrobus = isMetrobusSegment(seg);
+            const glowColor = isMetrobus
+                ? "#fb7185"
+                : (isFerry ? "#06b6d4" : (isRail ? "#8b5cf6" : "#3b82f6"));
+            const lineColor = isMetrobus
+                ? "#e11d48"
+                : (isFerry ? "#0891b2" : (isRail ? "#7c3aed" : "#2563eb"));
+            chunks.forEach((chunk) => {
+                const latlngs = chunk.map((c) => [c[0], c[1]]);
+                const glow = L.polyline(latlngs, {
+                    color: glowColor,
+                    weight: isMetrobus ? 12 : 10,
+                    opacity: isMetrobus ? 0.24 : 0.18,
+                }).addTo(map);
+                const line = L.polyline(latlngs, {
+                    color: lineColor,
+                    weight: isMetrobus ? 6 : 5,
+                    opacity: 0.95,
+                    dashArray: isFerry ? "10,8" : null,
+                }).addTo(map);
+                transitRouteLayers.push(glow, line);
+            });
         } else {
-            const line = L.polyline(latlngs, {
-                color: "#16a34a",
-                weight: 4,
-                opacity: 0.9,
-                dashArray: "8,6",
-            }).addTo(map);
-            transitRouteLayers.push(line);
+            chunks.forEach((chunk) => {
+                const latlngs = chunk.map((c) => [c[0], c[1]]);
+                const line = L.polyline(latlngs, {
+                    color: "#16a34a",
+                    weight: 4,
+                    opacity: 0.9,
+                    dashArray: "8,6",
+                }).addTo(map);
+                transitRouteLayers.push(line);
+            });
         }
     }
 
@@ -254,44 +393,71 @@
         if (!multimodalData || !multimodalData.options) return;
         const option = multimodalData.options[optionIndex];
         if (!option || !Array.isArray(option.segments)) return;
+        const transitOnlyView = option.type === "transit";
 
         clearTransitRoute();
-        let step = 1;
         const allBounds = [];
-        let finalEnd = null;
-
-        option.segments.forEach((seg) => {
-            if (!Array.isArray(seg.coords) || seg.coords.length < 2) return;
-            drawSegmentLine(seg, seg.coords);
-            seg.coords.forEach((c) => allBounds.push([c[0], c[1]]));
-
-            const start = seg.coords[0];
-            const end = seg.coords[seg.coords.length - 1];
-            finalEnd = end;
-            if (seg.mode === "walk") {
-                drawStepMarker(start[0], start[1], step++, "step-walk", seg.description || "Walk");
-            } else if (seg.mode === "bus" || seg.mode === "rail") {
-                const boardText = seg.mode === "rail" ? "Board metro" : "Board bus";
-                drawStepMarker(start[0], start[1], step++, "step-board", boardText);
-                drawStepMarker(end[0], end[1], step++, "step-alight", "Get off");
-                if (seg.route_code) {
-                    const mid = seg.coords[Math.floor(seg.coords.length / 2)];
-                    const label = L.marker([mid[0], mid[1]], {
-                        icon: L.divIcon({
-                            className: "transit-route-label",
-                            html: `<div class="route-label-tag">${seg.route_code}</div>`,
-                            iconSize: [70, 24],
-                            iconAnchor: [35, 12],
-                        }),
-                    }).addTo(map);
-                    transitRouteLayers.push(label);
-                }
+        const shownRouteLabels = new Set();
+        const drawableSegments = option.segments.map((seg, idx) => {
+            const displayCoords = getSegmentCoordsForDrawing(seg, transitOnlyView);
+            return { seg, idx, displayCoords };
+        }).filter(({ seg, idx, displayCoords }) => {
+            if (!Array.isArray(displayCoords) || displayCoords.length < 2) return false;
+            if (transitOnlyView && seg.mode === "walk") {
+                // Transit gorunumunde tum yuruyusu gizleme yerine
+                // sadece zorunlu erisim yuruyuslerini (baslangic/bitis) tut.
+                const isEndpointWalk = idx === 0 || idx === (option.segments.length - 1);
+                return isEndpointWalk;
             }
+            return true;
         });
 
-        if (finalEnd) {
-            drawStepMarker(finalEnd[0], finalEnd[1], step++, "step-end", "Destination");
-        }
+        drawableSegments.forEach(({ seg, displayCoords }) => {
+            drawSegmentLine(seg, displayCoords);
+            const chunks = splitSegmentCoords(displayCoords, seg.mode);
+            chunks.forEach((chunk) => {
+                chunk.forEach((c) => allBounds.push([c[0], c[1]]));
+            });
+
+            // Transit modunda Google Maps benzeri sade gorunum:
+            // sadece gidilecek segmentleri ciz, gereksiz adim marker'larini cizme.
+            if (transitOnlyView) {
+                if (!seg.route_code) return;
+                const routeCode = String(seg.route_code);
+                const labelKey = `${seg.mode}:${routeCode}`;
+                if (shownRouteLabels.has(labelKey)) return;
+                if (segmentLengthMeters(displayCoords, seg.mode) < 120) return;
+                shownRouteLabels.add(labelKey);
+
+                const clean = sanitizeSegmentCoords(displayCoords, seg.mode);
+                if (clean.length < 2) return;
+                const mid = clean[Math.floor(clean.length / 2)];
+                const metrobusClass = isMetrobusSegment(seg) ? " route-label-metrobus" : "";
+                const labelText = isMetrobusSegment(seg) ? `${routeCode} MB` : routeCode;
+                const label = L.marker([mid[0], mid[1]], {
+                    icon: L.divIcon({
+                        className: "transit-route-label",
+                        html: `<div class="route-label-tag${metrobusClass}">${labelText}</div>`,
+                        iconSize: [88, 24],
+                        iconAnchor: [44, 12],
+                    }),
+                }).addTo(map);
+                transitRouteLayers.push(label);
+                return;
+            }
+
+            const clean = sanitizeSegmentCoords(displayCoords, seg.mode);
+            if (clean.length < 2) return;
+            const start = clean[0];
+            const end = clean[clean.length - 1];
+            if (seg.mode === "walk") {
+                drawStepMarker(start[0], start[1], "W", "step-walk", seg.description || "Walk");
+            } else if (seg.mode === "bus" || seg.mode === "rail" || seg.mode === "ferry") {
+                const boardText = seg.mode === "rail" ? "Metroya bin" : (seg.mode === "ferry" ? "Vapura bin" : "Otobuse bin");
+                drawStepMarker(start[0], start[1], "B", "step-board", boardText);
+                drawStepMarker(end[0], end[1], "I", "step-alight", "Inis");
+            }
+        });
 
         if (allBounds.length >= 2) {
             map.fitBounds(allBounds, { padding: [40, 40], maxZoom: 16 });
@@ -322,16 +488,35 @@
             options.forEach((opt, index) => {
                 const isRec = opt.type === recommended;
                 const isMetro = opt.transit_mode === "metro";
+                const isMixed = opt.transit_mode === "mixed";
+                const isFerryMode = opt.transit_mode === "ferry";
+                const hasMetrobus = Array.isArray(opt.segments) && opt.segments.some((s) => isMetrobusSegment(s));
                 const iconHtml = opt.type === "transit"
-                    ? (isMetro ? "&#x1F687;" : "&#x1F68C;")
+                    ? (hasMetrobus ? "&#x1F68E;" : (isMetro ? "&#x1F687;" : (isMixed ? "&#x1F69D;" : (isFerryMode ? "&#x26F4;" : "&#x1F68C;"))))
                     : "&#x1F6B6;";
+                const modeBadge = opt.type === "transit"
+                    ? (hasMetrobus ? "Metrobus" : (isMetro ? "Metro" : (isMixed ? "Otobus + Metro" : (isFerryMode ? "Vapur" : "Otobus"))))
+                    : "Yuruyus";
+                const reasonLabels = {
+                    fastest: "En hizli",
+                    least_transfer: "Az aktarma",
+                    metro_preferred: "Metro odakli",
+                    metrobus_preferred: "Metrobus odakli",
+                    low_walk: "Az yurume",
+                    multimodal_mix: "Karma rota",
+                    ferry_direct: "Direkt vapur",
+                    alternative: "Alternatif",
+                };
+                const reasonBadge = (opt.selection_reason && reasonLabels[opt.selection_reason])
+                    ? `<span class="route-label-tag" style="margin-left:8px;">${reasonLabels[opt.selection_reason]}</span>`
+                    : "";
                 html += `
                     <div class="multimodal-option ${isRec ? "recommended" : ""}" onclick="showTransitRoute(${index})" style="cursor:pointer;">
                         <div class="multimodal-option-header">
                             <span class="multimodal-icon">${iconHtml}</span>
                             <div class="multimodal-option-info">
-                                <h3 class="multimodal-option-name">${opt.name || opt.type || "Option"}</h3>
-                                <p class="multimodal-option-desc">${opt.description || ""}</p>
+                                <h3 class="multimodal-option-name">${opt.name || opt.type || "Option"} ${reasonBadge}</h3>
+                                <p class="multimodal-option-desc"><strong>${modeBadge}</strong>${opt.description ? ` · ${opt.description}` : ""}</p>
                             </div>
                             <div class="multimodal-option-time">
                                 <span class="multimodal-time-value">${opt.total_time_min || "-"}</span>
@@ -342,18 +527,26 @@
                 `;
 
                 (opt.segments || []).forEach((seg) => {
+                    if (opt.type === "transit" && seg.mode === "walk") {
+                        return;
+                    }
                     const isRail = seg.mode === "rail";
-                    const segIcon = seg.mode === "bus" ? "&#x1F68C;" : (isRail ? "&#x1F687;" : "&#x1F6B6;");
-                    const segClass = (seg.mode === "bus" || isRail) ? "seg-bus" : "seg-walk";
+                    const isFerry = seg.mode === "ferry";
+                    const isMetrobus = isMetrobusSegment(seg);
+                    const segIcon = isMetrobus ? "&#x1F68E;" : (seg.mode === "bus" ? "&#x1F68C;" : (isRail ? "&#x1F687;" : (isFerry ? "&#x26F4;" : "&#x1F6B6;")));
+                    const segClass = isMetrobus ? "seg-metrobus" : ((seg.mode === "bus" || isRail) ? "seg-bus" : "seg-walk");
+                    const segDesc = isMetrobus
+                        ? `${seg.route_code || "34"} metrobus`
+                        : (seg.description || seg.mode || "");
                     html += `
                         <div class="multimodal-segment ${segClass}">
                             <span class="seg-icon">${segIcon}</span>
-                            <span class="seg-desc">${seg.description || seg.mode || ""}</span>
+                            <span class="seg-desc">${segDesc}</span>
                             <span class="seg-time">${seg.duration_min || 0} dk</span>
                         </div>
                     `;
 
-                    if ((seg.mode === "bus" || seg.mode === "rail") && seg.wait_min) {
+                    if ((seg.mode === "bus" || seg.mode === "rail" || seg.mode === "ferry") && seg.wait_min) {
                         html += `
                             <div class="multimodal-segment seg-wait">
                                 <span class="seg-icon">&#x23F3;</span>
@@ -392,6 +585,14 @@
             return;
         }
 
+        const allowedModes = getSelectedTransitModes();
+        if (!allowedModes.length) {
+            if (typeof showToast === "function") {
+                showToast("En az bir ulasim modu sec", "error");
+            }
+            return;
+        }
+
         const origin = selectedPoints[0];
         const destination = selectedPoints[selectedPoints.length - 1];
 
@@ -402,7 +603,7 @@
             const response = await fetch(`${API_BASE}/multimodal/compare`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ origin, destination }),
+                body: JSON.stringify({ origin, destination, allowed_modes: allowedModes }),
             });
             const data = await response.json();
             if (!response.ok) {

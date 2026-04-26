@@ -21,7 +21,7 @@
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css?v=1.0.11">
-    <link rel="stylesheet" href="css/transit.css?v=1.0.0">
+    <link rel="stylesheet" href="css/transit.css?v=1.0.1">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -121,6 +121,28 @@
             <button class="btn btn-transit" id="btnCompareRoutes" disabled style="margin-top: 8px;">
                 🚌 Toplu Tasima Karsilastir
             </button>
+        </div>
+
+        <div class="transit-mode-filter" id="transitModeFilter" style="margin-top: -6px; margin-bottom: 10px;">
+            <div class="transit-mode-filter-title">Ulasim modu secimi</div>
+            <div class="transit-mode-chips">
+                <label class="transit-mode-chip">
+                    <input type="checkbox" data-transit-mode="bus" checked>
+                    <span>Otobus</span>
+                </label>
+                <label class="transit-mode-chip">
+                    <input type="checkbox" data-transit-mode="metro" checked>
+                    <span>Metro</span>
+                </label>
+                <label class="transit-mode-chip">
+                    <input type="checkbox" data-transit-mode="metrobus" checked>
+                    <span>Metrobus</span>
+                </label>
+                <label class="transit-mode-chip">
+                    <input type="checkbox" data-transit-mode="ferry" checked>
+                    <span>Vapur</span>
+                </label>
+            </div>
         </div>
 
         <!-- Alternative Routes Panel (hidden initially) -->
@@ -613,7 +635,7 @@
 
     <!-- App JS -->
     <script src="js/app.js?v=1.0.14"></script>
-    <script src="js/transit.js?v=1.0.0"></script>
+    <script src="js/transit.js?v=1.0.1"></script>
 </body>
 
 </html>

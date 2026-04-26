@@ -12,6 +12,48 @@
     opacity: 0.55;
 }
 
+.transit-mode-filter {
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.04);
+    border-radius: 12px;
+    padding: 10px;
+}
+
+.transit-mode-filter-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.transit-mode-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.transit-mode-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #334155;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+}
+
+.transit-mode-chip input[type="checkbox"] {
+    margin: 0;
+    accent-color: #2563eb;
+}
+
 .toggle-switch {
     position: relative;
     display: inline-block;
@@ -324,6 +366,11 @@
     border-left: 3px solid #3b82f6;
 }
 
+.seg-metrobus {
+    border-left: 3px solid #e11d48;
+    background: #fff1f2;
+}
+
 .seg-wait {
     border-left: 3px solid #f59e0b;
 }
@@ -347,6 +394,10 @@
     border-radius: 999px;
     font-size: 0.72rem;
     font-weight: 700;
+}
+
+.route-label-tag.route-label-metrobus {
+    background: rgba(225, 29, 72, 0.95);
 }
 
 .transit-route-tooltip {

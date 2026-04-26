@@ -6,6 +6,17 @@
 
 // ========== CONFIG ==========
 const API_BASE = "/api";
+const ISTANBUL_GEOFENCE_BBOX = {
+    minLat: 40.78,
+    maxLat: 41.40,
+    minLon: 28.30,
+    maxLon: 29.70,
+};
+const ISTANBUL_CENTER = [40.9903, 29.0291];
+const ISTANBUL_MAX_BOUNDS = L.latLngBounds(
+    [ISTANBUL_GEOFENCE_BBOX.minLat, ISTANBUL_GEOFENCE_BBOX.minLon],
+    [ISTANBUL_GEOFENCE_BBOX.maxLat, ISTANBUL_GEOFENCE_BBOX.maxLon]
+);
 
 // ========== STATE ==========
 let selectedPoints = [];
@@ -21,7 +32,9 @@ let currentNlpResult = null;
 // ========== MAP INIT ==========
 const map = L.map("map", {
     zoomControl: false,
-}).setView([40.9903, 29.0291], 14); // KadÃƒâ€Ã‚Â±kÃƒÆ’Ã‚Â¶y merkez
+    maxBounds: ISTANBUL_MAX_BOUNDS,
+    maxBoundsViscosity: 1.0,
+}).setView(ISTANBUL_CENTER, 14); // Kadikoy merkez
 
 // Custom zoom control (saÃƒâ€Ã…Â¸ ÃƒÆ’Ã‚Â¼ste)
 L.control.zoom({ position: "topright" }).addTo(map);
@@ -31,6 +44,41 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
 }).addTo(map);
+
+// Harita kapsamını Istanbul geofence ile kilitle.
+map.fitBounds(ISTANBUL_MAX_BOUNDS, { padding: [0, 0] });
+const istanbulMinZoom = map.getZoom();
+map.setMinZoom(istanbulMinZoom);
+map.setView(ISTANBUL_CENTER, 14);
+map.on("drag", function () {
+    map.panInsideBounds(ISTANBUL_MAX_BOUNDS, { animate: false });
+});
+
+function isInIstanbulBounds(lat, lon) {
+    return (
+        lat >= ISTANBUL_GEOFENCE_BBOX.minLat &&
+        lat <= ISTANBUL_GEOFENCE_BBOX.maxLat &&
+        lon >= ISTANBUL_GEOFENCE_BBOX.minLon &&
+        lon <= ISTANBUL_GEOFENCE_BBOX.maxLon
+    );
+}
+
+function focusMapInIstanbul(lat, lon, zoom = 16) {
+    const latNum = Number(lat);
+    const lonNum = Number(lon);
+    if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) {
+        return false;
+    }
+    if (!isInIstanbulBounds(latNum, lonNum)) {
+        showToast("Bu proje su an sadece Istanbul sinirlarinda calisiyor.", "error");
+        return false;
+    }
+    map.setView([latNum, lonNum], zoom);
+    return true;
+}
+
+window.isInIstanbulBounds = isInIstanbulBounds;
+window.focusMapInIstanbul = focusMapInIstanbul;
 
 // ========== DOM ELEMENTS ==========
 const elPointCount = document.getElementById("pointCount");
@@ -147,28 +195,39 @@ map.on("dblclick", function (e) {
 });
 
 function addPoint(lat, lng) {
+    const latNum = Number(lat);
+    const lonNum = Number(lng);
+    if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) {
+        showToast("Gecersiz koordinat.", "error");
+        return false;
+    }
+    if (!isInIstanbulBounds(latNum, lonNum)) {
+        showToast("Istanbul disina nokta ekleyemezsin.", "error");
+        return false;
+    }
+
     const index = selectedPoints.length;
-    selectedPoints.push([lat, lng]);
+    selectedPoints.push([latNum, lonNum]);
 
     // Hava durumu widget'Ãƒâ€Ã‚Â±nÃƒâ€Ã‚Â± bu noktaya gÃƒÆ’Ã‚Â¶re gÃƒÆ’Ã‚Â¼ncelle
-    fetchWeatherWidget(lat, lng);
+    fetchWeatherWidget(latNum, lonNum);
 
     // Marker ekle
-    const marker = L.marker([lat, lng], {
+    const marker = L.marker([latNum, lonNum], {
         icon: createNumberedIcon(index + 1),
     }).addTo(map);
 
     // SaÃƒâ€Ã…Â¸ tÃƒâ€Ã‚Â±klama menÃƒÆ’Ã‚Â¼sÃƒÆ’Ã‚Â¼ - Konumu Kaydet
     marker.on('contextmenu', function (e) {
-        openSaveLocationModal(lat, lng, `Nokta ${index + 1}`);
+        openSaveLocationModal(latNum, lonNum, `Nokta ${index + 1}`);
     });
 
     marker.bindPopup(
-        `<strong>Nokta ${index + 1}</strong><br>${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
+        `<strong>Nokta ${index + 1}</strong><br>${latNum.toFixed(5)}, ${lonNum.toFixed(5)}<br>
          <button class="btn btn-primary btn-sm" style="margin-top: 8px; width: 100%;"
             data-action-save-location
-            data-lat="${lat}"
-            data-lng="${lng}"
+            data-lat="${latNum}"
+            data-lng="${lonNum}"
             data-label="Nokta ${index + 1}">
             \u{1F4BE} Konumu Kaydet
          </button>`
@@ -180,6 +239,7 @@ function addPoint(lat, lng) {
     updateButtons();
 
     showToast(`Nokta ${index + 1} eklendi`, "info");
+    return true;
 }
 
 function removePoint(index) {
@@ -454,6 +514,27 @@ function parsePoiButtonLabel(buttonText) {
     const emoji = parts[0] || "\u{1F4CD}";
     const label = parts.length > 1 ? parts.slice(1).join(" ") : "";
     return { emoji, label };
+}
+
+function getPoiVisualFromCategory(category) {
+    const normalizedCategory = String(category || "")
+        .trim()
+        .toLocaleLowerCase("tr-TR");
+    if (!normalizedCategory) {
+        return { emoji: "\u{1F4CD}", label: "" };
+    }
+
+    const button = Array.from(document.querySelectorAll(".btn-poi")).find((btn) => {
+        const buttonCategory = String(btn.dataset.category || "")
+            .trim()
+            .toLocaleLowerCase("tr-TR");
+        return buttonCategory === normalizedCategory;
+    });
+
+    if (!button) {
+        return { emoji: "\u{1F4CD}", label: category };
+    }
+    return parsePoiButtonLabel(button.textContent);
 }
 
 function formatPoiAge(ageSeconds) {
@@ -933,11 +1014,8 @@ function displaySearchResult(data) {
  * Arama sonucuna tÃƒâ€Ã‚Â±klanÃƒâ€Ã‚Â±nca haritaya ekler
  */
 function selectSearchResult(lat, lon, name) {
-    // HaritayÃƒâ€Ã‚Â± o noktaya odakla
-    map.setView([lat, lon], 16);
-
-    // NoktayÃƒâ€Ã‚Â± ekle
-    addPoint(lat, lon);
+    if (!focusMapInIstanbul(lat, lon, 16)) return;
+    if (!addPoint(lat, lon)) return;
 
     // Input ve sonuÃƒÆ’Ã‚Â§larÃƒâ€Ã‚Â± temizle
     elPlaceSearchInput.value = "";
@@ -986,7 +1064,9 @@ function buildNlpSummary(result) {
         return (result.locations || []).map(escapeHtml).join(" ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº ");
     }
     if (result.type === "poi") {
-        return `${escapeHtml(result.location || "Bilinmeyen konum")} iÃƒÆ’Ã‚Â§in mekan aramasÃƒâ€Ã‚Â±`;
+        const poiConcept = String(result.poi_concept || "").trim();
+        const poiText = poiConcept ? `"${escapeHtml(poiConcept)}"` : "mekan";
+        return `${escapeHtml(result.location || "Bilinmeyen konum")} iÃƒÆ’Ã‚Â§in ${poiText} aramasÃƒâ€Ã‚Â±`;
     }
     if (result.type === "single") {
         return `${escapeHtml(result.destination || "Bilinmeyen hedef")} hedef olarak algÃƒâ€Ã‚Â±landÃƒâ€Ã‚Â±`;
@@ -1017,8 +1097,10 @@ function renderNlpResults(result) {
     const actions = [];
     if (result.type === "route" || result.type === "multi") {
         actions.push(`<button class="nlp-action-btn primary" data-action="apply-nlp">Haritaya Uygula</button>`);
-    } else if ((result.type === "single" && result.destination) || (result.type === "poi" && result.location)) {
+    } else if (result.type === "single" && result.destination) {
         actions.push(`<button class="nlp-action-btn primary" data-action="focus-nlp">Haritada GÃƒÆ’Ã‚Â¶ster</button>`);
+    } else if (result.type === "poi" && result.location) {
+        actions.push(`<button class="nlp-action-btn primary" data-action="focus-nlp">MekanlarÄ± Goster</button>`);
     }
 
     elNlpResults.innerHTML = `
@@ -1123,12 +1205,35 @@ async function focusNlpLocation() {
         return;
     }
 
+    const isPoiSearch = currentNlpResult.type === "poi";
+    const poiConcept = String(currentNlpResult.poi_concept || "").trim();
+
+    if (isPoiSearch && poiConcept) {
+        try {
+            const { emoji, label } = getPoiVisualFromCategory(poiConcept);
+            await searchPois(
+                poiConcept,
+                emoji || "\u{1F4CD}",
+                (label && String(label).trim()) ? label : poiConcept,
+                { placeOverride: placeName }
+            );
+
+            const place = await geocodePlaceName(placeName);
+            if (!focusMapInIstanbul(place.lat, place.lon, 14)) return;
+            showToast(`"${placeName}" iÃƒÆ’Ã‚Â§in "${poiConcept}" mekanlarÄ± gosterildi`, "success");
+        } catch (error) {
+            console.error("NLP POI gÃƒÆ’Ã‚Â¶sterme hatasÃƒâ€Ã‚Â±:", error);
+            showToast(`Hata: ${error.message}`, "error");
+        }
+        return;
+    }
+
     showLoading("Konum bulunuyor...");
 
     try {
         const place = await geocodePlaceName(placeName);
-        map.setView([place.lat, place.lon], 16);
-        addPoint(place.lat, place.lon);
+        if (!focusMapInIstanbul(place.lat, place.lon, 16)) return;
+        if (!addPoint(place.lat, place.lon)) return;
         showToast(`"${placeName}" haritada gÃƒÆ’Ã‚Â¶sterildi`, "success");
     } catch (error) {
         console.error("NLP konum gÃƒÆ’Ã‚Â¶sterme hatasÃƒâ€Ã‚Â±:", error);
@@ -2760,7 +2865,7 @@ function displaySavedLocationsSidebar(locations) {
 }
 
 window.zoomToLocation = function (lat, lon, name) {
-    map.setView([lat, lon], 16);
+    focusMapInIstanbul(lat, lon, 16);
 };
 
 /**
@@ -3238,7 +3343,7 @@ elDistrictSelect.addEventListener('change', async function() {
             const data = await geocodePlaceName(query);
             if (data && data.length > 0) {
                 const { lat, lon } = data[0];
-                map.setView([lat, lon], 14);
+                focusMapInIstanbul(lat, lon, 14);
                 showToast(`${selectedDistrict}, ${selectedProvince} konumuna odaklandÃƒâ€Ã‚Â±`, 'success');
             }
         } catch (error) {

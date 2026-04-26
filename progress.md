@@ -83,6 +83,46 @@ Bugun bu baslikta tamamlanan teknik adimlar:
 - Debug trace iyilestirildi:
   - Parse trace logunda POI plan denemelerinin ilk adimlari gorunur hale getirildi.
 
+### D.1) Siradaki Isler (Acil Sprint - BERT Oncelikli)
+Karar:
+- LLM calisma kalitesi sonraki asamaya birakilacak.
+- Bu sprintte tek ana hedef: BERT'te "lokasyon + mekan" birlikte cozumleme kalitesini net duzeltmek.
+
+Ana problem (kritik):
+- "Kadikoy icinde cami ariyorum" gibi sorgularda motor lokasyonu (Kadikoy) yakaliyor ama mekan niyetini (cami) operasyonel aramaya dogru yansitamiyor.
+- Beklenen davranis: lokasyon=Kadikoy + mekan= çami tag'i ile POI aramasi.
+
+Uygulama plani (sirayla):
+1. Parse karar katmani:
+   - POI sorgularinda `location` secildikten sonra `poi_concept` bossa sonucu "eksik/guvensiz" isaretle.
+   - `location` tek basina POI basarisi sayilmasin; `poi_concept` veya `poi_tags_hint` zorunlu check eklensin.
+2. Intent/score birlestirme:
+   - `has_poi_cue` sinyalinin agirligi arttirilacak.
+   - `route/multi` skorlarindan POI'ye kayis kurallari "icinde, yakininda, ... ariyorum" kaliplariyla guclendirilecek.
+3. Token/ek normalize:
+   - "camiler, camiyi, camilerde" gibi cekimlerde canonical "cami" yakalama testleri genisletilecek.
+   - `resolve_poi_from_tokens_with_debug` icindeki ngram denemelerine kural tabanli ek varyantlar eklenecek.
+4. Search entegrasyonu:
+   - `api/search-pois` tarafinda NLP parse sonucundan gelen `poi_osm_queries` ve `poi_tags_hint` onceliklendirilip place-boundary aramaya dogrudan aktarilacak.
+   - Lokasyon var + mekan var durumunda arama plani "yer + etiket filtreli" zorunlu akisa alinacak.
+5. Test ve kabul:
+   - En az 20 Turkce POI sorgusu ile regression set olusturulacak.
+   - Kriter: "Kadikoy icinde cami ariyorum" benzeri sorgularda ilk cevabin POI listesi donmesi.
+   - `api/nlp/audit/recent` uzerinden false-positive/fail durumlari takip edilip duzeltme iterasyonu yapilacak.
+
+Kabul kriterleri (Done):
+- `type=poi`, `location` ve `poi_concept` birlikte dolu olma orani hedef dataset'te belirgin sekilde artmis olacak.
+- Kritik sorgularda (Kadikoy + cami, Besiktas + eczane, Uskudar + kahve) dogru etiketle sonuc alinacak.
+- Trace kayitlarinda `poi_resolution_plan` secim zinciri anlasilir ve tutarli olacak.
+
+Uygulanan adim (bu oturum):
+- POI token toplamada role-hint false-positive duzeltildi:
+  - "eczane" gibi kelimelerin plain suffix nedeniyle yanlis role-hint alip elenmesi engellendi.
+  - Ham token POI terimiyse role-hint bypass edilip konsepte geri aliniyor.
+- POI parse siki kontrolu eklendi:
+  - Lokasyon tek basina basari sayilmiyor; generic browse disinda `poi_concept/poi_tags_hint` bekleniyor.
+  - Bu sayede "kadikoy icinde cami ariyorum" benzeri sorgular lokasyon+mekan birlikte cozumleniyor.
+
 ## E) 3. Oncelik - Veritabani basligi (yeni oturumda detaylandirilacak)
 - Bu basliga ekipten gelecek yeni veritabani dusunceleri eklenerek net karar dokumani cikarilacak.
 - Ozellikle su kararlar netlestirilecek:
@@ -2989,3 +3029,226 @@ Not: Her dosya icin satir araligi bazli aciklama verildi. Python dosyalarinda fo
 2. encoding standardizasyonu (UTF-8) icin tek seferlik duzenleme.
 3. CI test rapor ozetini progress.md'ye otomatik ekleyen script.
 4. model hata istatistiklerini kalici loglama.
+
+## 5) Toplu Tasima Durum Guncellemesi (2026-03-30)
+
+### Bu Turda Yapilanlar
+- `backend/multimodal_engine.py` uzerinde toplu tasima secenek cesitliligi genisletildi:
+  - bus, metro, mixed (bus+metro) ve ferry (vapur) modlari icin secenek uretimi denendi.
+  - secenek seciminde `fastest`, `least_transfer`, `metro_preferred`, `low_walk`, `alternative` etiketleri eklendi.
+- Metro graph tarafinda:
+  - aktif/aktif-degil istasyon kaynakli kayiplar azaltildi.
+  - Marmaray omurga baglantilari eklendi.
+  - vapur baglantisi icin sanal ferry edge denemeleri eklendi.
+- Transit cizim/arayuz tarafinda (`frontend/js/transit.js`):
+  - metro/bus/mixed/ferry ayrimi icin ikon/etiket guncellemeleri yapildi.
+  - transit secenegi secildiginde yuruyus segmentlerini gizleme davranisi korundu.
+- Yuruyus segment dogrulama tarafinda:
+  - imkansiz/gercekci olmayan yuruyus segmentlerini elemek icin ek kontroller eklendi.
+  - transfer esikleri birden fazla turda ayarlandi.
+
+### Acik Kalan Kritik Sorun
+- Belirli bogaz/halic senaryolarinda (ozellikle kullanicinin raporladigi 1->2 vapur odakli testte):
+  - algoritma halen beklenen dogrudan/gercekci vapur davranisini tutarli sekilde veremiyor.
+  - bazi durumlarda transit alternatif yerine yuruyus veya yanlis aktarma oneriye cikabiliyor.
+  - "oradan oraya yurume imkansiz" denilen segmentler tam olarak sifirlanamadi.
+
+### Sonraki Adim (Devamda Yapilacak)
+- Transfer modelini heuristikten cikip daha kati graph kurallarina gecirmek:
+  - yurunebilir edge/bridge whitelist-blacklist,
+  - su gecisi icin yalnizca vapur veya tanimli gecis edge'leri,
+  - istasyon seciminde sadece kus-ucusu degil network tabanli erisim maliyeti.
+
+## 6) Ileriye Donuk Yol Haritasi Notu (2026-03-31)
+
+### A) Transit Tercih Filtresi (Kullaniciya Ozgurluk)
+- UI'da secilebilir ulasim modlari eklenecek:
+  - otobus
+  - metro/tram
+  - metrobus
+  - vapur
+- Kullanici hangi modlari isaretlerse rota motoru yalnizca o modlardan rota uretecek.
+- Ornek: sadece "metro + metrobus" secildiyse otobus/vapur iceren alternatifler listelenmeyecek.
+- Backend API tarafinda `allowed_modes` benzeri bir parametre ile filtrelenecek.
+
+### B) Rota Motorunu Daha Guclu ve Hatasiz Hale Getirme
+- Mevcut heuristik agirlikli yaklasimdan daha guclu graph-cost modeline gecilecek.
+- Aktarma maliyetleri, bekleme, yurume, bogaz/halic gecisi kurallari daha kati modellenecek.
+- "Imkansiz yurume" durumlarini tamamen dislayan kesin network kurallari eklenecek.
+- Coklu alternatif ureterek (en hizli, az aktarma, az yurume, metrobus odakli) daha tutarli sonuc verilecek.
+
+### C) Uygulamayi Sadece Istanbul Ile Sinirlama
+- Geocoding, POI, rota ve NLP sorgulari Istanbul geofence (il siniri/bounding polygon) ile sinirlanacak.
+- Istanbul disi noktalar icin:
+  - arama sonucu verilmemesi,
+  - kullaniciya net uyari mesaji donulmesi.
+- UI tarafinda da secim/oneriler Istanbul disina tasmayacak sekilde filtrelenecek.
+
+### D) Kabul Kriteri (Ileri Faz)
+- Istanbul disi lokasyonlarda rota/POI sonucunun bilincli olarak reddedilmesi.
+- Mode filtresi ile secilmeyen ulasim tipinin hic oneriye girmemesi.
+- Test senaryolarinda (iki yaka, metrobus koridoru, vapur gecisi) stabil ve tekrar edilebilir dogru sonuclar.
+
+## 7) Durum Guncellemesi - Asama 1 Tamamlandi (2026-03-31)
+
+### Yapildi
+- Transit mod secimi UI'ya eklendi:
+  - otobus
+  - metro
+  - metrobus
+  - vapur
+- Frontend `allowed_modes` listesini `/api/multimodal/compare` istegine gonderiyor.
+- Backend API `allowed_modes` parametresini kabul edecek sekilde guncellendi.
+- Rota motorunda secilen modlar disindaki alternatifleri eleyen filtre eklendi:
+  - metrobus (34*) normal otobusten ayri ele aliniyor.
+  - karma rota seceneklerinde sadece secili modlardan olusanlar gosteriliyor.
+
+### Sonraki Siradaki Is
+- Asama 2: rota algoritmasini daha kati/complex modele gecirme (transfer kurallari, agirliklar, imkansiz yurume eliminasyonu).
+
+## 8) Durum Guncellemesi - Asama 2 (Baslangic) (2026-04-02)
+
+### Bu Turda Yapilan Core Iyilestirme
+- `backend/multimodal_engine.py` icinde yaya segment dogrulama sertlestirildi:
+  - Bogaz (iki yaka) yuruyusu dogrudan reddedilecek kural eklendi.
+  - Su gecislerinde OSRM fallback (duz cizgi) kabulunu engelleyen kontrol eklendi.
+  - Halic benzeri duz-cizgi su gecisi fallback'lari reddedilecek ek kontrol eklendi.
+- `direct walk` metriğinde iki yaka senaryosuna agir ceza eklendi:
+  - "Yuruyus en hizli" gibi hatali onerilerin onune gecmek icin.
+- Transfer yuruyusu dogrulamasina iki yaka kurali baglandi:
+  - fiziksel olarak imkansiz transfer-yurume edge'leri filtreleniyor.
+
+### Sonraki Teknik Adim
+- Bu su-gecisi kurallarini daha da deterministic hale getirmek:
+  - resmi yaya gecisleri/izinli kopru-gecis edge listesi,
+  - transfer edge olusturmada explicit whitelist mantigi,
+  - maliyet fonksiyonunda mode-odakli agirlik tuning.
+
+## 9) Durum Guncellemesi - Asama 2 (Devam) (2026-04-02)
+
+### Eklenen Iyilestirmeler
+- Transfer edge olusturmada dinamik mesafe limiti eklendi:
+  - varsayilan transfer limiti dusuruldu (daha kati),
+  - belirli buyuk hub adlari icin genis limit korunuyor.
+- OSRM cagrilarina bellek ici cache eklendi:
+  - tekli rota (`_osrm_route_coords`)
+  - coklu waypoint rota (`_osrm_multi_waypoint`)
+  - tekrar eden sorgularda gecikme anlamli sekilde dustu.
+
+### Gozlem
+- Iki yaka yuruyus metriği sert ceza aldigi icin "yuruyus en iyi" yanlisi azaldi.
+- Uskudar -> Besiktas testinde transit (vapur) onerisi beklendigi gibi one cikti.
+
+### Siradaki Adim
+- Izinli kopru/yaya gecis whitelist listesini kodlamak (tam deterministic mode).
+
+## 10) Durum Guncellemesi - Asama 2 (Deterministik Whitelist) (2026-04-04)
+
+### Yapilanlar
+- Su-gecisi yuruyuslerinde whitelist destekli kontrol eklendi:
+  - Halic gecisi olasiliginda, yaya rotasi tanimli kopru/checkpoint yakinin dan gecmiyorsa segment reddediliyor.
+  - Halic fallback (duz-cizgi) yuruyusu deterministic olarak reddediliyor.
+- Bogaz gecisi yuruyus engeli korunarak daha stabil hale getirildi.
+- `direct_walk` fallback cezalari Halic icin de guclendirildi.
+
+### Sonuc
+- Iki yaka yuruyus artefaktlari daha tutarli sekilde eleniyor.
+- Transit onerisi (ozellikle vapur) daha dogru one cikiyor.
+
+### Sonraki Adim
+- Checkpoint listesini Istanbul genelinde geometri/edge tabanli resmi whitelist dataset'ine tasimak.
+
+## 11) Durum Guncellemesi - Asama 2 (Performans + Deterministiklik) (2026-04-04)
+
+### Yapilanlar
+- `compare_routes` sonuc cache'i eklendi:
+  - ayni origin/destination/mode kombinasyonlarinda tekrar sorgu neredeyse anlik donuyor.
+- `direct_walk` tarafinda su-gecisi whitelist kurali da aktif hale getirildi:
+  - rota su gecisi iceriyorsa ve izinli gecis mantigina uymuyorsa yurume metrigi cezali hesaplaniyor.
+- Halic gecisi kontrolu ile fallback kontrolu birlikte daha kati hale getirildi.
+
+### Gozlem
+- Tekrarlanan ayni sorgularda sure ciddi dustu (ilk kosu yuksek, tekrarlar anlik).
+- Iki yaka senaryosunda yurume artifaktlari yerine transit onerisi stabil kaldi.
+
+### Sonraki Adim
+- Istanbul disi filtreyi (geofence) API ve motor katmaninda aktif etmek.
+
+## 12) Durum Guncellemesi - Asama 3 (Istanbul Geofence Baslangic) (2026-04-04)
+
+### Yapilanlar
+- Multimodal API (`/api/multimodal/compare`) icin Istanbul geofence aktif edildi.
+- Origin/destination koordinatlari:
+  - once tip/format olarak dogrulaniyor,
+  - sonra Istanbul bounding box icinde mi kontrol ediliyor.
+- Istanbul disi isteklerde API artik net hata donuyor:
+  - `code: outside_istanbul`
+  - aciklayici mesaj + aktif geofence bilgisi.
+
+### Sonraki Adim
+- Ayni geofence kuralini POI/NLP akislarina da yaymak.
+
+## 13) Durum Guncellemesi - Asama 3 (POI + NLP + Route API Geofence) (2026-04-04)
+
+### Bu Turda Yapilanlar
+- `backend/app.py` icinde ortak geofence yardimcilari eklendi:
+  - `outside_istanbul` hata formati teklestirildi.
+  - Nokta listelerinde Istanbul disi koordinati erken tespit eden kontrol eklendi.
+- Geofence kapsami genisletildi:
+  - `POST /api/search-pois`: place cozumlenip Istanbul disiysa istek reddediliyor.
+  - `POST /api/get-route`
+  - `POST /api/get-route-steps`
+  - `POST /api/get-alternative-routes`
+  - `POST /api/nlp/parse`: parse sonucunda cikan location/origin/destination adaylari Istanbul disiysa istek reddediliyor.
+- `POST /api/multimodal/compare` geofence hatasi da ortak hata formatini kullanacak sekilde standartlasti.
+
+### Test Tarafi
+- `tests/test_api/test_poi_api.py` guncellendi:
+  - geofence mock ile mevcut kategori testleri stabil tutuldu.
+  - Istanbul disi place icin `outside_istanbul` bekleyen yeni test eklendi.
+- `tests/test_api/test_routes.py` icine Istanbul disi nokta ile `get-route` reddi testi eklendi.
+
+### Sonraki Adim
+- Geofence kuralini geocode/reverse-geocode/POI autocomplete tarafina da ayni tutarlilikla yaymak.
+- Frontend’de `outside_istanbul` kodu geldiginde daha net kullanici mesaji gostermek.
+
+## 14) Durum Guncellemesi - Transit Kalite Hotfix (2026-04-04)
+
+### Bu Turda Yapilanlar
+- Vapur terminal adlandirmasi netlestirildi:
+  - veri kaynaginda tek terminal `Feshane` oldugu icin UI tarafina daha anlasilir etiket verildi: `Feshane / Sutluce`.
+- Karma rota seciminde aktarma noktasi kalitesi iyilestirildi:
+  - ayni hat kombinasyonunda ilk bulunan transfer noktasini kilitlemek yerine,
+    daha genis aday havuzundan daha iyi skorlanan transfer noktasi seciliyor.
+  - skorlama: toplam sure + transfer yuruyusu + toplam mesafe.
+
+### Beklenen Etki
+- Sütlüce/Feshane cevresindeki vapur senaryolarinda kart metni daha dogru ve anlasilir olur.
+- T1 + metrobus gibi kombinasyonlarda Bayrampasa/Cevizlibag benzeri transfer tercihlerinde daha mantikli secimler one cikar.
+
+### Ek Hotfix (Ayni Gun)
+- `ferry-only` secimde graph fallback kapatildi:
+  - sadece direkt vapur secenegi uretilir; karisik/yanlis ilk kart problemi azaltildi.
+- Transit ciziminde zorunlu erisim yuruyusleri (baslangic ve bitis) tekrar gosteriliyor:
+  - "direkt metrodan basliyor" gorunumu engellendi.
+- Harita ciziminde buyuk koordinat sicrama segmentleri bolunerek ciziliyor:
+  - tek cizgide sacma atlammalar yerine yalnizca gecerli parcalar cizilir.
+
+## 15) Durum Guncellemesi - Transit Cizim Motoru Ayrimi (2026-04-04)
+
+### Yapilanlar
+- Frontend `transit.js` icinde transit cizimi yurüyus ciziminden ayrildi:
+  - transit gorunumunde bus/rail/ferry segmentleri icin `stop_coords` oncelikli cizim eklendi.
+  - yuruyus segmentleri ayri geometriyle cizilmeye devam ediyor.
+- Segment ciziminde mode-bazli sicrama esikleri eklendi:
+  - ferry / rail / bus / walk icin farkli threshold.
+- `yalnizca vapur` modunda backend tarafinda karisik rota uretimi kesildi:
+  - bus/metro karisik kartlar yerine sadece ferry transit sonuclari donuyor.
+
+### Ek Stabilizasyon
+- Transit aday seciminde durak listeleri mesafe bazli siralanarak kullanilmaya baslandi
+  (ilk N kesmelerde iyi adaylarin disarda kalmasi azaltildi).
+- Metrobus seceneklerinde (34*) daha sade rota tercihine agirlik verildi
+  (ferry dolambacina ceza, gereksiz rail katmanina ceza).
+- `compare_routes` cache test asamasinda devre disi birakildi:
+  - ayni origin/destination sorgularinda stale sonuc gosterimi engellenir.

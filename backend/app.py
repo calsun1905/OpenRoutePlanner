@@ -35,6 +35,122 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+ISTANBUL_GEOFENCE_BBOX = {
+    "min_lat": 40.78,
+    "max_lat": 41.40,
+    "min_lon": 28.30,
+    "max_lon": 29.70,
+}
+
+
+def _to_lat_lon_pair(raw: Any) -> tuple[float, float] | None:
+    """
+    [lat, lon] formatindaki veriyi guvenli float ciftine cevirir.
+    """
+    if not (isinstance(raw, list) and len(raw) == 2):
+        return None
+    try:
+        lat = float(raw[0])
+        lon = float(raw[1])
+    except (TypeError, ValueError):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return None
+    return lat, lon
+
+
+def _is_in_istanbul_bbox(lat: float, lon: float) -> bool:
+    return (
+        ISTANBUL_GEOFENCE_BBOX["min_lat"] <= lat <= ISTANBUL_GEOFENCE_BBOX["max_lat"]
+        and ISTANBUL_GEOFENCE_BBOX["min_lon"] <= lon <= ISTANBUL_GEOFENCE_BBOX["max_lon"]
+    )
+
+
+def _outside_istanbul_response(detail: str | None = None, *, field: str | None = None):
+    payload = {
+        "error": "Bu ozellik su an sadece Istanbul sinirlari icin kullanilabilir.",
+        "code": "outside_istanbul",
+        "geofence": ISTANBUL_GEOFENCE_BBOX,
+    }
+    if detail:
+        payload["detail"] = detail
+    if field:
+        payload["field"] = field
+    return jsonify(payload), 400
+
+
+def _first_outside_point(points: list[Any]) -> tuple[int, float, float] | None:
+    for idx, raw in enumerate(points or []):
+        pair = _to_lat_lon_pair(raw)
+        if pair is None:
+            continue
+        lat, lon = pair
+        if not _is_in_istanbul_bbox(lat, lon):
+            return idx, lat, lon
+    return None
+
+
+def _is_place_text_in_istanbul(place_text: Any) -> tuple[bool | None, dict[str, Any]]:
+    text = str(place_text or "").strip()
+    if not text:
+        return None, {"status": "empty"}
+
+    try:
+        resolved = geocode(text)
+    except Exception as exc:
+        return None, {"status": "resolve_error", "message": str(exc)}
+
+    if not isinstance(resolved, dict) or resolved.get("status") != "success":
+        return None, {
+            "status": "unresolved",
+            "error_type": resolved.get("error_type") if isinstance(resolved, dict) else "unknown",
+            "message": resolved.get("message") if isinstance(resolved, dict) else "Yer cozumlenemedi",
+        }
+
+    try:
+        lat = float(resolved.get("lat"))
+        lon = float(resolved.get("lon"))
+    except (TypeError, ValueError):
+        return None, {"status": "invalid_coordinates"}
+
+    in_istanbul = _is_in_istanbul_bbox(lat, lon)
+    return in_istanbul, {
+        "status": "resolved",
+        "lat": lat,
+        "lon": lon,
+        "display_name": resolved.get("display_name", text),
+        "cached": bool(resolved.get("cached", False)),
+    }
+
+
+def _extract_nlp_places_for_scope_check(parse_result: dict[str, Any]) -> list[str]:
+    candidates: list[str] = []
+    for key in ("origin", "destination", "location"):
+        raw = parse_result.get(key)
+        if isinstance(raw, str) and raw.strip():
+            candidates.append(raw.strip())
+
+    raw_locations = parse_result.get("locations")
+    if isinstance(raw_locations, list):
+        for item in raw_locations:
+            if isinstance(item, str) and item.strip():
+                candidates.append(item.strip())
+            elif isinstance(item, dict):
+                place = item.get("place")
+                if isinstance(place, str) and place.strip():
+                    candidates.append(place.strip())
+
+    seen: set[str] = set()
+    unique: list[str] = []
+    for place in candidates:
+        place_key = place.casefold()
+        if place_key in seen:
+            continue
+        seen.add(place_key)
+        unique.append(place)
+    return unique[:4]
+
+
 def _openrouter_system_prompt() -> str:
     """
     OpenRouter uzerinden giden tum sohbetler icin global system prompt.
@@ -663,6 +779,14 @@ def api_get_route():
                 return jsonify({"error": f"Nokta {i} geÃ§ersiz koordinat."}), 400
 
         # 1) SeÃ§ilen noktalarÄ± kapsayan grafÄ± al (otomatik bÃ¶lge algÄ±lama)
+        outside_point = _first_outside_point(points)
+        if outside_point is not None:
+            idx, lat, lon = outside_point
+            return _outside_istanbul_response(
+                detail=f"points[{idx}] koordinati Istanbul disinda: ({lat:.6f}, {lon:.6f})",
+                field="points",
+            )
+
         point_tuples = [(p[0], p[1]) for p in points]
         # print(f"[API] Noktalar iÃ§in graf alÄ±nÄ±yor: {len(points)} nokta"))
         G = get_graph_for_points(point_tuples)
@@ -734,6 +858,18 @@ def api_get_route_steps():
 
         if not isinstance(points, list) or len(points) < 2:
             return jsonify({"error": "En az 2 nokta gerekli."}), 400
+
+        for i, p in enumerate(points):
+            if _to_lat_lon_pair(p) is None:
+                return jsonify({"error": f"Nokta {i} gecersiz format. [lat, lon] olmali."}), 400
+
+        outside_point = _first_outside_point(points)
+        if outside_point is not None:
+            idx, lat, lon = outside_point
+            return _outside_istanbul_response(
+                detail=f"points[{idx}] koordinati Istanbul disinda: ({lat:.6f}, {lon:.6f})",
+                field="points",
+            )
 
         point_tuples = [(p[0], p[1]) for p in points]
         G = get_graph_for_points(point_tuples)
@@ -866,6 +1002,18 @@ def api_get_alternative_routes():
         if not isinstance(points, list) or len(points) < 2:
             return jsonify({"error": "En az 2 nokta gereklidir."}), 400
 
+        for i, p in enumerate(points):
+            if _to_lat_lon_pair(p) is None:
+                return jsonify({"error": f"Nokta {i} gecersiz format. [lat, lon] olmali."}), 400
+
+        outside_point = _first_outside_point(points)
+        if outside_point is not None:
+            idx, lat, lon = outside_point
+            return _outside_istanbul_response(
+                detail=f"points[{idx}] koordinati Istanbul disinda: ({lat:.6f}, {lon:.6f})",
+                field="points",
+            )
+
         point_tuples = [(p[0], p[1]) for p in points]
 
         G = get_graph_for_points(point_tuples)
@@ -951,6 +1099,12 @@ def api_search_pois():
 
         place = data.get("place", "Kadikoy, Istanbul, Turkey")
         raw_category = data["category"]
+        place_in_istanbul, place_geofence_meta = _is_place_text_in_istanbul(place)
+        if place_in_istanbul is False:
+            return _outside_istanbul_response(
+                detail=f"POI aramasi Istanbul disinda bir konumu hedefliyor: {place_geofence_meta.get('display_name', place)}",
+                field="place",
+            )
         search_mode = (data.get("search_mode", "auto") or "auto").strip().lower()
         if search_mode not in {"auto", "place_boundary_only"}:
             search_mode = "auto"
@@ -1044,6 +1198,7 @@ def api_search_pois():
             "force_refresh": force_refresh,
             "poi_cache": poi_cache,
             "category_resolution": category_resolution,
+            "place_geofence": place_geofence_meta,
             "version_profile": {
                 "dict_version": _POI_DICT_VERSION,
                 "threshold_profile": _POI_THRESHOLD_PROFILE,
@@ -1941,6 +2096,20 @@ def api_nlp_parse():
         except Exception as bert_exc:
             print(f"{trace_prefix} [NLP API] ? BERT hatasÄ±: {bert_exc}")
             return jsonify({"error": f"BERT motoru hatasÄ±: {str(bert_exc)}"}), 500
+
+        scope_checks = []
+        for place in _extract_nlp_places_for_scope_check(result):
+            in_istanbul, meta = _is_place_text_in_istanbul(place)
+            scope_checks.append({"place": place, "in_istanbul": in_istanbul, "meta": meta})
+            if in_istanbul is False:
+                return _outside_istanbul_response(
+                    detail=f"NLP sorgusu Istanbul disi bir lokasyon iceriyor: {meta.get('display_name', place)}",
+                    field="query",
+                )
+        result["istanbul_scope"] = {
+            "enforced": True,
+            "checks": scope_checks,
+        }
 
         confidence = float(result.get("confidence", 0.0) or 0.0)
         print(f"{trace_prefix} [NLP API] ?? SonuÃ§:")
@@ -3368,7 +3537,8 @@ def api_multimodal_compare():
     Request Body:
         {
             "origin": [lat, lon],
-            "destination": [lat, lon]
+            "destination": [lat, lon],
+            "allowed_modes": ["bus", "metro", "metrobus", "ferry"]  # opsiyonel
         }
 
     Response:
@@ -3382,22 +3552,36 @@ def api_multimodal_compare():
         return jsonify({"error": "Multimodal motor yuklu degil"}), 503
 
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data or "origin" not in data or "destination" not in data:
             return jsonify({"error": "'origin' ve 'destination' alanlari gerekli"}), 400
 
         origin = data["origin"]
         destination = data["destination"]
+        allowed_modes = data.get("allowed_modes")
 
-        if not (isinstance(origin, list) and len(origin) == 2):
+        if allowed_modes is not None and not isinstance(allowed_modes, list):
+            return jsonify({"error": "allowed_modes liste formatinda olmali"}), 400
+
+        origin_pair = _to_lat_lon_pair(origin)
+        destination_pair = _to_lat_lon_pair(destination)
+        if origin_pair is None:
             return jsonify({"error": "origin [lat, lon] formatinda olmali"}), 400
-        if not (isinstance(destination, list) and len(destination) == 2):
+        if destination_pair is None:
             return jsonify({"error": "destination [lat, lon] formatinda olmali"}), 400
 
+        origin_lat, origin_lon = origin_pair
+        destination_lat, destination_lon = destination_pair
+
+        # Asama 3 geofence: su an uygulama sadece Istanbul icin.
+        if not (_is_in_istanbul_bbox(origin_lat, origin_lon) and _is_in_istanbul_bbox(destination_lat, destination_lon)):
+            return _outside_istanbul_response(detail="Origin veya destination Istanbul disinda.", field="origin,destination")
+
         result = multimodal_compare(
-            origin[0], origin[1],
-            destination[0], destination[1],
+            origin_lat, origin_lon,
+            destination_lat, destination_lon,
+            allowed_modes=allowed_modes,
         )
 
         return jsonify(result)

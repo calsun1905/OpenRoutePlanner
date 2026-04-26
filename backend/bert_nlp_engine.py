@@ -427,17 +427,25 @@ def _collect_poi_tokens(query: str, detected_places: Optional[List[Dict[str, Any
         return False
 
     for match in TOKEN_PATTERN.finditer(normalized_query):
-        if in_occupied_range(match.start(), match.end()):
-            continue
-
         token_surface = match.group(0)
         token_normalized, role_hint = normalize_token_with_role(token_surface)
         token_normalized = _singularize_tr_token(token_normalized)
+        raw_token_normalized = _singularize_tr_token(normalize_place_key(token_surface))
+
+        # Bazi durumlarda "cami" gibi mekan token'lari da yer span'i icine girebiliyor.
+        # POI kavram token'larini bu nedenle agresif sekilde elememek gerekir.
+        if in_occupied_range(match.start(), match.end()) and not is_poi_concept_term(token_normalized):
+            continue
 
         if len(token_normalized) < 2:
             continue
         if role_hint in {"from", "to", "loc"} and not is_poi_concept_term(token_normalized):
-            continue
+            # "eczane" gibi kelimeler plain suffix kuraliyla yanlis role-hint alabilir.
+            # Ham token POI terimiyse role-hint'i yok sayip konsepte geri al.
+            if is_poi_concept_term(raw_token_normalized):
+                token_normalized = raw_token_normalized
+            else:
+                continue
         if is_likely_action_token(token_normalized):
             continue
         if token_normalized in seen:
@@ -1887,7 +1895,20 @@ class BertNLPEngine:
 
             # Lokasyon sinyali çok zayıfsa POI'den unknown'a düş.
             has_loc_role = any(p.get("role_hint") == "loc" for p in ordered_places)
-            if (not has_poi_cue) and (not has_loc_role) and max_place_similarity < 0.82:
+            generic_browse_query = bool(
+                re.search(
+                    r"\b(neler var|nereler var|ne yapabilirim|gezilecek)\b",
+                    normalize_query_text(query),
+                )
+            )
+
+            # "kadikoyde cami ariyorum" gibi sorgularda lokasyon+mekan birlikte zorunlu.
+            # Sadece lokasyon varsa (ve generic browse da degilse) sonucu unknown'a indir.
+            has_structured_poi_target = bool(result.get("poi_concept")) or bool(result.get("poi_tags_hint"))
+            if result.get("location") and (not has_structured_poi_target) and (not generic_browse_query):
+                result["type"] = "unknown"
+                result["error"] = "Mekan tipi anlasilamadi"
+            elif (not has_poi_cue) and (not has_loc_role) and max_place_similarity < 0.82:
                 result["type"] = "unknown"
                 result["error"] = "Sorgu anlaşılamadı"
             elif not result["location"]:

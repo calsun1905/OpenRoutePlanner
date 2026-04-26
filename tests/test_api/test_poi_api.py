@@ -30,10 +30,11 @@ def test_search_pois_resolves_category_with_morph_dict(client, monkeypatch):
         return [{"name": "Ornek Pilavci", "lat": 0.0, "lon": 0.0, "category": category}]
 
     monkeypatch.setattr("app.search_pois", fake_search_pois)
+    monkeypatch.setattr("app._is_place_text_in_istanbul", lambda _place: (True, {"status": "mock"}))
 
     rv = client.post(
         "/api/search-pois",
-        json={"place": "Malatya, Turkey", "category": "pilavcilardan"},
+        json={"place": "Kadikoy, Istanbul, Turkey", "category": "pilavcilardan"},
         content_type="application/json",
     )
 
@@ -60,6 +61,7 @@ def test_search_pois_keeps_unknown_category(client, monkeypatch):
         return []
 
     monkeypatch.setattr("app.search_pois", fake_search_pois)
+    monkeypatch.setattr("app._is_place_text_in_istanbul", lambda _place: (True, {"status": "mock"}))
 
     rv = client.post(
         "/api/search-pois",
@@ -74,3 +76,24 @@ def test_search_pois_keeps_unknown_category(client, monkeypatch):
     assert captured["category"] == "xzy-bilinmeyen"
     assert data["search_mode"] == "place_boundary_only"
     assert captured["search_mode"] == "place_boundary_only"
+
+
+def test_search_pois_rejects_outside_istanbul(client, monkeypatch):
+    monkeypatch.setattr(
+        "app._is_place_text_in_istanbul",
+        lambda _place: (
+            False,
+            {"status": "resolved", "display_name": "Ankara, Turkiye", "lat": 39.93, "lon": 32.85},
+        ),
+    )
+
+    rv = client.post(
+        "/api/search-pois",
+        json={"place": "Ankara, Turkey", "category": "cafe"},
+        content_type="application/json",
+    )
+
+    assert rv.status_code == 400
+    data = rv.get_json()
+    assert data["code"] == "outside_istanbul"
+    assert data["field"] == "place"
