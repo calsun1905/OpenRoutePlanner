@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ğŸ§  BERT Test Lab - Semantic Search Demo</title>
+    <title>🧠 BERT Test Lab - Semantic Search Demo</title>
     <style>
         * {
             margin: 0;
@@ -543,11 +543,11 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>ğŸ§  BERT Test Lab</h1>
-            <p>TÃ¼rkÃ§e DoÄŸal Dil Ä°ÅŸleme - Semantic Search & Typo Tolerance Demo</p>
+            <h1>🧠 BERT Test Lab</h1>
+            <p>Türkçe Doğal Dil İşleme - Semantic Search & Typo Tolerance Demo</p>
             <div class="status-badge" id="statusBadge">
                 <span class="status-dot"></span>
-                <span id="statusText">BaÄŸlanÄ±yor...</span>
+                <span id="statusText">Bağlanıyor...</span>
             </div>
             <div class="btn-group" style="justify-content: center; margin-top: 15px;">
                 <button class="btn btn-primary" onclick="runAllDiagnostics()">Tüm Modları Doğrula</button>
@@ -560,7 +560,7 @@
             <!-- 1. Model Info Card -->
             <div class="card">
                 <div class="card-header">
-                    <span class="card-icon">â„¹ï¸</span>
+                    <span class="card-icon">ℹ️</span>
                     <span class="card-title">Model Bilgisi</span>
                 </div>
                 <div class="model-info">
@@ -578,42 +578,42 @@
                     </div>
                     <div class="info-item">
                         <div class="info-label">Dil</div>
-                        <div class="info-value">TÃ¼rkÃ§e ğŸ‡¹ğŸ‡·</div>
+                        <div class="info-value">Türkçe 🇹🇷</div>
                     </div>
                 </div>
                 <button class="btn btn-secondary" onclick="checkStatus()" style="width: 100%; margin-top: 15px;">
-                    ğŸ”„ Durumu Kontrol Et
+                    🔄 Durumu Kontrol Et
                 </button>
             </div>
 
             <!-- 2. Similarity Test -->
             <div class="card">
                 <div class="card-header">
-                    <span class="card-icon">ğŸ”</span>
+                    <span class="card-icon">🔍</span>
                     <span class="card-title">Semantic Similarity</span>
                 </div>
                 <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 15px;">
-                    Ä°ki metin arasÄ±ndaki anlamsal benzerliÄŸi Ã¶lÃ§Ã¼n. Typo tolerance test edin!
+                    İki metin arasındaki anlamsal benzerliği ölçün. Typo tolerance test edin!
                 </p>
                 <div class="input-group">
                     <label>Metin 1</label>
-                    <input type="text" id="simText1" placeholder="Ã¶rn: KadÄ±kÃ¶y" value="KadÄ±kÃ¶y">
+                    <input type="text" id="simText1" placeholder="örn: Kadıköy" value="Kadıköy">
                 </div>
                 <div class="input-group">
                     <label>Metin 2</label>
-                    <input type="text" id="simText2" placeholder="Ã¶rn: KadikÃ¶y" value="KadikÃ¶y">
+                    <input type="text" id="simText2" placeholder="örn: Kadiköy" value="Kadiköy">
                 </div>
                 <button class="btn btn-primary" onclick="testSimilarity()">
-                    ğŸ¯ Benzerlik Hesapla
+                    🎯 Benzerlik Hesapla
                 </button>
                 <div class="btn-group">
-                    <button class="btn btn-secondary quick-btn" onclick="setSimTest('KadÄ±kÃ¶y', 'KadikÃ¶y')">Typo Test</button>
-                    <button class="btn btn-secondary quick-btn" onclick="setSimTest('Ä°stanbul', 'Ä°æ–¯å¦å¸ƒå°”')">FarklÄ± YazÄ±m</button>
-                    <button class="btn btn-secondary quick-btn" onclick="setSimTest('KadÄ±kÃ¶y', 'BeÅŸiktaÅŸ')">FarklÄ± Yerler</button>
+                    <button class="btn btn-secondary quick-btn" onclick="setSimTest('Kadıköy', 'Kadiköy')">Typo Test</button>
+                    <button class="btn btn-secondary quick-btn" onclick="setSimTest('İstanbul', 'İ斯坦布尔')">Farklı Yazım</button>
+                    <button class="btn btn-secondary quick-btn" onclick="setSimTest('Kadıköy', 'Beşiktaş')">Farklı Yerler</button>
                 </div>
                 <div class="result-box" id="simResult">
                     <div style="text-align: center; color: var(--gray);">
-                        SonuÃ§ burada gÃ¶rÃ¼necek...
+                        Sonuç burada görünecek...
                     </div>
                 </div>
             </div>
@@ -621,27 +621,27 @@
             <!-- 3. Query Parser -->
             <div class="card">
                 <div class="card-header">
-                    <span class="card-icon">ğŸ—ºï¸</span>
-                    <span class="card-title">Sorgu AyrÄ±ÅŸtÄ±rÄ±cÄ±</span>
+                    <span class="card-icon">🗺️</span>
+                    <span class="card-title">Sorgu Ayrıştırıcı</span>
                 </div>
                 <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 15px;">
-                    DoÄŸal dil sorgularÄ±nÄ± ayÄ±ÅŸtÄ±rÄ±n - origin, destination, tip algÄ±lama
+                    Doğal dil sorgularını ayıştırın - origin, destination, tip algılama
                 </p>
                 <div class="input-group">
                     <label>Rota Sorgusu</label>
-                    <input type="text" id="queryInput" placeholder="Ã¶rn: KadÄ±kÃ¶y'den Taksim'e nasÄ±l gidilir?" value="KadÄ±kÃ¶y'den Taksim'e nasÄ±l gidilir?">
+                    <input type="text" id="queryInput" placeholder="örn: Kadıköy'den Taksim'e nasıl gidilir?" value="Kadıköy'den Taksim'e nasıl gidilir?">
                 </div>
                 <button class="btn btn-primary" onclick="parseQuery()">
-                    ğŸ§  Sorguyu AyrÄ±ÅŸtÄ±r
+                    🧠 Sorguyu Ayrıştır
                 </button>
                 <div class="btn-group">
-                    <button class="btn btn-secondary quick-btn" onclick="setQuery('KadÄ±kÃ¶y\'den BeÅŸiktaÅŸ\'a rota')">Rota</button>
-                    <button class="btn btn-secondary quick-btn" onclick="setQuery('Taksim yakÄ±nlarÄ±ndaki kafeler')">POI Arama</button>
+                    <button class="btn btn-secondary quick-btn" onclick="setQuery('Kadıköy\'den Beşiktaş\'a rota')">Rota</button>
+                    <button class="btn btn-secondary quick-btn" onclick="setQuery('Taksim yakınlarındaki kafeler')">POI Arama</button>
                     <button class="btn btn-secondary quick-btn" onclick="setQuery('kadikoyden mecidiyekoye')">Typo ile Rota</button>
                 </div>
                 <div class="result-box" id="queryResult">
                     <div style="text-align: center; color: var(--gray);">
-                        SonuÃ§ burada gÃ¶rÃ¼necek...
+                        Sonuç burada görünecek...
                     </div>
                 </div>
             </div>
@@ -649,34 +649,34 @@
             <!-- 4. Best Match Finder -->
             <div class="card">
                 <div class="card-header">
-                    <span class="card-icon">ğŸ¯</span>
-                    <span class="card-title">En YakÄ±n EÅŸleÅŸme</span>
+                    <span class="card-icon">🎯</span>
+                    <span class="card-title">En Yakın Eşleşme</span>
                 </div>
                 <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 15px;">
-                    Adaylar arasÄ±ndan en yakÄ±n yer ismini bulun (typo tolerant)
+                    Adaylar arasından en yakın yer ismini bulun (typo tolerant)
                 </p>
                 <div class="input-group">
                     <label>Aranacak Yer</label>
-                    <input type="text" id="matchQuery" placeholder="Ã¶rn: kadikoy" value="kadikoy">
+                    <input type="text" id="matchQuery" placeholder="örn: kadikoy" value="kadikoy">
                 </div>
                 <div class="input-group">
                     <label>Aday Yerler</label>
-                    <textarea id="matchCandidates" placeholder="Her satÄ±ra bir aday yazÄ±n...">KadÄ±kÃ¶y
-BeÅŸiktaÅŸ
+                    <textarea id="matchCandidates" placeholder="Her satıra bir aday yazın...">Kadıköy
+Beşiktaş
 Taksim
-MecidiyekÃ¶y
-ÅiÅŸli</textarea>
+Mecidiyeköy
+Şişli</textarea>
                 </div>
                 <div class="input-group">
-                    <label>Minimum EÅŸik: <span id="thresholdValue">0.75</span></label>
+                    <label>Minimum Eşik: <span id="thresholdValue">0.75</span></label>
                     <input type="range" id="matchThreshold" min="0" max="1" step="0.05" value="0.75" style="width: 100%;" oninput="document.getElementById('thresholdValue').textContent = this.value">
                 </div>
                 <button class="btn btn-primary" onclick="findBestMatch()">
-                    ğŸ¯ En YakÄ±nÄ±nÄ± Bul
+                    🎯 En Yakınını Bul
                 </button>
                 <div class="result-box" id="matchResult">
                     <div style="text-align: center; color: var(--gray);">
-                        SonuÃ§ burada gÃ¶rÃ¼necek...
+                        Sonuç burada görünecek...
                     </div>
                 </div>
             </div>
@@ -704,18 +704,18 @@ MecidiyekÃ¶y
             <!-- 5. Interactive Chat -->
             <div class="card" style="grid-column: span 2;">
                 <div class="card-header">
-                    <span class="card-icon">ğŸ’¬</span>
+                    <span class="card-icon">💬</span>
                     <span class="card-title">BERT ile Sohbet</span>
                 </div>
                 <div class="chat-container">
                     <div class="chat-messages" id="chatMessages">
                         <div class="chat-message bert">
-                            Merhaba! Ben BERT tabanlÄ± NLP asistanÄ±nÄ±z. TÃ¼rkÃ§e sorgularÄ±nÄ±zÄ± anlayabilirim. Rota, POI arama veya yer ismi sorgularÄ±nÄ±zÄ± yazÄ±n! ğŸš€
+                            Merhaba! Ben BERT tabanlı NLP asistanınız. Türkçe sorgularınızı anlayabilirim. Rota, POI arama veya yer ismi sorgularınızı yazın! 🚀
                         </div>
                     </div>
                     <div class="chat-input-area">
-                        <input type="text" id="chatInput" placeholder="Bir sorgu yazÄ±n..." onkeypress="if(event.key==='Enter')sendChat()">
-                        <button class="btn btn-primary" onclick="sendChat()">GÃ¶nder</button>
+                        <input type="text" id="chatInput" placeholder="Bir sorgu yazın..." onkeypress="if(event.key==='Enter')sendChat()">
+                        <button class="btn btn-primary" onclick="sendChat()">Gönder</button>
                     </div>
                 </div>
             </div>
@@ -780,9 +780,9 @@ function clearLogPanel() {
 }
 
 function getModeLabel(status) {
-    if (status === "pending") return "Ã‡alÄ±ÅŸÄ±yor";
-    if (status === "pass") return "DoÄŸrulandÄ±";
-    if (status === "fail") return "BaÅŸarÄ±sÄ±z";
+    if (status === "pending") return "Çalışıyor";
+    if (status === "pass") return "Doğrulandı";
+    if (status === "fail") return "Başarısız";
     return "Bekleniyor";
 }
 
@@ -845,7 +845,7 @@ async function fetchJsonWithTrace(name, url, options = {}) {
         };
     } catch (error) {
         const latencyMs = performance.now() - started;
-        appendLog("ERR", `${name} network hatasÄ± (${latencyMs.toFixed(1)} ms)`, { error: error.message });
+        appendLog("ERR", `${name} network hatası (${latencyMs.toFixed(1)} ms)`, { error: error.message });
         return {
             ok: false,
             status: 0,
@@ -875,22 +875,22 @@ function renderStatusInfo(evalInfo, payload) {
 
     if (evalInfo.bertReady) {
         badge.className = "status-badge connected";
-        text.textContent = "BERT aktif ve doÄŸrulandÄ±";
+        text.textContent = "BERT aktif ve doğrulandı";
         engineType.textContent = payload.engine || "bert-nlp";
         setModeStatus("status", "pass", payload.engine || "bert-nlp");
-        setGuardBanner(true, "Fallback algÄ±lanmadÄ±. BERT tÃ¼m kontrollerde geÃ§erli.");
+        setGuardBanner(true, "Fallback algılanmadı. BERT tüm kontrollerde geçerli.");
     } else {
         badge.className = "status-badge disconnected";
-        text.textContent = "BERT doÄŸrulanamadÄ±";
+        text.textContent = "BERT doğrulanamadı";
         engineType.textContent = payload?.engine || "bilinmiyor";
         setModeStatus("status", "fail", payload?.engine || "bilinmiyor");
-        setGuardBanner(false, "Fallback veya engine uyumsuzluÄŸu algÄ±landÄ±.");
+        setGuardBanner(false, "Fallback veya engine uyumsuzluğu algılandı.");
     }
 }
 
 async function checkStatus(options = {}) {
     if (!options.silent) {
-        appendLog("INFO", "NLP status kontrolÃ¼ baÅŸlatÄ±ldÄ±");
+        appendLog("INFO", "NLP status kontrolü başlatıldı");
     }
 
     setModeStatus("status", "pending", "kontrol");
@@ -902,13 +902,13 @@ async function checkStatus(options = {}) {
         const engineType = document.getElementById("engineType");
 
         badge.className = "status-badge disconnected";
-        text.textContent = "BaÄŸlantÄ± hatasÄ±";
+        text.textContent = "Bağlantı hatası";
         engineType.textContent = "-";
         setModeStatus("status", "fail", res.status ? `HTTP ${res.status}` : "network");
-        setGuardBanner(false, "Status alÄ±namadÄ±. BERT doÄŸrulamasÄ± baÅŸarÄ±sÄ±z.");
+        setGuardBanner(false, "Status alınamadı. BERT doğrulaması başarısız.");
 
         if (!options.silent) {
-            showToast("Backend'e baÄŸlanÄ±lamadÄ±", "error");
+            showToast("Backend'e bağlanılamadı", "error");
         }
         return null;
     }
@@ -922,7 +922,7 @@ async function checkStatus(options = {}) {
 
     renderStatusInfo(evalInfo, res.data);
 
-    appendLog(evalInfo.bertReady ? "PASS" : "FAIL", "Status analizi tamamlandÄ±", {
+    appendLog(evalInfo.bertReady ? "PASS" : "FAIL", "Status analizi tamamlandı", {
         available: res.data.available,
         engine: res.data.engine,
         model: res.data.model,
@@ -931,7 +931,7 @@ async function checkStatus(options = {}) {
     });
 
     if (!options.silent) {
-        showToast(evalInfo.bertReady ? "BERT doÄŸrulandÄ±" : "BERT doÄŸrulanamadÄ±", evalInfo.bertReady ? "success" : "error");
+        showToast(evalInfo.bertReady ? "BERT doğrulandı" : "BERT doğrulanamadı", evalInfo.bertReady ? "success" : "error");
     }
 
     return lastStatusInfo;
@@ -940,10 +940,10 @@ async function checkStatus(options = {}) {
 async function ensureBertReady(mode) {
     const statusInfo = await checkStatus({ silent: true });
     if (!statusInfo || !statusInfo.bertReady) {
-        setModeStatus(mode, "fail", "BERT hazÄ±r deÄŸil");
-        throw new Error("BERT hazÄ±r deÄŸil veya fallback algÄ±landÄ±");
+        setModeStatus(mode, "fail", "BERT hazır değil");
+        throw new Error("BERT hazır değil veya fallback algılandı");
     }
-    setModeStatus(mode, "pending", "BERT doÄŸrulandÄ±");
+    setModeStatus(mode, "pending", "BERT doğrulandı");
     return statusInfo;
 }
 
@@ -963,12 +963,12 @@ async function testSimilarity() {
     const resultBox = document.getElementById("simResult");
 
     if (!text1 || !text2) {
-        showToast("LÃ¼tfen her iki metni de girin", "error");
+        showToast("Lütfen her iki metni de girin", "error");
         return false;
     }
 
-    setModeStatus("similarity", "pending", "Ã§alÄ±ÅŸÄ±yor");
-    resultBox.innerHTML = '<div class="result-loading"><div class="spinner"></div> HesaplanÄ±yor...</div>';
+    setModeStatus("similarity", "pending", "çalışıyor");
+    resultBox.innerHTML = '<div class="result-loading"><div class="spinner"></div> Hesaplanıyor...</div>';
 
     try {
         await ensureBertReady("similarity");
@@ -985,7 +985,7 @@ async function testSimilarity() {
 
         const score = Number(res.data?.similarity);
         if (!Number.isFinite(score)) {
-            throw new Error("Similarity skoru sayÄ±sal deÄŸil");
+            throw new Error("Similarity skoru sayısal değil");
         }
 
         const percentage = Math.round(score * 100);
@@ -1000,23 +1000,23 @@ async function testSimilarity() {
                         <div class="score-bar-fill" style="width: ${percentage}%"></div>
                     </div>
                     <div style="margin-top: 10px; font-size: 0.85rem; color: var(--gray);">
-                        "${escapeHtml(text1)}" â†” "${escapeHtml(text2)}"
+                        "${escapeHtml(text1)}" ↔ "${escapeHtml(text2)}"
                     </div>
                     <div style="margin-top: 6px; font-size: 0.82rem; color: var(--gray);">
-                        skor=${score.toFixed(6)} | sÃ¼re=${res.latencyMs.toFixed(1)} ms | engine=${EXPECTED_ENGINE}
+                        skor=${score.toFixed(6)} | süre=${res.latencyMs.toFixed(1)} ms | engine=${EXPECTED_ENGINE}
                     </div>
                 </div>
             </div>
         `;
 
-        appendLog("PASS", "Similarity tamamlandÄ±", { text1, text2, score, percentage });
+        appendLog("PASS", "Similarity tamamlandı", { text1, text2, score, percentage });
         setModeStatus("similarity", "pass", `%${percentage}`);
         return true;
     } catch (error) {
         resultBox.innerHTML = `<div style="color: var(--danger);">Hata: ${escapeHtml(error.message)}</div>`;
-        appendLog("FAIL", "Similarity baÅŸarÄ±sÄ±z", { error: error.message });
+        appendLog("FAIL", "Similarity başarısız", { error: error.message });
         setModeStatus("similarity", "fail", "hata");
-        showToast("Benzerlik hesaplanamadÄ±", "error");
+        showToast("Benzerlik hesaplanamadı", "error");
         return false;
     }
 }
@@ -1031,12 +1031,12 @@ async function parseQuery() {
     const resultBox = document.getElementById("queryResult");
 
     if (!query) {
-        showToast("LÃ¼tfen bir sorgu girin", "error");
+        showToast("Lütfen bir sorgu girin", "error");
         return false;
     }
 
-    setModeStatus("parse", "pending", "Ã§alÄ±ÅŸÄ±yor");
-    resultBox.innerHTML = '<div class="result-loading"><div class="spinner"></div> AyrÄ±ÅŸtÄ±rÄ±lÄ±yor...</div>';
+    setModeStatus("parse", "pending", "çalışıyor");
+    resultBox.innerHTML = '<div class="result-loading"><div class="spinner"></div> Ayrıştırılıyor...</div>';
 
     try {
         await ensureBertReady("parse");
@@ -1054,20 +1054,20 @@ async function parseQuery() {
         const data = res.data || {};
         const responseEngine = String(data.engine || "").toLowerCase();
         if (responseEngine !== EXPECTED_ENGINE) {
-            throw new Error(`Parse engine beklenen deÄŸil: ${responseEngine || "none"}`);
+            throw new Error(`Parse engine beklenen değil: ${responseEngine || "none"}`);
         }
 
         let html = '<div class="parsed-result">';
         html += `<div class="parsed-item"><span class="parsed-label">Sorgu Tipi</span><span class="tag tag-type">${escapeHtml(data.type || "unknown")}</span></div>`;
         html += `<div class="parsed-item"><span class="parsed-label">Engine</span><span class="parsed-value">${escapeHtml(data.engine || "-")}</span></div>`;
         html += `<div class="parsed-item"><span class="parsed-label">Confidence</span><span class="parsed-value">${Number(data.confidence || 0).toFixed(4)}</span></div>`;
-        html += `<div class="parsed-item"><span class="parsed-label">SÃ¼re</span><span class="parsed-value">${Number(data.parse_time || 0).toFixed(4)} sn</span></div>`;
+        html += `<div class="parsed-item"><span class="parsed-label">Süre</span><span class="parsed-value">${Number(data.parse_time || 0).toFixed(4)} sn</span></div>`;
 
         if (data.origin) {
-            html += `<div class="parsed-item"><span class="parsed-label">BaÅŸlangÄ±Ã§</span><span class="parsed-value highlight tag tag-origin">${escapeHtml(data.origin)}</span></div>`;
+            html += `<div class="parsed-item"><span class="parsed-label">Başlangıç</span><span class="parsed-value highlight tag tag-origin">${escapeHtml(data.origin)}</span></div>`;
         }
         if (data.destination) {
-            html += `<div class="parsed-item"><span class="parsed-label">VarÄ±ÅŸ</span><span class="parsed-value highlight tag tag-destination">${escapeHtml(data.destination)}</span></div>`;
+            html += `<div class="parsed-item"><span class="parsed-label">Varış</span><span class="parsed-value highlight tag tag-destination">${escapeHtml(data.destination)}</span></div>`;
         }
         if (data.location) {
             html += `<div class="parsed-item"><span class="parsed-label">Konum</span><span class="parsed-value highlight tag tag-location">${escapeHtml(data.location)}</span></div>`;
@@ -1086,7 +1086,7 @@ async function parseQuery() {
         html += "</div>";
         resultBox.innerHTML = html;
 
-        appendLog("PASS", "Parse tamamlandÄ±", {
+        appendLog("PASS", "Parse tamamlandı", {
             query,
             type: data.type,
             engine: data.engine,
@@ -1097,9 +1097,9 @@ async function parseQuery() {
         return true;
     } catch (error) {
         resultBox.innerHTML = `<div style="color: var(--danger);">Hata: ${escapeHtml(error.message)}</div>`;
-        appendLog("FAIL", "Parse baÅŸarÄ±sÄ±z", { query, error: error.message });
+        appendLog("FAIL", "Parse başarısız", { query, error: error.message });
         setModeStatus("parse", "fail", "hata");
-        showToast("Sorgu ayrÄ±ÅŸtÄ±rÄ±lamadÄ±", "error");
+        showToast("Sorgu ayrıştırılamadı", "error");
         return false;
     }
 }
@@ -1149,7 +1149,7 @@ function renderBreakdownHtml(breakdown, winner) {
         return `
             <div style="margin-top:8px;">
                 <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-bottom:4px; color:${isWinner ? "var(--success)" : "var(--light)"};">
-                    <span>${isWinner ? "âœ“ " : ""}${escapeHtml(row.candidate)}</span>
+                    <span>${isWinner ? "✓ " : ""}${escapeHtml(row.candidate)}</span>
                     <span>%${pct}</span>
                 </div>
                 <div class="score-bar" style="height:8px;">
@@ -1162,7 +1162,7 @@ function renderBreakdownHtml(breakdown, winner) {
     return `
         <div style="margin-top:14px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08);">
             <div style="font-size:0.85rem; color:var(--gray); margin-bottom:6px;">
-                Aday benzerlik dÃ¶kÃ¼mÃ¼ (query vs candidate) - kontrol edilen: ${breakdown.checked}/${breakdown.total}
+                Aday benzerlik dökümü (query vs candidate) - kontrol edilen: ${breakdown.checked}/${breakdown.total}
             </div>
             ${rowsHtml}
         </div>
@@ -1176,18 +1176,18 @@ async function findBestMatch() {
     const resultBox = document.getElementById("matchResult");
 
     if (!query || !candidatesText) {
-        showToast("LÃ¼tfen sorgu ve adaylarÄ± girin", "error");
+        showToast("Lütfen sorgu ve adayları girin", "error");
         return false;
     }
 
     const candidates = candidatesText.split("\n").map((x) => x.trim()).filter(Boolean);
     if (candidates.length === 0) {
-        showToast("Aday listesi boÅŸ", "error");
+        showToast("Aday listesi boş", "error");
         return false;
     }
 
-    setModeStatus("best-match", "pending", "Ã§alÄ±ÅŸÄ±yor");
-    resultBox.innerHTML = '<div class="result-loading"><div class="spinner"></div> AranÄ±yor...</div>';
+    setModeStatus("best-match", "pending", "çalışıyor");
+    resultBox.innerHTML = '<div class="result-loading"><div class="spinner"></div> Aranıyor...</div>';
 
     try {
         await ensureBertReady("best-match");
@@ -1210,7 +1210,7 @@ async function findBestMatch() {
             const score = Math.round(Number(data.similarity || 0) * 100);
             resultBox.innerHTML = `
                 <div style="text-align: center;">
-                    <div style="font-size: 2.2rem; margin-bottom: 8px;">ğŸ¯</div>
+                    <div style="font-size: 2.2rem; margin-bottom: 8px;">🎯</div>
                     <div style="font-size: 1.25rem; font-weight: 600; margin-bottom: 4px;">${escapeHtml(data.match)}</div>
                     <div class="score-bar" style="margin: 12px 0;">
                         <div class="score-bar-fill" style="width: ${score}%"></div>
@@ -1224,13 +1224,13 @@ async function findBestMatch() {
             `;
 
             setModeStatus("best-match", "pass", `%${score}`);
-            appendLog("PASS", "Best-match tamamlandÄ±", { query, match: data.match, similarity: data.similarity, threshold });
+            appendLog("PASS", "Best-match tamamlandı", { query, match: data.match, similarity: data.similarity, threshold });
             return true;
         } else {
             resultBox.innerHTML = `
                 <div style="text-align: center; color: var(--warning);">
-                    <div style="font-size: 2rem; margin-bottom: 8px;">ğŸ˜•</div>
-                    <div>EÅŸleÅŸme bulunamadÄ±</div>
+                    <div style="font-size: 2rem; margin-bottom: 8px;">😕</div>
+                    <div>Eşleşme bulunamadı</div>
                     <div style="font-size: 0.82rem; margin-top: 6px; color: var(--gray);">
                         threshold=%${Math.round(threshold * 100)}
                     </div>
@@ -1238,15 +1238,15 @@ async function findBestMatch() {
                 ${breakdownHtml}
             `;
 
-            setModeStatus("best-match", "fail", "eÅŸleÅŸme yok");
-            appendLog("FAIL", "Best-match eÅŸleÅŸme Ã¼retemedi", { query, threshold, response: data });
+            setModeStatus("best-match", "fail", "eşleşme yok");
+            appendLog("FAIL", "Best-match eşleşme üretemedi", { query, threshold, response: data });
             return false;
         }
     } catch (error) {
         resultBox.innerHTML = `<div style="color: var(--danger);">Hata: ${escapeHtml(error.message)}</div>`;
-        appendLog("FAIL", "Best-match baÅŸarÄ±sÄ±z", { query, error: error.message });
+        appendLog("FAIL", "Best-match başarısız", { query, error: error.message });
         setModeStatus("best-match", "fail", "hata");
-        showToast("EÅŸleÅŸme aranamadÄ±", "error");
+        showToast("Eşleşme aranamadı", "error");
         return false;
     }
 }
@@ -1268,11 +1268,11 @@ async function validateChatMode() {
 
     const engine = String(res.data?.engine || "").toLowerCase();
     if (engine !== EXPECTED_ENGINE) {
-        throw new Error(`Chat probe parse engine beklenen deÄŸil: ${engine || "none"}`);
+        throw new Error(`Chat probe parse engine beklenen değil: ${engine || "none"}`);
     }
 
     setModeStatus("chat", "pass", "probe ok");
-    appendLog("PASS", "Chat modu probe doÄŸrulandÄ±", {
+    appendLog("PASS", "Chat modu probe doğrulandı", {
         query: probeQuery,
         engine: res.data.engine,
         type: res.data.type,
@@ -1311,7 +1311,7 @@ async function sendChat() {
         const data = res.data || {};
         const engine = String(data.engine || "").toLowerCase();
         if (engine !== EXPECTED_ENGINE) {
-            throw new Error(`Chat parse engine beklenen deÄŸil: ${engine || "none"}`);
+            throw new Error(`Chat parse engine beklenen değil: ${engine || "none"}`);
         }
 
         document.getElementById(typingId)?.remove();
@@ -1320,8 +1320,8 @@ async function sendChat() {
         responseText += `Engine: ${data.engine || "-"}<br>`;
         responseText += `Confidence: ${Number(data.confidence || 0).toFixed(4)}<br>`;
 
-        if (data.origin) responseText += `BaÅŸlangÄ±Ã§: ${escapeHtml(data.origin)}<br>`;
-        if (data.destination) responseText += `VarÄ±ÅŸ: ${escapeHtml(data.destination)}<br>`;
+        if (data.origin) responseText += `Başlangıç: ${escapeHtml(data.origin)}<br>`;
+        if (data.destination) responseText += `Varış: ${escapeHtml(data.destination)}<br>`;
         if (data.location) responseText += `Konum: ${escapeHtml(data.location)}<br>`;
 
         if (Array.isArray(data.detected_places) && data.detected_places.length > 0) {
@@ -1330,7 +1330,7 @@ async function sendChat() {
                 const place = typeof item === "string" ? item : item.place;
                 const score = typeof item === "object" ? Number(item.similarity || 0) : null;
                 const scoreText = Number.isFinite(score) ? ` (%${Math.round(score * 100)})` : "";
-                responseText += `â€¢ ${escapeHtml(place || "-")}${scoreText}<br>`;
+                responseText += `• ${escapeHtml(place || "-")}${scoreText}<br>`;
             });
         }
 
@@ -1338,23 +1338,23 @@ async function sendChat() {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
         setModeStatus("chat", "pass", data.type || "ok");
-        appendLog("PASS", "Chat parse tamamlandÄ±", { query: message, type: data.type, engine: data.engine });
+        appendLog("PASS", "Chat parse tamamlandı", { query: message, type: data.type, engine: data.engine });
     } catch (error) {
         document.getElementById(typingId)?.remove();
         messagesContainer.innerHTML += `<div class="chat-message bert" style="color: var(--danger);">Hata: ${escapeHtml(error.message)}</div>`;
         setModeStatus("chat", "fail", "hata");
-        appendLog("FAIL", "Chat baÅŸarÄ±sÄ±z", { query: message, error: error.message });
+        appendLog("FAIL", "Chat başarısız", { query: message, error: error.message });
     }
 }
 
 async function runAllDiagnostics() {
     if (diagnosticsBusy) {
-        showToast("DoÄŸrulama zaten Ã§alÄ±ÅŸÄ±yor", "error");
+        showToast("Doğrulama zaten çalışıyor", "error");
         return;
     }
 
     diagnosticsBusy = true;
-    appendLog("INFO", "TÃ¼m mod doÄŸrulamasÄ± baÅŸlatÄ±ldÄ±");
+    appendLog("INFO", "Tüm mod doğrulaması başlatıldı");
 
     setModeStatus("status", "pending", "kontrol");
     setModeStatus("parse", "pending", "bekliyor");
@@ -1365,46 +1365,46 @@ async function runAllDiagnostics() {
     try {
         const status = await checkStatus({ silent: false });
         if (!status || !status.bertReady) {
-            throw new Error("Status kontrolÃ¼nde BERT doÄŸrulanamadÄ±");
+            throw new Error("Status kontrolünde BERT doğrulanamadı");
         }
 
-        document.getElementById("queryInput").value = "KadÄ±kÃ¶y'den BeÅŸiktaÅŸ'a rota Ã§iz";
-        document.getElementById("simText1").value = "KadÄ±kÃ¶y";
+        document.getElementById("queryInput").value = "Kadıköy'den Beşiktaş'a rota çiz";
+        document.getElementById("simText1").value = "Kadıköy";
         document.getElementById("simText2").value = "Kadikoy";
         document.getElementById("matchQuery").value = "kadikoy";
-        document.getElementById("matchCandidates").value = "KadÄ±kÃ¶y\nBeÅŸiktaÅŸ\nTaksim\nMecidiyekÃ¶y\nÅiÅŸli";
+        document.getElementById("matchCandidates").value = "Kadıköy\nBeşiktaş\nTaksim\nMecidiyeköy\nŞişli";
         document.getElementById("matchThreshold").value = "0.75";
         document.getElementById("thresholdValue").textContent = "0.75";
 
         const parseOk = await parseQuery();
         if (!parseOk) {
-            throw new Error("Parse modu baÅŸarÄ±sÄ±z");
+            throw new Error("Parse modu başarısız");
         }
 
         const similarityOk = await testSimilarity();
         if (!similarityOk) {
-            throw new Error("Similarity modu baÅŸarÄ±sÄ±z");
+            throw new Error("Similarity modu başarısız");
         }
 
         const bestMatchOk = await findBestMatch();
         if (!bestMatchOk) {
-            throw new Error("Best-match modu baÅŸarÄ±sÄ±z");
+            throw new Error("Best-match modu başarısız");
         }
 
         await validateChatMode();
 
-        appendLog("PASS", "TÃ¼m mod doÄŸrulamasÄ± tamamlandÄ±");
-        showToast("TÃ¼m modlarda BERT doÄŸrulandÄ±", "success");
+        appendLog("PASS", "Tüm mod doğrulaması tamamlandı");
+        showToast("Tüm modlarda BERT doğrulandı", "success");
     } catch (error) {
-        appendLog("FAIL", "TÃ¼m mod doÄŸrulamasÄ± baÅŸarÄ±sÄ±z", { error: error.message });
-        showToast(`DoÄŸrulama baÅŸarÄ±sÄ±z: ${error.message}`, "error");
+        appendLog("FAIL", "Tüm mod doğrulaması başarısız", { error: error.message });
+        showToast(`Doğrulama başarısız: ${error.message}`, "error");
     } finally {
         diagnosticsBusy = false;
     }
 }
 
 checkStatus();
-appendLog("INFO", "BERT Test Lab baÅŸlatÄ±ldÄ±");
+appendLog("INFO", "BERT Test Lab başlatıldı");
 
     </script>
 </body>

@@ -1,5 +1,5 @@
 /* ============================================
-   OpenTrip â€” Design System & Styles
+   OpenTrip — Design System & Styles
    ============================================ */
 
 /* --- CSS Custom Properties (Design Tokens) --- */
@@ -564,7 +564,7 @@ body.chat-panel-collapsed .right-chat-expand-btn {
     border-color: var(--accent-primary);
 }
 
-/* Ã–neri dropdown Ã¶ÄŸeleri (yazarken Ã§Ä±kan liste) */
+/* Öneri dropdown öğeleri (yazarken çıkan liste) */
 .search-suggestion-item {
     padding: 8px 12px;
     margin-bottom: 4px;
