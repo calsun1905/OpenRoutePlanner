@@ -254,8 +254,8 @@
         const maxJumpMeters = modeName === "ferry"
             ? 45000
             : (modeName === "rail"
-                ? 9000
-                : (modeName === "bus" ? 5000 : (modeName === "walk" ? 3200 : 6000)));
+                ? 3200
+                : (modeName === "bus" ? 3800 : (modeName === "walk" ? 2500 : 4500)));
 
         const chunks = [];
         let current = [normalized[0]];
@@ -305,17 +305,12 @@
         const routeCoords = Array.isArray(seg?.coords) ? seg.coords : [];
         const stopCoords = Array.isArray(seg?.stop_coords) ? seg.stop_coords : [];
 
-        if (!transitOnlyView) {
-            return routeCoords.length >= 2 ? routeCoords : stopCoords;
+        // Duz cizgi "teleport" artefaktlarini azaltmak icin
+        // transit gorunumunde de once gercek rota geometrisini kullan.
+        if (routeCoords.length >= 2) {
+            return routeCoords;
         }
-
-        // Transit cizim algoritmasi yuruyusten ayrildi:
-        // bus/rail/ferry icin once stop-to-stop geometriyi kullan.
-        if (seg?.mode === "bus" || seg?.mode === "rail" || seg?.mode === "ferry") {
-            return stopCoords.length >= 2 ? stopCoords : routeCoords;
-        }
-
-        return routeCoords.length >= 2 ? routeCoords : stopCoords;
+        return stopCoords;
     }
 
     function segmentLengthMeters(coords, mode = "") {

@@ -356,6 +356,14 @@ HALIC_WALK_BRIDGE_CHECKPOINTS = [
     # Galata Koprusu
     (41.0222, 28.9734),
 ]
+ALIBEY_WALK_BRIDGE_CHECKPOINTS = [
+    # Miniaturk/Sutluce gecisleri
+    (41.0584, 28.9497),
+    # Sunnet Koprusu
+    (41.0637, 28.9505),
+    # Fil Koprusu
+    (41.0696, 28.9424),
+]
 
 
 def _transfer_max_distance_for_name(norm_name: str) -> float:
@@ -426,6 +434,8 @@ def _is_major_water_crossing_straight(
         return True
     if _is_likely_halic_straight_cross(from_lat, from_lon, to_lat, to_lon):
         return True
+    if _is_likely_alibey_crossing(from_lat, from_lon, to_lat, to_lon):
+        return True
     return False
 
 
@@ -453,6 +463,56 @@ def _is_likely_halic_crossing(
         or (to_lat < 41.031 <= from_lat)
         or abs(from_lon - to_lon) >= 0.012
     )
+
+
+def _is_likely_alibey_crossing(
+    from_lat: float,
+    from_lon: float,
+    to_lat: float,
+    to_lon: float,
+) -> bool:
+    """
+    Halic'in kuzey kolu (Alibeykoy deresi) uzerinde bank degisimi.
+    """
+    in_bbox = (
+        28.939 <= from_lon <= 28.954 and 28.939 <= to_lon <= 28.954
+        and 41.051 <= from_lat <= 41.072 and 41.051 <= to_lat <= 41.072
+    )
+    if not in_bbox:
+        return False
+    if abs(from_lon - to_lon) < 0.0023:
+        return False
+    if abs(from_lat - to_lat) > 0.016:
+        return False
+
+    def _alibey_side(lon: float) -> int:
+        if lon <= 28.9476:
+            return -1
+        if lon >= 28.9491:
+            return 1
+        return 0
+
+    side_a = _alibey_side(from_lon)
+    side_b = _alibey_side(to_lon)
+    if side_a != 0 and side_b != 0 and side_a != side_b:
+        return True
+
+    # Gri koridorda kalan endpoint'ler icin daha toleransli crossing heuristigi.
+    lon_span_min = min(from_lon, to_lon)
+    lon_span_max = max(from_lon, to_lon)
+    if (
+        abs(from_lon - to_lon) >= 0.0016
+        and lon_span_min <= 28.9484
+        and lon_span_max >= 28.9492
+    ):
+        return True
+
+    # Dar gri bolgede bir endpoint kalsa bile su koridoru cizgisi kesiliyorsa crossing kabul et.
+    if min(from_lon, to_lon) <= 28.9476 and max(from_lon, to_lon) >= 28.9484:
+        return True
+
+    # Daha genis yedek kontrol.
+    return min(from_lon, to_lon) <= 28.9470 and max(from_lon, to_lon) >= 28.9497
 
 
 def _coords_pass_near_checkpoints(
@@ -486,6 +546,10 @@ def _is_allowed_water_crossing_walk(
     """
     if _is_forbidden_bosphorus_walk(from_lat, from_lon, to_lat, to_lon):
         return False
+    if _is_likely_alibey_crossing(from_lat, from_lon, to_lat, to_lon):
+        if is_fallback:
+            return False
+        return _coords_pass_near_checkpoints(coords, ALIBEY_WALK_BRIDGE_CHECKPOINTS, max_dist_m=420.0)
     if not _is_likely_halic_crossing(from_lat, from_lon, to_lat, to_lon):
         return True
     if is_fallback:
@@ -504,6 +568,48 @@ def _path_distance_m(coords: List[List[float]]) -> float:
             coords[i + 1][0], coords[i + 1][1],
         )
     return total
+
+
+def _max_jump_in_coords_m(coords: List[List[float]]) -> float:
+    """Ardışık koordinatlar arasındaki maksimum sıçrama mesafesi (metre)."""
+    if not coords or len(coords) < 2:
+        return 0.0
+    max_jump = 0.0
+    for i in range(len(coords) - 1):
+        jump = _haversine_distance(
+            coords[i][0], coords[i][1],
+            coords[i + 1][0], coords[i + 1][1],
+        )
+        if jump > max_jump:
+            max_jump = jump
+    return max_jump
+
+
+def _has_implausible_segment_jump(option: Dict) -> bool:
+    """
+    Transit segment geometrisinde bariz 'teleport' sıçramaları var mı?
+    Bu filtre, haritada düz atlama çizen zayıf adayları eler.
+    """
+    for seg in (option.get("segments") or []):
+        mode = str(seg.get("mode") or "").lower()
+        if mode == "ferry":
+            continue
+
+        coords = seg.get("coords") or []
+        if len(coords) < 2:
+            continue
+
+        max_jump = _max_jump_in_coords_m(coords)
+
+        # Mode bazlı muhafazakar eşikler.
+        if mode == "walk" and max_jump > 3000:
+            return True
+        if mode == "bus" and max_jump > 5000:
+            return True
+        if mode == "rail" and max_jump > 5000:
+            return True
+
+    return False
 
 
 def _sum_walk_distance_m(segments: List[Dict]) -> float:
@@ -1049,7 +1155,11 @@ def _build_metro_options(
                     if not transfer_pairs:
                         continue
 
-                    for transfer_a, transfer_b in transfer_pairs[:3]:
+                    # Aktarma adaylarini dar bir ilk-3 kesitiyle sinirlamak,
+                    # M1B->M1A gibi hatlarda daha dogru dugumleri (ornegin Otogar)
+                    # hic denemeden elemekteydi. Tum adaylari degerlendirip
+                    # en iyi sonucu asagida sureye gore seciyoruz.
+                    for transfer_a, transfer_b in transfer_pairs:
                         leg1 = _get_line_path_between_stations(line_a_id, o["id"], transfer_a["id"])
                         leg2 = _get_line_path_between_stations(line_b_id, transfer_b["id"], d["id"])
                         if len(leg1) < 2 or len(leg2) < 2:
@@ -1413,6 +1523,7 @@ def _shortest_metro_path(
     dest_candidates: List[Dict],
     final_dest_lat: Optional[float] = None,
     final_dest_lon: Optional[float] = None,
+    allow_ferry: bool = True,
 ) -> Optional[Dict]:
     """
     Cok aktarmali metro aginda en iyi yolu bulur (Dijkstra).
@@ -1482,6 +1593,8 @@ def _shortest_metro_path(
                 goal_walk_seg_by_state[state] = walk_seg
 
         for to_sid, dist_m, line_id, edge_kind in graph.get(sid, []):
+            if edge_kind == "ferry" and not allow_ferry:
+                continue
             next_transfer = transfer_count
             add_cost = 0.0
             next_line = current_line
@@ -1591,6 +1704,12 @@ def _build_graph_metro_option(
     best_origin_candidates: List[Dict] = []
     best_dest_candidates: List[Dict] = []
     best_score = float("inf")
+    same_side = (
+        _bosphorus_side(float(origin_lon)) != 0
+        and _bosphorus_side(float(origin_lon)) == _bosphorus_side(float(dest_lon))
+    )
+    # Ayni yakada gorece kisa yolculuklarda once karasal/railsel rota denensin.
+    prefer_non_ferry = same_side and direct_walk_m <= 18000
 
     for radius in search_radii:
         raw_origin = get_metro_stations_in_area(origin_lat, origin_lon, radius)
@@ -1602,21 +1721,43 @@ def _build_graph_metro_option(
         if not origin_candidates or not dest_candidates:
             continue
 
-        path_info = _shortest_metro_path(
+        path_variants: List[Dict] = []
+        if prefer_non_ferry:
+            no_ferry_path = _shortest_metro_path(
+                origin_candidates,
+                dest_candidates,
+                final_dest_lat=dest_lat,
+                final_dest_lon=dest_lon,
+                allow_ferry=False,
+            )
+            if no_ferry_path:
+                path_variants.append(no_ferry_path)
+
+        any_path = _shortest_metro_path(
             origin_candidates,
             dest_candidates,
             final_dest_lat=dest_lat,
             final_dest_lon=dest_lon,
+            allow_ferry=True,
         )
-        if not path_info:
-            continue
+        if any_path:
+            path_variants.append(any_path)
 
-        score = float(path_info.get("total_time_min", 10**9))
-        if score < best_score:
-            best_score = score
-            best_path_info = path_info
-            best_origin_candidates = origin_candidates
-            best_dest_candidates = dest_candidates
+        for path_info in path_variants:
+            score = float(path_info.get("total_time_min", 10**9))
+            has_ferry_leg = any(
+                str(seg.get("edge_kind") or "") == "ferry"
+                for seg in (path_info.get("grouped_segments") or [])
+            )
+            # Ayni yakada ferry'yi varsayilan kazanan yapma: ciddi kazanc yoksa geri plana at.
+            if prefer_non_ferry and has_ferry_leg:
+                score += 9.0
+
+            if score < best_score:
+                best_score = score
+                best_path_info = path_info
+                best_origin_candidates = origin_candidates
+                best_dest_candidates = dest_candidates
 
     if not best_path_info:
         return None
@@ -1758,6 +1899,12 @@ def _build_graph_metro_option(
     route_labels = [r for r in route_labels if r]
     has_ferry_leg = any(s.get("mode") == "ferry" for s in segments)
     has_rail_leg = any(s.get("mode") == "rail" for s in segments)
+    if has_ferry_leg and same_side:
+        saved_min = float(direct_walk_min) - float(total_time_min)
+        detour_ratio = float(total_distance_m) / max(1.0, float(direct_walk_m))
+        # Ayni yakada vapurlu "tur" secenegi ancak net fayda varsa kabul edilir.
+        if detour_ratio >= 1.8 and saved_min < 24:
+            return None
 
     if has_ferry_leg and not has_rail_leg:
         route_code = "->".join(route_labels[:4]) if route_labels else "Vapur"
@@ -1971,12 +2118,50 @@ def _diversify_transit_options(transit_options: List[Dict], max_options: int = 8
 
     selected: List[Dict] = []
     seen = set()
+    route_usage: Dict[str, int] = {}
+    bus_route_repeat_cap = 2
 
     def _count_mode(opt: Dict, mode_name: str) -> int:
         return sum(
             1 for seg in (opt.get("segments") or [])
             if str(seg.get("mode") or "").lower() == mode_name
         )
+
+    def _option_bus_routes(opt: Dict) -> set[str]:
+        routes: set[str] = set()
+        for seg in (opt.get("segments") or []):
+            if str(seg.get("mode") or "").lower() != "bus":
+                continue
+            code = str(seg.get("route_code") or "").strip().upper()
+            if code:
+                routes.add(code)
+
+        # Segment bazli route_code yoksa route_code alanindan fallback topla.
+        if not routes:
+            raw_route_code = str(opt.get("route_code") or "").strip().upper()
+            if raw_route_code:
+                for part in re.split(r"->|\+|,|\s+", raw_route_code):
+                    part = part.strip().upper()
+                    if part and any(ch.isdigit() for ch in part):
+                        routes.add(part)
+
+        return routes
+
+    def _can_pick_under_route_cap(opt: Dict) -> bool:
+        routes = _option_bus_routes(opt)
+        if not routes:
+            return True
+        return all(route_usage.get(route_code, 0) < bus_route_repeat_cap for route_code in routes)
+
+    def _route_usage_score(opt: Dict) -> int:
+        routes = _option_bus_routes(opt)
+        if not routes:
+            return 0
+        return max(route_usage.get(route_code, 0) for route_code in routes)
+
+    def _register_route_usage(opt: Dict) -> None:
+        for route_code in _option_bus_routes(opt):
+            route_usage[route_code] = route_usage.get(route_code, 0) + 1
 
     def _metrobus_simplicity_score(opt: Dict) -> Tuple[int, int]:
         # Daha sade metrobus onerisi: az ferry + az rail katmani.
@@ -1987,6 +2172,21 @@ def _diversify_transit_options(transit_options: List[Dict], max_options: int = 8
         return penalty, rail_legs
 
     def _pick(candidates: List[Dict], reason: str) -> None:
+        # 1) Route cesitliligini koruyan secim.
+        for item in candidates:
+            sig = _transit_signature(item)
+            if sig in seen:
+                continue
+            if not _can_pick_under_route_cap(item):
+                continue
+            cloned = dict(item)
+            cloned["selection_reason"] = reason
+            selected.append(cloned)
+            seen.add(sig)
+            _register_route_usage(cloned)
+            return
+
+        # 2) Baska secenek yoksa cap'i gevset, bos liste yaratma.
         for item in candidates:
             sig = _transit_signature(item)
             if sig in seen:
@@ -1995,6 +2195,7 @@ def _diversify_transit_options(transit_options: List[Dict], max_options: int = 8
             cloned["selection_reason"] = reason
             selected.append(cloned)
             seen.add(sig)
+            _register_route_usage(cloned)
             return
 
     # En hizli
@@ -2051,7 +2252,33 @@ def _diversify_transit_options(transit_options: List[Dict], max_options: int = 8
     )
     _pick(by_walk, "low_walk")
 
-    for item in options:
+    remaining = sorted(
+        options,
+        key=lambda o: (
+            _route_usage_score(o),
+            _effective_time(o),
+            int(o.get("transfer_count", 0) or 0),
+            float(o.get("total_time_min", 10**9)),
+        ),
+    )
+
+    # Once ayni hatti tekrar tekrar basmadan doldur.
+    for item in remaining:
+        if len(selected) >= max_options:
+            break
+        sig = _transit_signature(item)
+        if sig in seen:
+            continue
+        if not _can_pick_under_route_cap(item):
+            continue
+        cloned = dict(item)
+        cloned["selection_reason"] = "alternative"
+        selected.append(cloned)
+        seen.add(sig)
+        _register_route_usage(cloned)
+
+    # Hala yer varsa, cap'i gevsetip alternatifleri tamamla.
+    for item in remaining:
         if len(selected) >= max_options:
             break
         sig = _transit_signature(item)
@@ -2061,6 +2288,7 @@ def _diversify_transit_options(transit_options: List[Dict], max_options: int = 8
         cloned["selection_reason"] = "alternative"
         selected.append(cloned)
         seen.add(sig)
+        _register_route_usage(cloned)
 
     return selected[:max_options]
 
@@ -2149,6 +2377,49 @@ def _option_user_modes(option: Dict) -> set:
     if transit_mode == "mixed":
         return {"bus", "metro"}
     return set()
+
+
+def _is_absurd_transit_option(
+    option: Dict,
+    *,
+    origin_lon: float,
+    dest_lon: float,
+    direct_walk_min: float,
+    direct_walk_m: float,
+) -> bool:
+    """
+    Bariz anlamsiz toplu tasima turlarini (uzun detour + zayif kazanc) eler.
+    """
+    total_time = float(option.get("total_time_min", 10**9) or 10**9)
+    total_distance = float(option.get("total_distance_m", 0) or 0)
+    transfer_count = int(option.get("transfer_count", 0) or 0)
+    if total_time <= 0 or total_distance <= 0:
+        return True
+
+    has_ferry = any(
+        str(seg.get("mode") or "").lower() == "ferry"
+        for seg in (option.get("segments") or [])
+    )
+    same_side = (
+        _bosphorus_side(float(origin_lon)) != 0
+        and _bosphorus_side(float(origin_lon)) == _bosphorus_side(float(dest_lon))
+    )
+    saved_min = float(direct_walk_min) - total_time
+    detour_ratio = total_distance / max(1.0, float(direct_walk_m))
+
+    # Kisa/orta mesafede asiri karmasik transfer turlari.
+    if direct_walk_min <= 120 and transfer_count >= 3 and detour_ratio >= 2.4 and saved_min < 28:
+        return True
+
+    # Ayni yakada vapurlu rota sadece ciddi fayda veriyorsa kalsin.
+    if has_ferry and same_side and detour_ratio >= 1.8 and saved_min < 24:
+        return True
+
+    # Vapur + coklu aktarma + neredeyse yurume suresine yakin rota.
+    if has_ferry and transfer_count >= 2 and total_time > (direct_walk_min * 0.78) and detour_ratio >= 2.0:
+        return True
+
+    return False
 
 
 def _find_one_transfer_candidates(origin_stop_code: int, dest_stop_code: int, limit: int = 30) -> List[Dict]:
@@ -2930,8 +3201,16 @@ def find_transit_routes(
 
     # Artan yaricaplarla dene
     transit_options = []
+    # En yakin 16 durak bazen dogru hatti kacirabiliyor (orta siradaki ama etkili bir durak gibi).
+    # Kisa/orta mesafede aday havuzunu bir miktar genisletiyoruz.
+    if direct_walk_m <= 12000:
+        stop_pair_scan_limit = 28
+    elif direct_walk_m <= 22000:
+        stop_pair_scan_limit = 24
+    else:
+        stop_pair_scan_limit = 20
 
-    for radius in SEARCH_RADII:
+    for radius_idx, radius in enumerate(SEARCH_RADII):
         # Baslangica yakin duraklar
         origin_stops = get_stops_in_area(origin_lat, origin_lon, radius)
         # Hedefe yakin duraklar
@@ -2943,11 +3222,11 @@ def find_transit_routes(
             continue
 
         # Her baslangic duragi icin
-        for o_stop in origin_stops[:16]:
+        for o_stop in origin_stops[:stop_pair_scan_limit]:
             if o_stop["distance_m"] > MAX_WALK_TO_STOP_M:
                 continue
 
-            for d_stop in dest_stops[:16]:
+            for d_stop in dest_stops[:stop_pair_scan_limit]:
                 if d_stop["distance_m"] > MAX_WALK_TO_STOP_M:
                     continue
 
@@ -2957,13 +3236,17 @@ def find_transit_routes(
                 for conn in connections:
                     walk_to_seg = _build_walk_leg(
                         origin_lat, origin_lon, float(o_stop["lat"]), float(o_stop["lon"]),
-                        max_distance_m=900,
-                        allow_fallback_if_short=False,
+                        max_distance_m=1400,
+                        allow_fallback_if_short=True,
+                        fallback_max_m=1200,
+                        max_ratio=6.0,
                     )
                     walk_from_seg = _build_walk_leg(
                         float(d_stop["lat"]), float(d_stop["lon"]), dest_lat, dest_lon,
-                        max_distance_m=1200,
-                        allow_fallback_if_short=False,
+                        max_distance_m=1700,
+                        allow_fallback_if_short=True,
+                        fallback_max_m=1300,
+                        max_ratio=6.0,
                     )
                     if not walk_to_seg or not walk_from_seg:
                         continue
@@ -3049,13 +3332,17 @@ def find_transit_routes(
 
                     walk_to_seg = _build_walk_leg(
                         origin_lat, origin_lon, float(o_stop["lat"]), float(o_stop["lon"]),
-                        max_distance_m=900,
-                        allow_fallback_if_short=False,
+                        max_distance_m=1400,
+                        allow_fallback_if_short=True,
+                        fallback_max_m=1200,
+                        max_ratio=6.0,
                     )
                     walk_from_seg = _build_walk_leg(
                         float(d_stop["lat"]), float(d_stop["lon"]), dest_lat, dest_lon,
-                        max_distance_m=1200,
-                        allow_fallback_if_short=False,
+                        max_distance_m=1700,
+                        allow_fallback_if_short=True,
+                        fallback_max_m=1300,
+                        max_ratio=6.0,
                     )
                     if not walk_to_seg or not walk_from_seg:
                         continue
@@ -3136,8 +3423,9 @@ def find_transit_routes(
                         ],
                     })
 
-        # Bir yaricap daha tarayip secenek cesidi biriktir.
-        if transit_options and len(transit_options) >= (max_results * 2):
+        # Ilk dar yaricapta erken cikis, 700-900m civarindaki duraklari kacirabiliyor.
+        # En az ikinci yaricapi da (>=1000m) tarayalim.
+        if transit_options and len(transit_options) >= (max_results * 2) and radius_idx >= 1:
             break
 
     unique_options = _diversify_transit_options(transit_options, max_options=max_results)
@@ -3349,6 +3637,16 @@ def find_transit_routes(
         user_modes = _option_user_modes(opt)
         # Kullanici secimi disindaki modlari iceren kombinasyonlari ele.
         if user_modes and not user_modes.issubset(allowed_user_modes):
+            continue
+        if _is_absurd_transit_option(
+            opt,
+            origin_lon=origin_lon,
+            dest_lon=dest_lon,
+            direct_walk_min=direct_walk_min,
+            direct_walk_m=direct_walk_m,
+        ):
+            continue
+        if _has_implausible_segment_jump(opt):
             continue
         transit.append(opt)
     merged = _diversify_transit_options(transit, max_options=8)
