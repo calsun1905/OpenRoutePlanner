@@ -13,10 +13,6 @@ const ISTANBUL_GEOFENCE_BBOX = {
     maxLon: 29.70,
 };
 const ISTANBUL_CENTER = [40.9903, 29.0291];
-const ISTANBUL_MAX_BOUNDS = L.latLngBounds(
-    [ISTANBUL_GEOFENCE_BBOX.minLat, ISTANBUL_GEOFENCE_BBOX.minLon],
-    [ISTANBUL_GEOFENCE_BBOX.maxLat, ISTANBUL_GEOFENCE_BBOX.maxLon]
-);
 
 // ========== STATE ==========
 let selectedPoints = [];
@@ -32,8 +28,6 @@ let currentNlpResult = null;
 // ========== MAP INIT ==========
 const map = L.map("map", {
     zoomControl: false,
-    maxBounds: ISTANBUL_MAX_BOUNDS,
-    maxBoundsViscosity: 1.0,
 }).setView(ISTANBUL_CENTER, 14); // Kadikoy merkez
 
 // Custom zoom control (sağ üste)
@@ -45,14 +39,8 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
 }).addTo(map);
 
-// Harita kapsamını Istanbul geofence ile kilitle.
-map.fitBounds(ISTANBUL_MAX_BOUNDS, { padding: [0, 0] });
-const istanbulMinZoom = map.getZoom();
-map.setMinZoom(istanbulMinZoom);
+// Harita gorunumu serbest: geofence sadece rota/nokta gecerliligi icin korunur.
 map.setView(ISTANBUL_CENTER, 14);
-map.on("drag", function () {
-    map.panInsideBounds(ISTANBUL_MAX_BOUNDS, { animate: false });
-});
 
 function isInIstanbulBounds(lat, lon) {
     return (
