@@ -248,6 +248,57 @@ def _cache_path(place_name: str) -> str:
     return os.path.join(DATA_DIR, f"{safe_name}.graphml")
 
 
+def _osm_values(value) -> set[str]:
+    """Normalize an OSM edge value that may be scalar or list-like."""
+    if value is None:
+        return set()
+    if isinstance(value, (list, tuple, set)):
+        return {str(item).strip().lower() for item in value if str(item).strip()}
+    return {str(value).strip().lower()}
+
+
+def _is_blocked_walk_edge(data: dict) -> bool:
+    """Return True for edges that should not be used by outdoor routes."""
+    tunnel_values = _osm_values(data.get("tunnel"))
+    if any("building_passage" in value for value in tunnel_values):
+        return True
+
+    indoor_values = _osm_values(data.get("indoor"))
+    if indoor_values and not indoor_values.issubset({"no", "false", "outdoor"}):
+        return True
+
+    highway_values = _osm_values(data.get("highway"))
+    if "corridor" in highway_values:
+        return True
+
+    access_values = _osm_values(data.get("access"))
+    return bool(access_values & {"no", "private", "customers"})
+
+
+def _filter_outdoor_walk_graph(G):
+    """
+    Remove indoor/private shortcuts while keeping public outdoor walkways.
+
+    OSMnx's walk network intentionally includes passages through buildings.
+    The product routes outdoor sightseeing trips, so those edges must not
+    participate in shortest-path or alternative-route calculations.
+    """
+    blocked_edges = [
+        (u, v, key)
+        for u, v, key, data in G.edges(keys=True, data=True)
+        if _is_blocked_walk_edge(data)
+    ]
+    if not blocked_edges:
+        return G
+
+    G.remove_edges_from(blocked_edges)
+    isolated_nodes = list(nx.isolates(G))
+    if isolated_nodes:
+        G.remove_nodes_from(isolated_nodes)
+    print(f"[GraphManager] Outdoor routing filtresi: {len(blocked_edges)} kapali/ozel kenar cikarildi")
+    return G
+
+
 def get_graph(place_name: str = "Kadikoy, Istanbul, Turkey"):
     """
     Belirtilen bÃ¶lgenin yÃ¼rÃ¼yÃ¼ÅŸ grafiÄŸini dÃ¶ner.
@@ -265,7 +316,7 @@ def get_graph(place_name: str = "Kadikoy, Istanbul, Turkey"):
         ox.save_graphml(G, cache_file)
         print(f"[GraphManager] Cache'e kaydedildi: {cache_file}")
 
-    return G
+    return _filter_outdoor_walk_graph(G)
 
 
 def get_graph_for_points(points: list):
@@ -320,7 +371,7 @@ def get_graph_for_points(points: list):
         ox.save_graphml(G, cache_file)
         print(f"[GraphManager] Cache'e kaydedildi: {cache_file}")
     
-    return G
+    return _filter_outdoor_walk_graph(G)
 
 
 def find_nearest_node(G, lat: float, lon: float) -> int:

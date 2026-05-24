@@ -1,0 +1,34 @@
+{
+  "seed": 42,
+  "sft": {
+    "raw": 421,
+    "clean": 354,
+    "train": 318,
+    "val": 17,
+    "test": 19,
+    "dropped_total": 71,
+    "dropped_reasons": {
+      "outside_allowed_scope": 42,
+      "assistant_not_longer_than_user": 2,
+      "assistant_no_terminal_punctuation": 27
+    }
+  },
+  "dpo": {
+    "raw": 210,
+    "clean": 151,
+    "train": 135,
+    "val": 7,
+    "test": 9,
+    "dropped_total": 73,
+    "dropped_reasons": {
+      "outside_allowed_scope": 31,
+      "dpo_chosen_not_longer": 7,
+      "dpo_chosen_no_terminal_punctuation": 30,
+      "dpo_chosen_prompt_ratio_too_low": 2,
+      "dpo_chosen_too_short": 1,
+      "dpo_chosen_not_longer_than_prompt": 2
+    }
+  },
+  "eval_prompts": 19,
+  "strict_mode": true
+}

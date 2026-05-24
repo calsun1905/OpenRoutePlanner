@@ -1,0 +1,160 @@
+{
+  "seed": 42,
+  "model": {
+    "base_model": "ytu-ce-cosmos/Turkish-Llama-8b-Instruct-v0.1",
+    "trust_remote_code": false
+  },
+  "paths": {
+    "sft_input_jsonl": "artifacts/finetune/input/sft_raw.jsonl",
+    "dpo_input_jsonl": "artifacts/finetune/input/dpo_raw.jsonl",
+    "prepared_data_dir": "artifacts/finetune/data",
+    "output_root": "artifacts/finetune/runs",
+    "sft_adapter_dir": "artifacts/finetune/runs/sft_adapter",
+    "merged_sft_model_dir": "artifacts/finetune/runs/merged_sft_model",
+    "dpo_adapter_dir": "artifacts/finetune/runs/dpo_adapter",
+    "merged_dpo_model_dir": "artifacts/finetune/runs/merged_dpo_model",
+    "eval_dir": "artifacts/finetune/eval"
+  },
+  "data": {
+    "split": {
+      "train_ratio": 0.9,
+      "val_ratio": 0.05,
+      "test_ratio": 0.05
+    },
+    "min_assistant_chars": 16,
+    "drop_toxic": true,
+    "toxic_keywords": [
+      "nefret soylemi",
+      "bombali saldiri",
+      "intihar yonlendirme"
+    ],
+    "strict": {
+      "enabled": true,
+      "require_exact_turn_structure": true,
+      "require_single_user_and_assistant": true,
+      "min_user_chars": 8,
+      "min_assistant_chars": 40,
+      "max_user_chars": 800,
+      "max_assistant_chars": 2000,
+      "dpo_min_prompt_chars": 8,
+      "dpo_min_chosen_chars": 40,
+      "dpo_min_rejected_chars": 8,
+      "dpo_max_prompt_chars": 800,
+      "dpo_max_chosen_chars": 2000,
+      "dpo_max_rejected_chars": 1200,
+      "require_terminal_punctuation": true,
+      "require_assistant_longer_than_user": true,
+      "assistant_to_user_len_ratio_min": 1.1,
+      "require_chosen_longer_than_rejected": true,
+      "require_chosen_longer_than_prompt": true,
+      "chosen_to_prompt_len_ratio_min": 1.2,
+      "reject_mojibake_patterns": true,
+      "reject_long_unspaced_runs": true,
+      "max_unspaced_run": 32,
+      "reject_repeated_char_runs": true,
+      "max_repeated_char_run": 4,
+      "required_any_keywords": [
+        "istanbul",
+        "tarihi",
+        "tarih",
+        "gezi",
+        "gez",
+        "rota",
+        "ulasim",
+        "ulaşım",
+        "metro",
+        "vapur",
+        "marmaray",
+        "tramvay",
+        "sultanahmet",
+        "topkapi",
+        "topkapı",
+        "ayasofya",
+        "dolmabahce",
+        "dolmabahçe",
+        "galata",
+        "eminonu",
+        "eminönü",
+        "uskudar",
+        "üsküdar",
+        "kadikoy",
+        "kadıköy",
+        "besiktas",
+        "beşiktaş",
+        "bogaz",
+        "boğaz"
+      ],
+      "forbidden_keywords": [],
+      "profanity_keywords": [
+        "amk",
+        "aq",
+        "orospu",
+        "siktir",
+        "pic",
+        "got",
+        "yarrak"
+      ]
+    }
+  },
+  "sft": {
+    "epochs": 3.0,
+    "learning_rate": 0.0002,
+    "lr_scheduler_type": "cosine",
+    "warmup_ratio": 0.03,
+    "weight_decay": 0.01,
+    "max_seq_len": 4096,
+    "per_device_train_batch_size": 1,
+    "per_device_eval_batch_size": 1,
+    "gradient_accumulation_steps": 32,
+    "logging_steps": 10,
+    "eval_steps": 100,
+    "save_steps": 100,
+    "save_total_limit": 2,
+    "load_best_model_at_end": true,
+    "metric_for_best_model": "eval_loss",
+    "greater_is_better": false
+  },
+  "qlora": {
+    "load_in_4bit": true,
+    "bnb_4bit_quant_type": "nf4",
+    "bnb_4bit_use_double_quant": true,
+    "bnb_4bit_compute_dtype": "bfloat16"
+  },
+  "lora": {
+    "r": 64,
+    "lora_alpha": 128,
+    "lora_dropout": 0.05,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "bias": "none",
+    "task_type": "CAUSAL_LM"
+  },
+  "dpo": {
+    "beta": 0.1,
+    "epochs": 2.0,
+    "learning_rate": 5e-06,
+    "lr_scheduler_type": "cosine",
+    "warmup_ratio": 0.03,
+    "weight_decay": 0.01,
+    "max_length": 4096,
+    "per_device_train_batch_size": 1,
+    "per_device_eval_batch_size": 1,
+    "gradient_accumulation_steps": 32,
+    "logging_steps": 10,
+    "eval_steps": 100,
+    "save_steps": 100,
+    "save_total_limit": 2,
+    "load_best_model_at_end": false
+  },
+  "quantize": {
+    "target": "Q4_K_M",
+    "notes": "Use llama.cpp convert_hf_to_gguf.py and llama-quantize after merged_dpo_model."
+  }
+}

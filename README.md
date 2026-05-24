@@ -152,6 +152,21 @@ pytest tests/test_api/
 pytest tests/test_core/
 ```
 
+## Fine-tune Pipeline (SFT -> DPO -> GGUF)
+
+For the high-quality Turkish LLM route (RAG later), use:
+
+- [scripts/finetune/README.md](scripts/finetune/README.md)
+
+This pipeline includes:
+
+1. dataset preparation and cleaning
+2. SFT with QLoRA
+3. DPO preference optimization
+4. adapter merges
+5. blind eval sheet generation
+6. GGUF Q4_K_M quantization runbook for LM Studio
+
 ## Yapılandırma
 
 `backend/route_config.py` dosyasından rota motoru parametrelerini ayarlayabilirsiniz:

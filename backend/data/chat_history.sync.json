@@ -141,80 +141,1296 @@
       "token_total": 1229
     },
     {
-      "content": "Deniz",
-      "created_at": "2026-03-28T15:02:56Z",
+      "content": "bugün nasılsın ?",
+      "created_at": "2026-05-23T10:15:58Z",
       "error_type": "",
-      "id": "09b1c2be-61f4-4e8a-97fb-4a707420073e",
+      "id": "7fda0aea-0779-4157-8359-4a2ded47356b",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "user",
+      "session_id": "29719b3c-f0da-4bf5-aec8-0b2dc21d39bc",
+      "token_total": 440
+    },
+    {
+      "content": "Bu bağlamda bugün nasılsın sorusuna bir yanıt vermek mümkün değil çünkü bağlam yalnızca ulaşım ve biletli mekanlar hakkındaki bilgileri içeriyor ve kişisel durum hakkında herhangi bir bilgi vermiyor.",
+      "created_at": "2026-05-23T10:15:58Z",
+      "error_type": "",
+      "id": "b11f4b23-1d26-42a7-aa30-578a06099476",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "assistant",
+      "session_id": "29719b3c-f0da-4bf5-aec8-0b2dc21d39bc",
+      "token_total": 440
+    },
+    {
+      "content": "M4 duraklarını listeler misin ?",
+      "created_at": "2026-05-23T10:16:14Z",
+      "error_type": "",
+      "id": "28f4ee6e-4921-4d37-8d16-5b609c699c74",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "user",
+      "session_id": "29719b3c-f0da-4bf5-aec8-0b2dc21d39bc",
+      "token_total": 786
+    },
+    {
+      "content": "M4 hatının durakları sırasıyla Kadıköy, Ayrılık Çeşmesi, Acıbadem, Ünalan, Göztepe, Yenisahra, Pegasus-Kozyatağı, Bostancı ve Küçükyalıdır.",
+      "created_at": "2026-05-23T10:16:14Z",
+      "error_type": "",
+      "id": "d999098a-efa4-4800-affe-4cec2ca09378",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "assistant",
+      "session_id": "29719b3c-f0da-4bf5-aec8-0b2dc21d39bc",
+      "token_total": 786
+    },
+    {
+      "content": "Kisaca merhaba de.",
+      "created_at": "2026-05-17T09:36:01Z",
+      "error_type": "",
+      "id": "530030b0-ddea-4b3a-81f7-399b68c36186",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "43527647-c5d5-4eff-91ae-3e57cb88601b",
+      "token_total": 63
+    },
+    {
+      "content": "Merhaba! Beni kullanan ilk kişi sen oluyorsun. Seninle tanışmaktan mutluyum! Ne tür bir yardıma ihtiyacın var? Konuşmak ister misin?",
+      "created_at": "2026-05-17T09:36:01Z",
+      "error_type": "",
+      "id": "b0f65790-7923-4356-9cd6-aa06ff8d113f",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "43527647-c5d5-4eff-91ae-3e57cb88601b",
+      "token_total": 63
+    },
+    {
+      "content": "kılıç alayı osmanlıda ne demektir ?",
+      "created_at": "2026-05-17T09:51:21Z",
+      "error_type": "",
+      "id": "3b369277-00ec-4140-bf86-6d5a504e058d",
+      "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
+      "role": "user",
+      "session_id": "50598feb-8bce-41db-9089-d1170852ce7b",
+      "token_total": 406
+    },
+    {
+      "content": "Osmanlı ordusunda “kılıç alayı”, bir birimin (alayın) tertiplenmiş bir grup olarak sword (kılıç) kullanıyan askerleri ifade eder. Yani, kılıçla donanımlı bir regiment/alay ya da kılıç gösterisi yapılan bir törenالحضورıdır. Anlamı “kılıçlı alay” veya “kılıçli birim”.",
+      "created_at": "2026-05-17T09:51:21Z",
+      "error_type": "",
+      "id": "80e63067-0541-4942-8588-485e342510a7",
+      "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
+      "role": "assistant",
+      "session_id": "50598feb-8bce-41db-9089-d1170852ce7b",
+      "token_total": 406
+    },
+    {
+      "content": "Osmanlı ordusunda \"Kılıç Alayı\", bir tür askeri gösteri veya törendir. Bu tören, Osmanlı Padişahının veya üst düzey bir devlet memurunun katıldığı ve kılıç taşıyan askerlerin düzenlenerek yapılan geçit törenidir. Kılıç Alayı genellikle yeni bir padişaha taç giyme töreni ya da önemli bir diplomatik ziyaretle eşleşiyordu.\n\nKılıç Alayı töreninde, seçkin askerler tertip edilir ve kılıçlarını göstermek için ritmik bir şekilde hareket ederlerdi. Bu gösterinin amacı, Osmanlı İmparatorluğu'nun gücünü, askeri hazırlığını ve disiplinini göstermekti. Tören aynı zamanda padişahın veya devlet memurunun şerefini ve statüsünü de vurguluyordu.\n\nKılıç Alayı törenleri, Osmanlı tarihinin çeşitli dönemlerinde farklı şekillerde uygulanmıştır ve bu uygulama 19. yüzyılın sonlarına kadar devam etmiştir. Bu gösteriler genellikle sarayların avlularında veya diğer önemli mekanlarda gerçekleştiriliyordu.",
+      "created_at": "2026-05-17T09:51:33Z",
+      "error_type": "",
+      "id": "90accc3a-3ea7-4cfe-8d73-af3085b3ba28",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "50598feb-8bce-41db-9089-d1170852ce7b",
+      "token_total": 382
+    },
+    {
+      "content": "kılıç alayı osmanlıda ne demektir ?",
+      "created_at": "2026-05-17T09:51:33Z",
+      "error_type": "",
+      "id": "f380c2ef-5e90-47e4-a595-d87827c0bf0a",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "50598feb-8bce-41db-9089-d1170852ce7b",
+      "token_total": 382
+    },
+    {
+      "content": "**Kılıç Alayı Osmanlı'da Ne Demek?**\n\n\"Kılıç Alayı\", Osmanlı ordusunda bir birimin (alayın) tertiplenmiş bir grup olarak kılıç taşıyan askerleri ifade eden bir terimdir. Kılıç Alayı töreni, Osmanlı Padişahının veya üst düzey bir devlet memurunun katıldığı ve kılıç taşıyan askerlerin düzenlenerek yapılan geçit törenidir.\n\n**İstanbul Sağlık ve Teknoloji Üniversitesi Nedir?**\n\nİstanbul Sağlık ve Teknoloji Üniversitesi (İSTÜ), 2007 yılında kurulan bir Türk üniversitesidir. Üniversite, İstanbul'da bulunmaktadır ve sağlığı ve teknolojiyi birleştirme temelinde eğitim ve araştırma sağlar. İSTÜ, tıp fakültesinin yanı sıra sağlık yönetimi, biyoteknoloji ve moleküler biyoloji gibi alanlarda da çeşitli programlar sunmaktadır.\n\nİSTÜ'nin misyonu, \"Sağlık bilimi ve teknolojisine dayalı yüksek kalitede eğitim ve araştırma sağlamak\" ve bu alanlardaki profesyonelleri yetiştirmektir. Üniversite, hem ulusal hem de uluslararası düzeyde tanınan ve saygı duyulan bir kurumdur.\n\nİSTÜ'nün ana kampüsü İstanbul'un Beykoz ilçesinde yer alırken, üniversite aynı zamanda çeşitli sağlık merkezleri ve hastanelerine sahiptir. Bu merkezler arasında Ankara Hastanesi, İstanbul Hastanesi ve Beykoz Hastanesi bulunmaktadır.",
+      "created_at": "2026-05-17T09:52:00Z",
+      "error_type": "",
+      "id": "1b1ca57b-bcd5-424d-9e4c-fa7a120dd473",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "50598feb-8bce-41db-9089-d1170852ce7b",
+      "token_total": 707
+    },
+    {
+      "content": "istanbul sağlık ve teknoloji üniversitesi nedir",
+      "created_at": "2026-05-17T09:52:00Z",
+      "error_type": "",
+      "id": "e922b196-4a61-4e08-90eb-2c9fa53cd4d1",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "50598feb-8bce-41db-9089-d1170852ce7b",
+      "token_total": 707
+    },
+    {
+      "content": "istanbul sağlık ve teknoloji üniversitesi nedir",
+      "created_at": "2026-05-17T09:52:15Z",
+      "error_type": "",
+      "id": "598f4218-a25b-4f6c-b62f-096629b1af03",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "token_total": 322
+    },
+    {
+      "content": "İstanbul Sağlık ve Teknoloji Üniversitesi (İSTÜ), Türkiye'de 2006 yılında kurulmuş bir devlet üniversitesidir. Üniversite, tıp fakültesinin yanı sıra mühendislik, eğitim bilimleri ve tıbbi bilimler gibi alanlarda da programlar sunmaktadır.\n\nİSTÜ'nün misyonu, araştırma ve yenilikleri temel alarak öğrencilere yüksek kalitede eğitim vermek ve onları topluma fayda sağlayacak şekilde hazırlamaktır. Üniversite, çeşitli alanlardaki ihtiyaçları karşılamak için çok disiplinli bir yaklaşımla çalışmaktadır.\n\nİSTÜ'nün tıp fakültesi, öğrencilere temel ve uzmanlık tıbbının yanı sıra klinik uygulamaları da sağlamaya odaklanmıştır. Üniversite ayrıca biyomedikal mühendisliği, bilgisayar mühendisliği ve elektrik-elektronik mühendisliği gibi alanlarda da programlar sunmaktadır.\n\nİSTÜ'nün güçlü yönlerinden biri de araştırma ve yenilik alanıdır. Üniversite, çeşitli alanlardaki projelere sponsorluk yaparken aynı zamanda öğrencilere de araştırma fırsatları sunmaktadır.\n\nGenel olarak İSTÜ, tıp ve teknoloji alanında yetenekli profesyonelleri eğitmek için bir platform görevi görüyor ve bu alanda önemli katkılarda bulunmaya devam ediyor.",
+      "created_at": "2026-05-17T09:52:15Z",
+      "error_type": "",
+      "id": "c28f4570-5d81-47d4-88ce-93a0563e1d33",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "token_total": 322
+    },
+    {
+      "content": "İSTÜN nedir ?",
+      "created_at": "2026-05-17T09:52:33Z",
+      "error_type": "",
+      "id": "cbdaf155-a6f4-46f2-bcf1-262026bc87c2",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "token_total": 444
+    },
+    {
+      "content": "İSTÜN, İstanbul Sağlık ve Teknoloji Üniversitesinin kısaltmasıdır. Üniversite, 2006 yılında kurulmuş ve tıp fakültesinin yanı sıra mühendislik, eğitim bilimleri ve tıbbi bilimler gibi alanlarda da programlar sunmaktadır.\n\nİSTÜN aynı zamanda İSTÜ'nün kısaltması olarak da bilinir; bu durumdan önce geçmiştir. Her iki terim de aynı üniversiteyi ifade eder ancak İSTÜN daha yaygın olarak kullanılır.",
+      "created_at": "2026-05-17T09:52:33Z",
+      "error_type": "",
+      "id": "ccfb8670-efd2-4068-89ca-98710fe63e29",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "token_total": 444
+    },
+    {
+      "content": "2+2",
+      "created_at": "2026-05-17T09:52:41Z",
+      "error_type": "",
+      "id": "f53194cb-88c5-45ba-b510-197d3b8d323f",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "token_total": 458
+    },
+    {
+      "content": "4",
+      "created_at": "2026-05-17T09:52:41Z",
+      "error_type": "",
+      "id": "f8082bb7-3254-4143-bf34-272f98694500",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "token_total": 458
+    },
+    {
+      "content": "NLP nedir",
+      "created_at": "2026-05-17T09:52:53Z",
+      "error_type": "",
+      "id": "5aba67cb-f181-4e68-8dbf-33e9ccdbe51f",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "token_total": 982
+    },
+    {
+      "content": "NLP (Natural Language Processing), insan dilini ve onunla ilgili bilgileri işlemek için kullanılan bir alandır. NLP, makine öğrenimi ve yapay zeka alanındaki bir alt disiplin olarak kabul edilir.\n\nNLP'nin temel amacı, doğal dil iletişiminde bulunan karmaşıklığı anlamak ve yönetmek için algoritmalar geliştirmektir. Bu görevi yerine getirerek NLP, bilgisayarların insan dilini anlayabilmesine ve yorumlayabilmesine olanak tanıyarak çeşitli uygulamalarda kullanılabilecek özellikler ekler.\n\nNLP'nin bazı örnekleri:\n\n1. Doğal Dil Anlamına Göre Makine Çevirisi (Machine Translation): Bir makinenin bir dilden diğer dile çevrilmesini sağlar.\n2. Konuşma Tanıma: Sesli komutları veya konuşmayı algılar ve işleyebilir.\n3. Duygu Analizi: Bir metnin veya konuşmanın içinde bulunan duygusal tonu tanımlar.\n4. Metin Sınıflandırması: Belirli bir kategoriye göre metni sınıflandırmak için kullanılır.\n5. Otomatik Özetleme: Uzun metinleri daha kısa ve özetlenmiş biçime dönüştürmek için kullanılır.\n\nNLP'nin uygulamaları çok çeşitli olup, aşağıdaki alanlarda görülebilir:\n\n1. Chatbot'lar: Kullanıcı sorularını ve taleplerini algılayıp yanıtlamak için kullanırlar.\n2. Sesli Asistanlar: Sesli komutları alır ve işleyebilir.\n3. Arama Motoru Optimizasyonu (SEO): Web sitelerini arama motorlarında daha üst sıralara taşımak için kullanılır.\n4. Makine Çevirisi: Dokümanları veya web sayfalarını bir dilden diğer dile çevirmek için kullanılır.\n5. Yapay Zeka: NLP, yapay zekayı geliştirmeye yardımcı olan temel bir bileşen olarak kabul edilir.\n\nNLP'nin potansiyel faydaları şunlardır:\n\n1. Daha iyi müşteri hizmetleri ve destek.\n2. Daha verimli iş akışları ve operasyonlar.\n3. Daha etkili pazarlama ve reklam kampanyaları.\n4. Daha iyi sağlık ve tıbbi sonuçlar.\n5. Daha iyi eğitim ve öğrenme deneyimi.\n\nAncak NLP aynı zamanda bazı etik ve sosyal kaygıları da beraberinde",
+      "created_at": "2026-05-17T09:52:53Z",
+      "error_type": "",
+      "id": "c0fb3577-505c-414c-8249-e78c41a9b916",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "token_total": 982
+    },
+    {
+      "content": "İstanbul'un güzelliğini takdir etmek zor değil! Bu muhteşem şehrin zengin tarihi ve kültürü nedeniyle çok sayıda muhteşem ve büyülü yer var. Şehrin farklı bölgelerinden beş tarihî yapı seçtim ve bu başyapıtları hakkında kısa bir hikaye anlatıyorum:\n\n1. Ayasofya (Hagia Sophia):\nAyasofya, İstanbul'un en ikonik simgelerinden biri ve eski dünyanın en büyük katedralidir. 537 yılında Bizans İmparatoru Justinianus tarafından yaptırılmış ve daha sonra cami olarak kullanılmıştır. Bu yapıyı inşa etmek için 10000'den fazla işçi görevlendirildi ve 60 tonluk bir kaplama ve 30 bin parça cam ile süslandı.\n\n2. Topkapı Sarayı:\nTopkapı Sarayı, Osmanlı İmparatorluğu'nun kalbi olan ve 400 yıldan fazla süren idari merkezidir. Bu muhteşem yapı 1460'ta Fatih Sultan Mehmed tarafından inşa edildi ve daha sonra birçok sultan tarafından genişletildi. Sarayda 4000'den fazla oda ve mahkeme bulunmaktadır.\n\n3. Süleymaniye Camii:\nSüleymaniye Camii, İstanbul'un en güzel camilerinden biridir ve Mimar Sinan tarafından tasarlanmıştır. Bu muhteşem yapıyı inşa etmek için 11 yıl sürmüş ve 1557'de tamamlanmıştır. Caminin iç kısmı kubbelere sahip olup, 20 tonluk bir şap ve 60 bin parça cam ile süslenmiştir.\n\n4. Yerebatan Sarnıcı:\nYerebatan Sarnıcı, Bizans İmparatoru I. Justinianus tarafından yaptırılan ve 6. yüzyılın sonlarına kadar kullanılmış olan büyük bir su deposudur. Bu yapıyı inşa etmek için 10000'den fazla işçi görevlendirildi ve 64 tonluk bir kaplama ile süslenmiştir.\n\n5. Dolmabahçe Sarayı:\nDolmabahçe Sarayı, İstanbul'un en büyük ve en güzel saraylarından biridir. Bu muhteşem yapıyı inşa etmek için 16 yıl sürmüş ve 1853'te tamamlanmıştır. Sarayın 285 odası ve 46 kapısı bulunmaktadır.\n\nBu beş tarihî yapı, İstanbul'un güz",
+      "created_at": "2026-05-17T09:53:07Z",
+      "error_type": "",
+      "id": "2dac2e85-ebbe-4e1e-9d09-7e6f212d0252",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "token_total": 1513
+    },
+    {
+      "content": "istanbuldaki sana göre en güzel 5 tarihi yapıyı anlat",
+      "created_at": "2026-05-17T09:53:07Z",
+      "error_type": "",
+      "id": "5f30fecd-9a82-494d-8f01-e29771942a2a",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "token_total": 1513
+    },
+    {
+      "content": "naber",
+      "created_at": "2026-05-16T22:31:14Z",
+      "error_type": "",
+      "id": "4ef39cfc-3623-493e-b97a-e80aa25f8b41",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "user",
+      "session_id": "5cf59384-d2e4-4338-8b4f-fc33b93cc7a1",
+      "token_total": null
+    },
+    {
+      "content": "Merhaba!Nasılgidiyor?ð",
+      "created_at": "2026-05-16T22:31:14Z",
+      "error_type": "",
+      "id": "98355a9d-5509-401c-84cf-72fa5da6e846",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "assistant",
+      "session_id": "5cf59384-d2e4-4338-8b4f-fc33b93cc7a1",
+      "token_total": null
+    },
+    {
+      "content": "rezil",
+      "created_at": "2026-05-16T22:31:20Z",
+      "error_type": "",
+      "id": "2c6e0fa2-c8a0-4cdc-95bb-a052b6437340",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "user",
+      "session_id": "5cf59384-d2e4-4338-8b4f-fc33b93cc7a1",
+      "token_total": null
+    },
+    {
+      "content": "\"Rezil\",birkişininveyaşeyinitibarını,saygınlığınıvedeğerinikaybetmesiyleoluşanolumsuzbirdurumdur.Budurumgenellikleyanlışdavranışlar,kötüniyetlieylemlerveyatoplumsalnormlaraaykırıhareketlersonucuortayaçıkar.Rezilolmak,bireyinsosyalçevresindedışlanmasına,alaykonusuolmasınaveitibarınınzedelenmesineyolaçabilir.Örneğin:\"Oyuncuyuhaksızyerekovduklarıiçintakımrezilolmuştu.\"cümlesinde,oyuncununhaksızyerekovulmasınedeniyletakımınitibarızedelenmiş,saygınlığıazalmışvetoplumsalolarakdışlanmıştır.",
+      "created_at": "2026-05-16T22:31:20Z",
+      "error_type": "",
+      "id": "c9a697be-f0b7-439b-8793-50ec34a4bbe1",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "assistant",
+      "session_id": "5cf59384-d2e4-4338-8b4f-fc33b93cc7a1",
+      "token_total": null
+    },
+    {
+      "content": "Lütfenbanadahafazlabilgiverinkisizeyardımcıolayım.\"Dasdas\"neanlamageliyor?Banabirkonuhakkındasorusorabilirveyayapmakistediğinizbirşeyisöyleyebilirsiniz.ð",
+      "created_at": "2026-05-16T22:31:31Z",
+      "error_type": "",
+      "id": "81c71f10-3a49-41ee-be7a-479544c9352a",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "assistant",
+      "session_id": "5cf59384-d2e4-4338-8b4f-fc33b93cc7a1",
+      "token_total": null
+    },
+    {
+      "content": "dasdas",
+      "created_at": "2026-05-16T22:31:31Z",
+      "error_type": "",
+      "id": "d474c873-9bb1-4674-808e-c8ddfea0229e",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "user",
+      "session_id": "5cf59384-d2e4-4338-8b4f-fc33b93cc7a1",
+      "token_total": null
+    },
+    {
+      "content": "asdasdas",
+      "created_at": "2026-05-16T22:32:18Z",
+      "error_type": "",
+      "id": "aa067e46-3937-43ec-a469-2b94a5de8e34",
+      "model": "wiroai-turkish-llm-9b:2",
+      "role": "user",
+      "session_id": "5cf59384-d2e4-4338-8b4f-fc33b93cc7a1",
+      "token_total": null
+    },
+    {
+      "content": "Herikiifadededeyazınız\"dasdas\",yazıkarakterlerininrastgelebirörüntüsügibigörünüyorveanlamveyabağlamtaşıyanbelirlibirkelimedeğil.Budurumdadahafazlabilgiolmadanherhangibircevabınsunulmasızorolacaktır.Lütfenbanaaçıklayıcıayrıntılarverin,böylecesizeyardımcıolabilirim!",
+      "created_at": "2026-05-16T22:32:18Z",
+      "error_type": "",
+      "id": "c66ac39f-1361-433d-91eb-50b3cadd68b1",
+      "model": "wiroai-turkish-llm-9b:2",
+      "role": "assistant",
+      "session_id": "5cf59384-d2e4-4338-8b4f-fc33b93cc7a1",
+      "token_total": null
+    },
+    {
+      "content": "m4 metrosunda hangi duraklar var",
+      "created_at": "2026-05-17T16:22:02Z",
+      "error_type": "",
+      "id": "a791bd65-4f53-44d6-8b48-0d1cfd085fad",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "user",
+      "session_id": "619cf409-018f-4690-be83-0381a6d3b57a",
+      "token_total": 836
+    },
+    {
+      "content": "M4 metrosunda aşağıdaki duraklar vardır:\n\n1. Kadıköy\n2. Ayrılık Çeşmesi\n3. Acıbadem\n4. Ünalan\n5. Göztepe\n6. Yenisahra\n7. Pegasus-Kozyatağı\n8. Bostancı\n9. Küçükyalı\n10. Maltepe\n11. Huzurevi\n12. Gülsuyu\n13. Esenkent\n14. Hastane-Adliye\n15. Soğanlık\n16. Kartal\n17. Yakacık-Adnan Kahveci\n18. Pendik\n19. Tavşantepe\n20. Fevzi Çakmak-Hastane\n21. Yayalar-Şeyhli\n22. Kurtköy\n23. Sabiha Gökçen Havalimanı",
+      "created_at": "2026-05-17T16:22:02Z",
+      "error_type": "",
+      "id": "b1b5ef3c-777f-4299-8a2d-6fe3c0429303",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "assistant",
+      "session_id": "619cf409-018f-4690-be83-0381a6d3b57a",
+      "token_total": 836
+    },
+    {
+      "content": "İyiyim, teşekkür ederim. Sen nasılsın?",
+      "created_at": "2026-03-25T11:15:08Z",
+      "error_type": "",
+      "id": "47200846-5857-4dca-8bb4-a5dbadf74cd7",
       "model": "gemini-2.5-flash",
       "role": "assistant",
-      "session_id": "7e5ace5d-88c7-4236-920d-36842df2bde3",
-      "token_total": 134
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 90
     },
     {
-      "content": "sea",
-      "created_at": "2026-03-28T15:02:56Z",
+      "content": "NABER",
+      "created_at": "2026-03-25T11:15:08Z",
       "error_type": "",
-      "id": "d5a51f98-814e-487e-83d9-7bcba6691d0d",
+      "id": "7d30d1d9-bfe1-4e6d-bfa4-94b3db1eab1d",
       "model": "gemini-2.5-flash",
       "role": "user",
-      "session_id": "7e5ace5d-88c7-4236-920d-36842df2bde3",
-      "token_total": 134
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 90
     },
     {
-      "content": "sea",
-      "created_at": "2026-03-28T15:02:28Z",
+      "content": "Evet, \"Naber İstanbul\" adlı bir YouTube kanalını biliyorum. İstanbul'da sokak röportajları yapan bir kanal.",
+      "created_at": "2026-03-25T11:15:28Z",
       "error_type": "",
-      "id": "432b218f-9965-48d2-85c1-bf94ffcd6745",
+      "id": "5ea46050-9515-4ca4-b079-ab97bc4f8256",
+      "model": "gemini-2.5-flash",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 130
+    },
+    {
+      "content": "İSTANBULU BİLİYOR MUSUN",
+      "created_at": "2026-03-25T11:15:28Z",
+      "error_type": "",
+      "id": "88f82d88-b3b3-4099-86d2-e74e884e1593",
+      "model": "gemini-2.5-flash",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 130
+    },
+    {
+      "content": "[Hata] Gemini hatasi (404):",
+      "created_at": "2026-03-25T11:15:58Z",
+      "error_type": "other",
+      "id": "ae7ca2ee-821b-42c3-9ad3-82bb31f6ccf9",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "naber",
+      "created_at": "2026-03-25T11:15:58Z",
+      "error_type": "",
+      "id": "e570a218-636f-4513-90d5-8f77b8b699f3",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "naber",
+      "created_at": "2026-03-25T11:16:09Z",
+      "error_type": "",
+      "id": "e197f8c1-7dc7-4ae1-bb0c-b5bfecb5cd68",
       "model": "arcee-ai/trinity-mini-20251201:free",
       "role": "user",
-      "session_id": "b83e6a97-eb60-4166-b00b-03ea35b5af75",
-      "token_total": 525
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 485
     },
     {
-      "content": "Turkiye'nin kuzeyinde bulunan Ege Denizi, Yunanistan ile sınırındadır.",
-      "created_at": "2026-03-28T15:02:28Z",
+      "content": "Evet, \"naber\"demek. Nasılsın?",
+      "created_at": "2026-03-25T11:16:09Z",
       "error_type": "",
-      "id": "867abe4f-75ac-484f-a932-abf3c50fdd96",
+      "id": "fd86f499-0e77-444f-b6ed-94b28147a20e",
       "model": "arcee-ai/trinity-mini-20251201:free",
       "role": "assistant",
-      "session_id": "b83e6a97-eb60-4166-b00b-03ea35b5af75",
-      "token_total": 525
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 485
+    },
+    {
+      "content": "Selam! Nasılsın?",
+      "created_at": "2026-03-25T11:16:19Z",
+      "error_type": "",
+      "id": "575d1d3b-f905-4791-a599-95b3528daf7e",
+      "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 300
+    },
+    {
+      "content": "selam",
+      "created_at": "2026-03-25T11:16:19Z",
+      "error_type": "",
+      "id": "e4580a80-9637-4e60-a26d-40072f56c37e",
+      "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 300
+    },
+    {
+      "content": "Testtamam!ð",
+      "created_at": "2026-03-25T11:17:03Z",
+      "error_type": "",
+      "id": "edde94b0-8c43-48ce-ade1-e766cc7dbe62",
+      "model": "z-ai/glm-4.5-air:free",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 528
+    },
+    {
+      "content": "test",
+      "created_at": "2026-03-25T11:17:03Z",
+      "error_type": "",
+      "id": "fb285373-74b6-47f8-8272-52025264de84",
+      "model": "z-ai/glm-4.5-air:free",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 528
+    },
+    {
+      "content": "what are you doing",
+      "created_at": "2026-03-25T11:17:35Z",
+      "error_type": "",
+      "id": "5948a259-6ef0-4664-a18e-6fce13e3edfb",
+      "model": "z-ai/glm-4.5-air:free",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 506
+    },
+    {
+      "content": "I'mcurrentlyrespondingtoyourmessage!Howaboutyou?",
+      "created_at": "2026-03-25T11:17:35Z",
+      "error_type": "",
+      "id": "faa223ae-7756-457e-9182-afc2c6dc544e",
+      "model": "z-ai/glm-4.5-air:free",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": 506
+    },
+    {
+      "content": "Merhaba,nasılsın?",
+      "created_at": "2026-05-16T22:28:08Z",
+      "error_type": "",
+      "id": "289c2c00-28d0-44e3-bfe1-f79bfae85bf0",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "selam",
+      "created_at": "2026-05-16T22:28:08Z",
+      "error_type": "",
+      "id": "c1849a53-a386-45a4-9162-6992fa9f8cc2",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "iyiyim sen",
+      "created_at": "2026-05-16T22:28:13Z",
+      "error_type": "",
+      "id": "a01c3c8a-bb5b-487b-a100-1cbedf062f23",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "Selam,nasılsıncanım?Herşeyyolundamıgidiyor?ð",
+      "created_at": "2026-05-16T22:28:13Z",
+      "error_type": "",
+      "id": "e284e493-0864-47c0-9b07-5ea11cb6e2d5",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "Bu\"Evet\"kelimesinenekadarminnettarolduğumuzainanamadığımızısöylemekisteriz.Evet,doğruduydukmuzuhayaledin-buçoközeldir!Herzamanolumlubirşekildekullanırızveharikaşeyleryapmamızayardımcıolur.İşteneden:1.Bazeninsanlar\"evet\"demekzorundakalırçünküfarklıfikirlerivardırvebunuyaparakbirbirlerininhissettiğigibihissetmezler.Amayinede,evetdeyipdiğerinsanınyanındaolduklarınıgösterirler-buharikabirşeydir!2.Birininbanabirşeyleristediğinihayaledin,örneğinoyuncakayıoynamakveyaatıştırmalıkalmakistiyorlarsave\"evet\"demekzorundakalırlarsabudaarkadaşlarıylapaylaşabileceklerianlamınagelir.Buçoknazikveadilcedeğilmi?3.Bazenyetişkinlerönemliişleryaparlar,örneğinyenioyunalanlarıyapmakveyasağlıklıyemekpişirmekgibişeyler.Vebazen\"evet\"demişolsalardabaşkabirininfikrinidinlemekiçindurupduramıyorlarsabunukabulederveofikirdenhoşlanmıyorsaonureddederler.Buharikaçünküyetişkinlerinherzamanakıllıcaseçimlerdebulunmalarınayardımcıolur!Dolayısıyla\"evet\",herkesledahaiyiarkadaşolmamıza,paylaşmavebirlikteoynamamızayardımcıolduğumuziçingerçektenbüyükbirkelimedir.",
+      "created_at": "2026-05-16T22:28:20Z",
+      "error_type": "",
+      "id": "2cfe08a7-603f-4758-a244-166fecf5a54e",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "evet",
+      "created_at": "2026-05-16T22:28:20Z",
+      "error_type": "",
+      "id": "e4d885fb-f693-412f-b4b7-28db4965b289",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "selam",
+      "created_at": "2026-05-16T22:30:41Z",
+      "error_type": "",
+      "id": "a13deac4-347a-4856-ab23-1201fc115071",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "Merhaba!Nasılsın?Bukelimelerneanlamageliyor?Banabirazdahabilgiverebilirmisin?ð",
+      "created_at": "2026-05-16T22:30:41Z",
+      "error_type": "",
+      "id": "aeaf7b25-37d4-4433-b61d-b511759740a0",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "\"Adalsdas\"kelimesianlamlıbirkelimedeğil.Bu,rastgeleyazılmışharflerdenoluşanbirkombinasyongibigörünüyor.Ancak,\"adalsdas\"ileilgiliolarakbazıolasılıklarşunlardır:***Rastgeleyazı:**Bukelimeyisadeceeğlenceamaçlıveyarastgeleyazmışolabilirsiniz.***Yazımhatası:**Birbaşkakelimeninyanlışyazılmışhaliolabilir.Örneğin,\"adalet\",\"adalsızlık\"gibikelimelerikastediyorsanızbuolasıbirdurumdur.***Kendidilinizdekullanılanbirkelime:**Belkidekendidillerindeözelbiranlamtaşıyanbirkelimedir.Budurumdalütfenhangidilikullandığınızıbelirtin,sizedahadetaylıbilgiverebilirim.Lütfen\"adalsdas\"kelimesininneanlamageldiğiniveyanedenyazdığınızıbanasöyleyin,böylecesizedahaiyiyardımcıolabilirim.",
+      "created_at": "2026-05-16T22:30:49Z",
+      "error_type": "",
+      "id": "ce50c649-f382-46ee-8612-01cde00c15d6",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "adalsdas",
+      "created_at": "2026-05-16T22:30:49Z",
+      "error_type": "",
+      "id": "ec1fbe2b-bccf-4671-b37a-a3f3ca942ac7",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "Merhaba!Nasılhissetmek?Bukelimelerneanlamageliyor?Banabirazdahabilgiverebilirmisin?ð\"Adalsdas\"kelimesianlamlıbirkelimedeğil.Bu,rastgeleyazılmışharflerdenoluşanbirkombinasyongibigörünüyor.Ancak,\"adalsdas\"ileilgiliolarakbazıolasılıklarşunlardır:***Rastgeleyazı:**Bukelimeyisadeceeğlenceamaçlıveyarastgeleyazmışolabilirsiniz.***Yazımhatası:**Birbaşkakelimeninyanlışyazılmışhaliolabilir.Örneğin,\"adalet\",\"adalsızlık\"gibikelimelerikastediyorsanızbuolasıbirdurumdur.***Kendidilinizdekullanılanbirkelime:**Belkidekendidillerindeözelbiranlamtaşıyanbirkelimedir.Budurumdalütfenhangidilikullandığınızıbelirtin,sizedahadetaylıbilgiverebilirim.Lütfen\"adalsdas\"kelimesininneanlamageldiğiniveyanedenyazdığınızıbanasöyleyin,böylecesizedahaiyiyardımcıolabilirim.",
+      "created_at": "2026-05-16T22:31:08Z",
+      "error_type": "",
+      "id": "7984561c-1b7d-4231-b95a-4a92746d43fc",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "assistant",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "naber",
+      "created_at": "2026-05-16T22:31:08Z",
+      "error_type": "",
+      "id": "d2e2fd5d-71d8-45b5-a44c-6d028e128d99",
+      "model": "wiroai-turkish-llm-9b",
+      "role": "user",
+      "session_id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "token_total": null
+    },
+    {
+      "content": "1 Günlük Tarihî Rota: Eminönü'den Beyazıt'a (veya Çemberlitaş veya Kapalıçarşı)\n\n* 10:00 – Eminönü Meydanı (başlangıç)\n\t+ Toplu taşıma: Eminönü Tramvayı T1 hattına binin\n* 10:30 - Sirkeci Tramvayı durağı\n\t+ Yürüyüş: Mısır Çarşısı ve Yeni Camii çevresine yürüyün (yaklaşık 15 dakikalık yürüyüş)\n* 11:00 – Nuruosmaniye Camisi (kısaca durun)\n\t+ Yürüyüş: Kapalıçarşı yönüne doğru devam edin\n* 12:30 - Kapalıçarşı ve Beyazıt Meydanı (bitiş)\n\t+ Toplu taşıma: Beyazıt Tramvayı T1 hattına binin (veya Çemberlitaş veya Kapalıçarşı çevresindeki T1 duraklarına binin)\n\nGüncel Sefer Kontrol Notu:\nSefer ve geçici düzenlemeler için resmi ulaşım kaynaklarını kontrol edin. Önerilen rota yürüyerek yapılabilir; bölgeye ulaşmak için Sultanahmet veya Gülhane Tramvayı durağı üzerinden T1 hattına binin.",
+      "created_at": "2026-05-17T16:20:38Z",
+      "error_type": "",
+      "id": "35c664c2-8a1c-45be-acd1-422a9101584a",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "assistant",
+      "session_id": "8969fedf-2cc4-42dd-95d4-6f1a8a9bda01",
+      "token_total": 665
+    },
+    {
+      "content": "Eminönü başlangıçlı 1 günlük tarihî rota ver. Sadece İstanbul içi duraklar kullan, toplu taşıma + yürüyüş öner, kesin saat verme ve en sonda güncel sefer kontrol notu ekle.",
+      "created_at": "2026-05-17T16:20:38Z",
+      "error_type": "",
+      "id": "55805783-151d-44c8-8a4d-87d5ba96e549",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "user",
+      "session_id": "8969fedf-2cc4-42dd-95d4-6f1a8a9bda01",
+      "token_total": 665
+    },
+    {
+      "content": "M4 metrosunda hangi duraklar var",
+      "created_at": "2026-05-17T16:21:49Z",
+      "error_type": "",
+      "id": "291dbc71-e1e1-4155-a705-f875da87ccde",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "user",
+      "session_id": "8969fedf-2cc4-42dd-95d4-6f1a8a9bda01",
+      "token_total": 1379
+    },
+    {
+      "content": "Soru: Eminönü başlangıçlı 1 günlük tarihî rota önerisi ver.\n\nRota:\n10:00 - Eminönü Meydanı (başlangıç)\n\n* Toplu taşıma: Marmaray hattından Üsküdar'a gidin\n* 11:30 - Üsküdar Tramvayı durağı (T1 hattına binin)\n\t+ Yürüyüş: Üsküdar'da dolaşın ve Sultan Ahmed III Köprüsü'ne yürüyün (yaklaşık 15 dakikalık yürüyüş)\n* 13:00 - Topkapı Müzesi\n\t+ Toplu taşıma: T1 hattından Sirkeci'ye gidin; Eminönü Tramvayı durağından da çıkabilirsiniz\n* 14:30 - Kapalıçarşı ve Çemberlitaş Meydanı (bitiş)\n\nGüncel Sefer Kontrol Notu:\nSefer ve geçici düzenlemeler için resmi ulaşım kaynaklarını kontrol edin. Önerilen rota yürüyerek yapılabilir; bölgeye ulaşmak için Sultanahmet veya Gülhane Tramvayı durağı üzerinden T1 hattına binin.\n\nSoru: M4 metrosunda hangi duraklar var?\n\nCevap:\nKadıköy, Ayrılık Çeşmesi, Acıbadem, Ünalan, Göztepe, Yenisahra, Pegasus-Kozyatağı, Bostancı, Küçükyalı, Maltepe, Huzurevi, Gülsuyu, Esenkent, Hastane-Adliye, Soğanlık, Kartal, Yakacık-Adnan Kahveci ve Pendik.",
+      "created_at": "2026-05-17T16:21:49Z",
+      "error_type": "",
+      "id": "452f725a-5671-42cd-b2e7-8edbaf3ad262",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "assistant",
+      "session_id": "8969fedf-2cc4-42dd-95d4-6f1a8a9bda01",
+      "token_total": 1379
+    },
+    {
+      "content": "merhaba",
+      "created_at": "2026-05-16T22:36:39Z",
+      "error_type": "",
+      "id": "223fb277-7d3e-4a22-b3a5-f78689011fe6",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "9b8d91a9-3275-44c6-8ec3-f87b38f13c8c",
+      "token_total": null
+    },
+    {
+      "content": "Selam!",
+      "created_at": "2026-05-16T22:36:39Z",
+      "error_type": "",
+      "id": "834ee4a3-538b-45c4-8e11-4942da3ebdf6",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "9b8d91a9-3275-44c6-8ec3-f87b38f13c8c",
+      "token_total": null
+    },
+    {
+      "content": "bugün nasılsın",
+      "created_at": "2026-05-16T22:36:42Z",
+      "error_type": "",
+      "id": "01a74496-da78-4782-a6fe-b59a21492148",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "9b8d91a9-3275-44c6-8ec3-f87b38f13c8c",
+      "token_total": null
+    },
+    {
+      "content": "Bugüngüzelbirgün,sevgivehuzuriçindeolun.",
+      "created_at": "2026-05-16T22:36:42Z",
+      "error_type": "",
+      "id": "c532173b-9104-4840-a6ea-29b44889ccc6",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "9b8d91a9-3275-44c6-8ec3-f87b38f13c8c",
+      "token_total": null
+    },
+    {
+      "content": "selam",
+      "created_at": "2026-05-16T22:37:54Z",
+      "error_type": "",
+      "id": "90dcf8e3-6378-4071-afef-32aa0c7b89a7",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "9b8d91a9-3275-44c6-8ec3-f87b38f13c8c",
+      "token_total": null
+    },
+    {
+      "content": "saudanınınkalbineselametler..",
+      "created_at": "2026-05-16T22:37:54Z",
+      "error_type": "",
+      "id": "b9b7be53-a5dc-4755-9069-f340e1c470d2",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "9b8d91a9-3275-44c6-8ec3-f87b38f13c8c",
+      "token_total": null
+    },
+    {
+      "content": "selam",
+      "created_at": "2026-05-17T09:41:47Z",
+      "error_type": "",
+      "id": "13e15fc6-145f-492f-8bc5-3bdfc1eb87ad",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "9f4abb3a-631c-4275-9840-5814da2bdde2",
+      "token_total": 22
+    },
+    {
+      "content": "Merhaba! Nasılsınız?",
+      "created_at": "2026-05-17T09:41:47Z",
+      "error_type": "",
+      "id": "8b1e07ad-753a-4f6b-869e-a50b3d0359d5",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "9f4abb3a-631c-4275-9840-5814da2bdde2",
+      "token_total": 22
+    },
+    {
+      "content": "Güzel! Umarım her şey yolunda. Bana ne hakkında konuşmak istiyorsun? Bir konu seçebilir miyiz veya keyifli bir sohbet başlatabilir miyiz?",
+      "created_at": "2026-05-17T09:41:54Z",
+      "error_type": "",
+      "id": "1705c3e3-a179-4176-aae7-4821b9c760ba",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "9f4abb3a-631c-4275-9840-5814da2bdde2",
+      "token_total": 82
+    },
+    {
+      "content": "yiyim sağ ol sen",
+      "created_at": "2026-05-17T09:41:54Z",
+      "error_type": "",
+      "id": "e898050c-1204-4189-81d2-76d412b95be2",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "9f4abb3a-631c-4275-9840-5814da2bdde2",
+      "token_total": 82
+    },
+    {
+      "content": "İyi ki iyiysin!\n\nAh, İstanbul'daki tarihi mekanlar gerçekten büyüleyici! Bu muhteşem şehrin zengin kültürünü ve geçmişiyle ilgili çok şey anlatırlar. Pek çok etkileyici yer var ama size en ünlülerinden bazılarını anlatabilirim.\n\nÖncelikle Sultanahmet Camii'ni (Sultan Ahmed Camii) ele alalım. Bu cami 17. yüzyılın başlarında padişah II. Osman tarafından inşa edilmiştir ve dünyanın en büyük camilerinden biri olarak kabul edilir. Mimar Sinan'ın başyapıtı olan bu muhteşem yapı, minareleri ve çinileri ile şehrin simgesidir.\n\nDaha sonra Ayasofya'yı (Hagia Sophia) ele alalım. Bu ikonik yapı 6. yüzyılın başlarında Bizans İmparatoru I. Justinianus tarafından inşa edilmiştir ve daha sonra Osmanlılar tarafından cami olarak kullanılmıştır. Bugün müze olarak hizmet veriyor ve UNESCO Dünya Mirası Listesi'nde yer alıyor.\n\nTopkapı Sarayı da bir diğer önemli tarihi mekan. Padişahlar ve onların aileleri için inşa edilen bu saray, 15. yüzyılın sonlarına kadar imparatorluğun resmi ikametgâhıydı. Bugün müze olarak hizmet veriyor ve çok sayıda hazineyi barındırmaktadır.\n\nDolmabahçe Sarayı'nı da unutmamalıyız! Padişah III. Selim tarafından 19. yüzyılın başlarında inşa edilen bu saray, Osmanlı İmparatorluğu'nun son günlerinde padişahların ikametgâhıydı. Muhteşem mimarisi ve sanat eserleriyle çok ünlüdür.\n\nSon olarak İstanbul'un en eski mahallesi olan Sultanahmet'teki Arasta Çarşısı'nı da unutmamalıyız! Bu çarşı 17. yüzyılın başlarında inşa edilmiş ve şehrin tarihi yerlerinden biridir. Çeşitli sanat eserleri, mücevherler ve hediyelik eşyalar bulabileceğiniz bu çarşı, İstanbul'un güzelliğini keşfetmek için harika bir yer.\n\nBu sadece birkaç örnek ama İstanbul'da çok daha fazla tarihi mekan var! Bu muhteşem şehir hakkında daha ne konuş",
+      "created_at": "2026-05-17T09:42:08Z",
+      "error_type": "",
+      "id": "6388d11b-3dc3-426c-b041-184ef76776ea",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "9f4abb3a-631c-4275-9840-5814da2bdde2",
+      "token_total": 603
+    },
+    {
+      "content": "istanbuldaki tarihi mekanlar hakkında konuşalım",
+      "created_at": "2026-05-17T09:42:08Z",
+      "error_type": "",
+      "id": "d8fe9fb8-0f9a-4f6a-ac41-725c1008a3cd",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "9f4abb3a-631c-4275-9840-5814da2bdde2",
+      "token_total": 603
+    },
+    {
+      "content": "Sultanahmet! Bu mahalle gerçekten İstanbul'un kalbi ve kültürünün en derinlerinden biridir. Sultanahmet Camii'ne ev sahipliği yapan bu bölge, 1453'te Konstantinopolis'in fethinden sonra Osmanlı padişahları tarafından inşa edilen ilk camilerden biriydi.\n\nSultanahmet Camii gerçekten dikkat çekici ve etkileyicidir. Minareleri ile şehrin siluetinde önemli bir yer kaplar ve güzelleştirir. Caminin iç kısmı ise gerçekten nefes kesici: karmaşık çiniler, zarif çerçeveli mozaikler ve paha biçilmez sanat eserleriyle süslenmiştir.\n\nAma Sultanahmet sadece camiden ibaret değil. Bu mahallede çok daha fazlası var! Sultanahmet'in yakınında Topkapı Sarayı'nın kalıntısı da bulunmaktadır. Bu saray Osmanlı İmparatorluğu'nun ilk başkentiydi ve padişahların ikametgâhıydı. Bugün müze olarak hizmet veriyor ve çok sayıda hazineyi barındırmaktadır.\n\nBu mahallede ayrıca Basilica Cistern'i de bulacaksınız! Bu devasa kuyu, 6. yüzyılın başlarında Bizans İmparatoru I. Justinianus tarafından inşa edildi ve daha sonra Osmanlılar tarafından kullanıldı. Bugün hala ayakta kalan en büyük kuyulardan biridir.\n\nVe Sultanahmet'teki Arasta Çarşısı'nı unutmamalıyız! Bu çarşı 17. yüzyılın başlarında inşa edilmiş ve şehrin tarihine sahiptir. Çeşitli sanat eserleri, mücevherler ve hediyelik eşyalar bulabileceğiniz bu çarşı, İstanbul'un güzelliğini keşfetmek için harika bir yer.\n\nSultanahmet'in yakınında da Süleymaniye Camii'ni bulacaksınız! Bu cami 16. yüzyılın başlarında mimar Sinan tarafından inşa edilmiştir ve Osmanlı mimarisinin en önemli yapılarından biri olarak kabul edilir.\n\nVe bu sadece birkaç örnek! Sultanahmet mahallesi gerçekten çok daha fazlası var. Tarihi ve kültürüyle süslenen bu bölge, İstanbul'un güzelliğini keşfetmek için harika bir yerdir.\n\nNe düşünüyorsunuz? Sultanahmet",
+      "created_at": "2026-05-17T09:42:33Z",
+      "error_type": "",
+      "id": "8e404cc1-a23f-4d16-a618-aa4bbd79d3f1",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "assistant",
+      "session_id": "9f4abb3a-631c-4275-9840-5814da2bdde2",
+      "token_total": 1127
+    },
+    {
+      "content": "sultahahmet mekanını biraz anlatır mısın",
+      "created_at": "2026-05-17T09:42:33Z",
+      "error_type": "",
+      "id": "db34b129-8e7e-4b3b-b5df-93b4533abbfd",
+      "model": "turkish-llama-8b-instruct-v0.1",
+      "role": "user",
+      "session_id": "9f4abb3a-631c-4275-9840-5814da2bdde2",
+      "token_total": 1127
+    },
+    {
+      "content": "M4 metro hattında bulunan duraklar şunlardır:\n\n1. Kadıköy\n2. Ayrılık Çeşmesi\n3. Acıbadem\n4. Ünalan\n5. Göztepe\n6. Yenisahra\n7. Pegasus-Kozyatağı\n8. Bostancı\n9. Küçükyalı\n10. Maltepe\n11. Huzurevi\n12. Gülsuyu\n13. Esenkent\n14. Hastane-Adliye\n15. Soğanlık\n16. Kartal\n17. Yakacık-Adnan Kahveci\n18. Pendik\n19. Tavşantepe\n20. Fevzi Çakmak-Hastane\n21. Yayalar-Şeyhli\n22. Kurtköy\n23. Sabiha Gökçen Havalimanı\n\nBu listedeki tüm duraklar M4 metro hattının parçasıdır ve Kadıköy'den başlayarak Ayrılık Çeşmesi, Kozyatağı, Bostancı, Pendik ve Sabiha Gökçen Havalimanı yönüne uzanır.",
+      "created_at": "2026-05-17T16:30:28Z",
+      "error_type": "",
+      "id": "659fc325-f3c8-4f66-87da-bb61f5761fb5",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "assistant",
+      "session_id": "ae05c523-e1bc-4e15-a294-fd6677299414",
+      "token_total": 893
+    },
+    {
+      "content": "M4 metrosunda hangi duraklar var ?",
+      "created_at": "2026-05-17T16:30:28Z",
+      "error_type": "",
+      "id": "6bfef26a-41d1-4dc9-971e-6f724b85dfc8",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "user",
+      "session_id": "ae05c523-e1bc-4e15-a294-fd6677299414",
+      "token_total": 893
+    },
+    {
+      "content": "Sultanahmet semtinde bulunan ve tarihi yapılar ile kültürel mekanlarla dolu bir mahalle. Günlük ulaşımında dikkatli olmak için aşağıdaki 1 günlük kısa rota öneriyorum:\n\nSabah:\n- Kahvaltı: Sultanahmet'teki Üsküdar'daki Karaköy Gulli lokantasına gidin (yaklaşık 10 km)\n- Topkapı Sarayı'na gitmek ve sabahın erken saatlerinde ziyareti yapın\n- Sultanahmet Meydanı'ndan Aya Sofya Camii'nin yanındaki tramvay durağına gidin ve tramvaya binerek Taksim'e kadar gidin (yaklaşık 4 km)\n- Kahvaltı için Taksim'deki Karadeniz lokantasına gidin\n\nÖğleden sonra:\n- Taksim Meydanı'ndaki Galata Kulesi'ne tırmanın ve şehrin muhteşem manzarasını izleyin (yaklaşık 100 metre)\n- Galata Kulesi yakınında bulunan Mısır Çarşısı'na gidin ve eşsiz hediyelik eşyalar bulmak için alışveriş yapın\n- Galata Kulesi'nden İstanbul Modern Sanat Müzesi'ne (yaklaşık 2 km) yürümek veya taksiyle gitmek\n- Akşam yemeği için Sultanahmet'teki Hafız Mustafa lokantasına gidin\n\nAkşam:\n- Hafız Mustafa'nın ardından Sultanahmet Camii ve Külliyesi'ni ziyaret edin ve akşam namazını kılan Müslümanları izleyin (yaklaşık 100 metre)\n- Sultanahmet Meydanı yakınında bulunan Yerebatan Sarnıcı'na gidin ve antik Roma dönemi sarnıcını gezip keşfedin (yaklaşık 150 metre)\n\nÖzetle, bu günlük rota Sultanahmet'in tarihi ve kültürel mekanlarını ziyaret etmeyi ve keyifli bir yolculuk geçirmenizi sağlıyor. Ulaşım için dikkatli olmayı unutmayın ve gerekirse taksi veya tramvay kullanın.",
+      "created_at": "2026-05-17T16:16:12Z",
+      "error_type": "",
+      "id": "9d61a0c9-045f-49e3-a53f-130745f365ba",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "assistant",
+      "session_id": "bf09c70c-814e-4111-9ec5-318e1caccc25",
+      "token_total": 511
+    },
+    {
+      "content": "Sultanahmet için 1 günlük kısa rota ver, ulaşımda temkinli ol.",
+      "created_at": "2026-05-17T16:16:12Z",
+      "error_type": "",
+      "id": "f3bd9033-4232-422d-a9e6-b4251aac845b",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "user",
+      "session_id": "bf09c70c-814e-4111-9ec5-318e1caccc25",
+      "token_total": 511
+    },
+    {
+      "content": "1 Günlük Kısa Rota: Eminönü'den Başlayarak Sultanahmet'e\n\n**Eminönü'ndan başlangıç**\n\n* Sabah 9.00 civarında Eminönü'nün Karaköy meydanına gelin.\n* Toplu taşıma veya yürüyerek Taksim Meydanı'na (yaklaşık 3 km) gidin.\n\n**Taksim ve Sultanahmet**\n\n* Taksim'den Galata Kulesi'ne (yaklaşık 100 metre) tırmanın ve şehrin muhteşem manzarasını izleyin.\n* Galata Kulesi yakınında bulunan Mısır Çarşısı'na gidin ve eşsiz hediyelik eşyalar bulmak için alışveriş yapın.\n\n**Sultanahmet Kültürü**\n\n* Sultanahmet Meydanı'ndan Aya Sofya Camii'nin yanındaki tramvay durağına girin ve Topkapı Sarayı'na (yaklaşık 10 dakikalık yolculuk) gidin.\n* Topkapı Sarayı'nı ziyaret edin ve imparatorlar için oluşturulmuş mücevherlerin, silahların ve sanat eserlerinin sergilendiği sergileri keşfedin.\n\n**Sultanahmet Camii ve Külliyesi**\n\n* Tramvayla Sultanahmet Meydanı'na dönün (yaklaşık 10 dakikalık yolculuk).\n* Sultanahmet Camii ve Külliyesi'ni ziyaret edin; caminin güzelliğini ve kültürel önemini keşfedin.\n\n**Yerebatan Sarnıcı**\n\n* Yürüyerek Yerebatan Sarnıcı'na (yaklaşık 150 metre) gidin ve antik Roma dönemi sarnıcını gezip keşfedin.\n* Akşam namazını kılan Müslümanları izleyin.\n\n**Eminönü'ya dönüş**\n\n* Yerebatan Sarnıcı yakınında bulunan Sultanahmet Meydanı'na döndükten sonra Eminönü'ye (yaklaşık 10 dakikalık yolculuk) geri dönün.\n* Güncel toplu taşıma seferlerini kontrol edin ve gerektiği gibi ayarlayın.\n\nLütfen güncellenmiş toplu taşıma seferlerini kontrol etmeyi unutmayın ve gerektiğinde ayarlamalar yapın. Bu rota, Sultanahmet'in kültürünü ve tarihi mekanlarını keşfetmeyi amaçlamaktadır; bu nedenle dikkatli olmayı unutmayın ve gerekirse taksi veya yürüyüş kullanın.",
+      "created_at": "2026-05-17T16:18:43Z",
+      "error_type": "",
+      "id": "3bb372f4-acb0-4ba1-bc6d-bc04339692ad",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "assistant",
+      "session_id": "bf09c70c-814e-4111-9ec5-318e1caccc25",
+      "token_total": 1119
+    },
+    {
+      "content": "Eminönü başlangıçlı, 1 günlük kısa tarih rotası ver. Ulaşımda sadece toplu taşıma ve yürüyüş öner; kesin saat verme, güncel sefer kontrol notu ekle",
+      "created_at": "2026-05-17T16:18:43Z",
+      "error_type": "",
+      "id": "56647cc1-96a8-415c-b0a7-4c2eb287eada",
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "role": "user",
+      "session_id": "bf09c70c-814e-4111-9ec5-318e1caccc25",
+      "token_total": 1119
+    },
+    {
+      "content": "İyiyim, sen?",
+      "created_at": "2026-05-16T22:39:09Z",
+      "error_type": "",
+      "id": "d1293d8b-b897-4316-a022-aa008a0383cf",
+      "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
+      "role": "assistant",
+      "session_id": "cddca6d8-b87a-484b-855c-1c39a9d80918",
+      "token_total": 139
+    },
+    {
+      "content": "naber",
+      "created_at": "2026-05-16T22:39:09Z",
+      "error_type": "",
+      "id": "fb916944-29d8-4e03-9002-3f973789fc86",
+      "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
+      "role": "user",
+      "session_id": "cddca6d8-b87a-484b-855c-1c39a9d80918",
+      "token_total": 139
+    },
+    {
+      "content": "merhaba",
+      "created_at": "2026-05-16T22:38:00Z",
+      "error_type": "",
+      "id": "ae4e30c6-d26d-42f6-80ed-0937ecc56078",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "d071ff37-f6b4-43f6-8a38-6f1f037c9458",
+      "token_total": null
+    },
+    {
+      "content": "Selam!",
+      "created_at": "2026-05-16T22:38:00Z",
+      "error_type": "",
+      "id": "b4539a00-a9a7-4775-b087-514c471ce5fe",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "d071ff37-f6b4-43f6-8a38-6f1f037c9458",
+      "token_total": null
+    },
+    {
+      "content": "bugün nasılsın",
+      "created_at": "2026-05-16T22:38:03Z",
+      "error_type": "",
+      "id": "00496469-dac8-4c65-9a86-fec0a53596a6",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "d071ff37-f6b4-43f6-8a38-6f1f037c9458",
+      "token_total": null
+    },
+    {
+      "content": "Bugüngüzelbirgün,havaiyi!",
+      "created_at": "2026-05-16T22:38:03Z",
+      "error_type": "",
+      "id": "6006f9e9-09b7-4036-98d7-de60ee74c4bc",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "d071ff37-f6b4-43f6-8a38-6f1f037c9458",
+      "token_total": null
+    },
+    {
+      "content": "hava nasıl",
+      "created_at": "2026-05-16T22:38:05Z",
+      "error_type": "",
+      "id": "116970a6-3d7c-4305-a8c9-7af880ff26a5",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "d071ff37-f6b4-43f6-8a38-6f1f037c9458",
+      "token_total": null
+    },
+    {
+      "content": "Veteranınınyakasındakihavağa,sevgiyle!",
+      "created_at": "2026-05-16T22:38:05Z",
+      "error_type": "",
+      "id": "27ffc17b-6d58-4dbc-aa50-cbfa8e5bb905",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "d071ff37-f6b4-43f6-8a38-6f1f037c9458",
+      "token_total": null
+    },
+    {
+      "content": "ne diyon olum",
+      "created_at": "2026-05-16T22:38:11Z",
+      "error_type": "",
+      "id": "6ed42ceb-cb38-4a84-a82c-bfac1078cf84",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "d071ff37-f6b4-43f6-8a38-6f1f037c9458",
+      "token_total": null
+    },
+    {
+      "content": "güzelgün,sanasevgilerimle!",
+      "created_at": "2026-05-16T22:38:11Z",
+      "error_type": "",
+      "id": "b0d4a6a1-9bac-4536-9e77-4441caa17621",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "d071ff37-f6b4-43f6-8a38-6f1f037c9458",
+      "token_total": null
+    },
+    {
+      "content": "naber",
+      "created_at": "2026-05-16T22:40:54Z",
+      "error_type": "",
+      "id": "c5a5e617-347c-46cc-b12b-dbe25567d0bf",
+      "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
+      "role": "user",
+      "session_id": "e7c8f532-0049-4241-9b51-f14c29c89b12",
+      "token_total": 304
+    },
+    {
+      "content": "İyiyim, sen nasılsın?",
+      "created_at": "2026-05-16T22:40:54Z",
+      "error_type": "",
+      "id": "c98d03b5-1f14-4710-868b-dcfede5a20fd",
+      "model": "nvidia/nemotron-3-super-120b-a12b-20230311:free",
+      "role": "assistant",
+      "session_id": "e7c8f532-0049-4241-9b51-f14c29c89b12",
+      "token_total": 304
+    },
+    {
+      "content": "iyiyim",
+      "created_at": "2026-05-16T22:40:58Z",
+      "error_type": "",
+      "id": "5d8fa8b5-e78e-4282-be40-e61b529473f4",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "e7c8f532-0049-4241-9b51-f14c29c89b12",
+      "token_total": null
+    },
+    {
+      "content": "İyiyim,sennasıltaj?",
+      "created_at": "2026-05-16T22:40:58Z",
+      "error_type": "",
+      "id": "9bdf3ad3-bdee-49d8-9a66-282b17cae77d",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "e7c8f532-0049-4241-9b51-f14c29c89b12",
+      "token_total": null
+    },
+    {
+      "content": "Bugünçokgüzel,neşet!",
+      "created_at": "2026-05-16T22:41:01Z",
+      "error_type": "",
+      "id": "004f56df-209b-48bf-a361-ce9e7ed94161",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "e7c8f532-0049-4241-9b51-f14c29c89b12",
+      "token_total": null
+    },
+    {
+      "content": "bugün nasılsın",
+      "created_at": "2026-05-16T22:41:01Z",
+      "error_type": "",
+      "id": "71cf9391-42a7-41f9-a78e-4c1c1c13faf8",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "e7c8f532-0049-4241-9b51-f14c29c89b12",
+      "token_total": null
+    },
+    {
+      "content": "Merhaba!",
+      "created_at": "2026-05-16T22:35:33Z",
+      "error_type": "",
+      "id": "66e0947b-6186-4e72-984e-1444c316c213",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "selam",
+      "created_at": "2026-05-16T22:35:33Z",
+      "error_type": "",
+      "id": "795c2127-cd21-4b5d-8533-50516fb8f111",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "Selamlar!Benarkadaşolaraktanışıyorum,buyüzdenkalırsınız.",
+      "created_at": "2026-05-16T22:35:35Z",
+      "error_type": "",
+      "id": "39cf22a6-8764-4687-bcf2-2909e35edfcf",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "nasılsın",
+      "created_at": "2026-05-16T22:35:35Z",
+      "error_type": "",
+      "id": "7655496e-05aa-465f-babd-740ed64fa4e7",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "merhabalar!",
+      "created_at": "2026-05-16T22:35:42Z",
+      "error_type": "",
+      "id": "608d51e3-b853-4369-b36a-84904876b8be",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "cevap",
+      "created_at": "2026-05-16T22:35:42Z",
+      "error_type": "",
+      "id": "e87dbe92-0f0b-4e62-b47a-5816d23ff3e4",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "2+2",
+      "created_at": "2026-05-16T22:35:46Z",
+      "error_type": "",
+      "id": "791af4bc-4e3a-4e1a-a08f-d0b680a1b352",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "2+2=4",
+      "created_at": "2026-05-16T22:35:46Z",
+      "error_type": "",
+      "id": "e6954ea4-81e7-41ea-89c8-1e3fd59fa088",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "İstanbul'unnesesi,kentvebölge.",
+      "created_at": "2026-05-16T22:35:51Z",
+      "error_type": "",
+      "id": "9274c4e8-a66f-4801-a09e-d313b89de061",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "istanbul neresi",
+      "created_at": "2026-05-16T22:35:51Z",
+      "error_type": "",
+      "id": "d701bf54-76da-4985-838e-bcc68abfe8d1",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "İstanbul,Türkiye'ninenbüyükvekalabalıkşehridir.Yenişehirvilayetinin(şehrimizin)başkentidir.",
+      "created_at": "2026-05-16T22:35:55Z",
+      "error_type": "",
+      "id": "255a650c-e282-44b6-8bcd-20cbf721f0e2",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "istanbul nedir",
+      "created_at": "2026-05-16T22:35:55Z",
+      "error_type": "",
+      "id": "b6e07dc7-aeb6-413b-b6c0-61ea89b075f2",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "cevap kabiliyetin bok gibi",
+      "created_at": "2026-05-16T22:36:02Z",
+      "error_type": "",
+      "id": "9a54984f-2227-4278-96c3-35a9480a1480",
+      "model": "jamba2-3b-turkish",
+      "role": "user",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
+    },
+    {
+      "content": "Diyarbakır'auzakolandiyarbakır'ınaksine,İstanbul'unmerkezinadirdendahayakındır.Yenibirçün(şehirimi)nin(dolayısıyla)köyündekendinizeğeristiyorsunuzdiyarbakır'ıtercihedin!",
+      "created_at": "2026-05-16T22:36:02Z",
+      "error_type": "",
+      "id": "a375d6f6-3a02-40d8-8e97-afc741c25cce",
+      "model": "jamba2-3b-turkish",
+      "role": "assistant",
+      "session_id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "token_total": null
     }
   ],
   "sessions": [
     {
       "archived": 0,
-      "created_at": "2026-03-28T15:02:54Z",
-      "id": "7e5ace5d-88c7-4236-920d-36842df2bde3",
-      "message_count": 2,
-      "title": "sea",
-      "updated_at": "2026-03-28T15:02:56Z"
+      "created_at": "2026-05-23T08:42:02Z",
+      "id": "29719b3c-f0da-4bf5-aec8-0b2dc21d39bc",
+      "message_count": 4,
+      "title": "bugün nasılsın ?",
+      "updated_at": "2026-05-23T10:16:14Z"
     },
     {
       "archived": 0,
-      "created_at": "2026-03-28T15:02:16Z",
-      "id": "b83e6a97-eb60-4166-b00b-03ea35b5af75",
-      "message_count": 2,
-      "title": "sea",
-      "updated_at": "2026-03-28T15:02:28Z"
-    },
-    {
-      "archived": 0,
-      "created_at": "2026-03-27T21:52:21Z",
-      "id": "0a429b88-201a-4397-8ff0-bdf12a456dd6",
+      "created_at": "2026-05-23T08:31:09Z",
+      "id": "51bdc4b1-2a9f-4333-bb33-f7ce1136bbef",
       "message_count": 0,
       "title": "Yeni Sohbet",
-      "updated_at": "2026-03-27T21:52:21Z"
+      "updated_at": "2026-05-23T08:31:09Z"
     },
     {
       "archived": 0,
+      "created_at": "2026-05-17T16:30:18Z",
+      "id": "ae05c523-e1bc-4e15-a294-fd6677299414",
+      "message_count": 2,
+      "title": "M4 metrosunda hangi duraklar var ?",
+      "updated_at": "2026-05-17T16:30:28Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-17T16:24:14Z",
+      "id": "cea5dccc-be18-472b-8b8c-cda4034695f1",
+      "message_count": 0,
+      "title": "Yeni Sohbet",
+      "updated_at": "2026-05-17T16:24:14Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-17T16:21:55Z",
+      "id": "619cf409-018f-4690-be83-0381a6d3b57a",
+      "message_count": 2,
+      "title": "m4 metrosunda hangi duraklar var",
+      "updated_at": "2026-05-17T16:22:02Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-17T16:20:29Z",
+      "id": "8969fedf-2cc4-42dd-95d4-6f1a8a9bda01",
+      "message_count": 4,
+      "title": "Eminönü başlangıçlı 1 günlük tarihî rota ver. Sadece İsta...",
+      "updated_at": "2026-05-17T16:21:49Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-17T16:15:58Z",
+      "id": "bf09c70c-814e-4111-9ec5-318e1caccc25",
+      "message_count": 4,
+      "title": "Sultanahmet için 1 günlük kısa rota ver, ulaşımda temkinl...",
+      "updated_at": "2026-05-17T16:18:43Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-17T16:13:51Z",
+      "id": "e9508fc6-2982-44b5-959d-7bdceb04bc9e",
+      "message_count": 0,
+      "title": "Yeni Sohbet",
+      "updated_at": "2026-05-17T16:13:51Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-17T09:52:11Z",
+      "id": "50ba413f-9ffd-472d-b8d5-39eea402fd2e",
+      "message_count": 10,
+      "title": "istanbul sağlık ve teknoloji üniversitesi nedir",
+      "updated_at": "2026-05-17T09:53:07Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-17T09:50:58Z",
+      "id": "50598feb-8bce-41db-9089-d1170852ce7b",
+      "message_count": 6,
+      "title": "kılıç alayı osmanlıda ne demektir ?",
+      "updated_at": "2026-05-17T09:52:00Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-17T09:41:45Z",
+      "id": "9f4abb3a-631c-4275-9840-5814da2bdde2",
+      "message_count": 8,
+      "title": "selam",
+      "updated_at": "2026-05-17T09:42:33Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-17T09:36:00Z",
+      "id": "43527647-c5d5-4eff-91ae-3e57cb88601b",
+      "message_count": 2,
+      "title": "Kisaca merhaba de.",
+      "updated_at": "2026-05-17T09:36:01Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-16T22:39:14Z",
+      "id": "e7c8f532-0049-4241-9b51-f14c29c89b12",
+      "message_count": 6,
+      "title": "naber",
+      "updated_at": "2026-05-16T22:41:01Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-16T22:39:04Z",
+      "id": "cddca6d8-b87a-484b-855c-1c39a9d80918",
+      "message_count": 2,
+      "title": "naber",
+      "updated_at": "2026-05-16T22:39:09Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-16T22:37:56Z",
+      "id": "d071ff37-f6b4-43f6-8a38-6f1f037c9458",
+      "message_count": 8,
+      "title": "merhaba",
+      "updated_at": "2026-05-16T22:38:11Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-16T22:36:35Z",
+      "id": "9b8d91a9-3275-44c6-8ec3-f87b38f13c8c",
+      "message_count": 6,
+      "title": "merhaba",
+      "updated_at": "2026-05-16T22:37:54Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-16T22:32:43Z",
+      "id": "f630d78a-fc73-49b9-9a82-04d88e754fd6",
+      "message_count": 14,
+      "title": "selam",
+      "updated_at": "2026-05-16T22:36:02Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-05-16T22:31:09Z",
+      "id": "5cf59384-d2e4-4338-8b4f-fc33b93cc7a1",
+      "message_count": 8,
+      "title": "naber",
+      "updated_at": "2026-05-16T22:32:18Z"
+    },
+    {
+      "archived": 0,
+      "created_at": "2026-03-25T11:13:12Z",
+      "id": "6fbef851-0f02-4d4e-82a3-0d5e7bc969b7",
+      "message_count": 26,
+      "title": "NABER",
+      "updated_at": "2026-05-16T22:31:08Z"
+    },
+    {
+      "archived": 1,
+      "created_at": "2026-03-25T11:13:11Z",
+      "id": "7487079f-14a7-4827-9c7a-e9c5816c3e0a",
+      "message_count": 0,
+      "title": "Yeni Sohbet",
+      "updated_at": "2026-03-25T11:13:12Z"
+    },
+    {
+      "archived": 1,
       "created_at": "2026-03-24T16:01:55Z",
       "id": "04001315-fa7f-4600-8392-4630c5a7c20c",
       "message_count": 14,
       "title": "selam",
-      "updated_at": "2026-03-24T21:19:54Z"
+      "updated_at": "2026-03-25T11:13:11Z"
     }
   ],
-  "updated_at": "2026-03-28T15:02:56Z",
+  "updated_at": "2026-05-23T10:16:14Z",
   "version": 1
 }

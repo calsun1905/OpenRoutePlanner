@@ -1374,6 +1374,29 @@ function mainLlmRepairText(text) {
     return out.replace(/Â/g, "").trim();
 }
 
+function mainLlmRepairTokenText(text) {
+    if (text === undefined || text === null) return "";
+
+    let out = String(text);
+    for (const [bad, good] of Object.entries(mainLlmMojibakeReplacements)) {
+        out = out.split(bad).join(good);
+    }
+
+    if (/[ÃƒÃ‚Ã„Ã…Ã¢]/.test(out)) {
+        try {
+            out = decodeURIComponent(escape(out));
+        } catch (_) {
+            // ignore
+        }
+        for (const [bad, good] of Object.entries(mainLlmMojibakeReplacements)) {
+            out = out.split(bad).join(good);
+        }
+    }
+
+    // Stream tokenlarinda bosluklari koru, trim uygulama.
+    return out.replace(/Ã‚/g, "");
+}
+
 function mainLlmGetProvider() {
     const checked = elMainLlmProviderRadios.find((radio) => radio.checked);
     return checked ? checked.value : "openrouter";
@@ -1471,6 +1494,33 @@ async function mainLlmLoadModelHealth(provider) {
         });
     } catch (_) {
         // health endpoint optional
+    }
+}
+
+async function mainLlmFetchProviderModels(provider) {
+    const p = String(provider || "openrouter").trim().toLowerCase();
+    let modelsUrl = "";
+    if (p === "openrouter") {
+        modelsUrl = "/api/llm/openrouter/models";
+    } else if (p === "gemini") {
+        modelsUrl = "/api/llm/gemini/models";
+    } else if (p === "local") {
+        modelsUrl = "/api/llm/local/models";
+    } else {
+        return [];
+    }
+
+    try {
+        const response = await fetch(modelsUrl);
+        const payload = await response.json();
+        if (!response.ok || !payload?.ok || !Array.isArray(payload.models)) {
+            return [];
+        }
+        return payload.models
+            .map((m) => String(m || "").trim())
+            .filter(Boolean);
+    } catch (_) {
+        return [];
     }
 }
 
@@ -1773,9 +1823,12 @@ function mainLlmPanelSetOpen(open) {
 async function mainLlmCheckStatus() {
     if (!elMainLlmBox) return;
     const provider = mainLlmGetProvider();
-    const statusUrl = provider === "gemini"
-        ? "/api/llm/gemini/status"
-        : "/api/llm/openrouter/status";
+    let statusUrl = "/api/llm/openrouter/status";
+    if (provider === "gemini") {
+        statusUrl = "/api/llm/gemini/status";
+    } else if (provider === "local") {
+        statusUrl = "/api/llm/local/status";
+    }
     try {
         const response = await fetch(statusUrl);
         const data = await response.json();
@@ -1789,6 +1842,10 @@ async function mainLlmCheckStatus() {
         if (Array.isArray(data?.fallback_models)) {
             mainLlmManualCandidates.push(...data.fallback_models);
         }
+        const discoveredModels = await mainLlmFetchProviderModels(provider);
+        if (discoveredModels.length > 0) {
+            mainLlmManualCandidates.push(...discoveredModels);
+        }
         mainLlmRefreshModelOptions();
 
         if (response.ok && data.available && data.configured) {
@@ -1801,11 +1858,13 @@ async function mainLlmCheckStatus() {
         } else if (response.ok && data.available && !data.configured) {
             const msg = provider === "gemini"
                 ? "GEMINI_API_KEY / GOOGLE_API_KEY tanimli degil"
-                : "OPENROUTER_API_KEY tanimli degil";
+                : provider === "local"
+                    ? "LOCAL_LLM_BASE_URL veya LOCAL_LLM_MODEL tanimli degil"
+                    : "OPENROUTER_API_KEY tanimli degil";
             mainLlmSetStatus(msg);
             mainLlmSetActiveModel("-", []);
         } else {
-            const svc = provider === "gemini" ? "Gemini" : "OpenRouter";
+            const svc = provider === "gemini" ? "Gemini" : provider === "local" ? "Local LLM" : "OpenRouter";
             mainLlmSetStatus(`${svc} servisi hazir degil`);
         }
     } catch (error) {
@@ -1844,9 +1903,67 @@ async function mainLlmSendMessage() {
     mainLlmSetStatus("Canli akis devam ediyor...");
     mainLlmCurrentAttemptModel = forcedModel || "";
 
-    const streamPath = mainLlmGetProvider() === "gemini"
-        ? "/api/llm/gemini/chat/stream"
-        : "/api/llm/openrouter/chat/stream";
+    const provider = mainLlmGetProvider();
+    if (provider === "local") {
+        mainLlmSetStatus("Local model yanitliyor...");
+        try {
+            const response = await fetch("/api/llm/local/chat/rag", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_id: mainLlmActiveSessionId,
+                    query: prompt,
+                    model: forcedModel || undefined,
+                    use_fallback: !isManual,
+                    top_k: 5,
+                    include_chunks: false,
+                }),
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload?.error) {
+                throw new Error(payload?.error || `HTTP ${response.status}`);
+            }
+
+            const finalAssistantText = mainLlmRepairText(payload.text || "[Bos yanit]");
+            const usage = payload.usage || {};
+            const usageModel = mainLlmRepairText(payload.model || forcedModel || "-");
+            const usageToken = usage.total_tokens ?? null;
+            const ragSources = Array.isArray(payload?.rag?.sources) ? payload.rag.sources.filter(Boolean) : [];
+            if (assistantBox) {
+                assistantBox.textContent = finalAssistantText;
+                const sourceMeta = ragSources.length > 0 ? ` | kaynak: ${ragSources.length}` : "";
+                mainLlmAppendMeta(assistantBox, `model: ${usageModel || "-"} | token: ${usageToken ?? "-"}${sourceMeta}`);
+            }
+
+            mainLlmCurrentAttemptModel = usageModel;
+            mainLlmSetActiveModel(usageModel, payload.tried_models || []);
+            mainLlmMessages.push({
+                role: "assistant",
+                content: finalAssistantText,
+                model: usageModel || "",
+                token_total: usageToken,
+                error_type: "",
+            });
+            mainLlmSaveLocalCache(mainLlmActiveSessionId);
+            mainLlmSetStatus("Hazir");
+            mainLlmPopulateSessionSelect();
+        } catch (error) {
+            if (assistantBox) {
+                assistantBox.textContent = `[Hata] ${mainLlmRepairText(error.message || error)}`;
+            }
+            mainLlmSetStatus("Baglanti hatasi");
+        } finally {
+            mainLlmToggleBusy(false);
+            if (elMainLlmInput) elMainLlmInput.focus();
+        }
+        return;
+    }
+
+    let streamPath = "/api/llm/openrouter/chat/stream";
+    if (provider === "gemini") {
+        streamPath = "/api/llm/gemini/chat/stream";
+    }
 
     try {
         const response = await fetch(streamPath, {
@@ -1902,7 +2019,7 @@ async function mainLlmSendMessage() {
                 }
 
                 if (payload.type === "token") {
-                    const tokenText = mainLlmRepairText(payload.text || "");
+                    const tokenText = mainLlmRepairTokenText(payload.text || "");
                     output += tokenText;
                     if (assistantBox) assistantBox.textContent = output;
                     if (elMainLlmChatLog) {
@@ -3682,9 +3799,5 @@ if (typeof clearPois === "function") {
         }
     };
 }
-
-
-
-
 
 

@@ -1,0 +1,12 @@
+{
+  "name": "orp_turkish_llama_sft_dpo_q4km",
+  "system_prompt": "",
+  "temperature": 0.8,
+  "top_k": 40,
+  "top_p": 0.95,
+  "min_p": 0.05,
+  "repeat_penalty": 1.1,
+  "context_overflow": "truncate_middle",
+  "limit_response_length_enabled": false,
+  "notes": "Recommended baseline for post-train validation in LM Studio."
+}
