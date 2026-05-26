@@ -1,0 +1,48 @@
+{
+  "kadikoy": [
+    {
+      "name": "Starbucks Moda",
+      "lat": 40.9912,
+      "lon": 29.0265,
+      "type": "cafe",
+      "address": "Moda Cd. No:15",
+      "rating": 4.2
+    },
+    {
+      "name": "MMM Mantı",
+      "lat": 40.9905,
+      "lon": 29.0258,
+      "type": "restaurant",
+      "address": "Caferağa Mah.",
+      "rating": 4.5
+    }
+  ],
+  "besiktas": [
+    {
+      "name": "Kahve Dünyası",
+      "lat": 41.0442,
+      "lon": 29.0101,
+      "type": "cafe",
+      "address": "Akaretler No:8",
+      "rating": 4.1
+    },
+    {
+      "name": "İstanbul Pub",
+      "lat": 41.0438,
+      "lon": 29.0095,
+      "type": "bar",
+      "address": "Barbaros Bulv.",
+      "rating": 3.8
+    }
+  ],
+  "uskudar": [
+    {
+      "name": "Çengelköy Kahvesi",
+      "lat": 41.0265,
+      "lon": 29.0432,
+      "type": "cafe",
+      "address": "Çengelköy Cd.",
+      "rating": 4.4
+    }
+  ]
+}

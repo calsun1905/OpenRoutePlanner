@@ -1,0 +1,13 @@
+ilçe,name,lat,lon,type,address,phone,rating
+kadıköy,Starbucks Moda,40.9912,29.0265,cafe,Moda Cd. No:15,-,4.2
+kadıköy,MMM Mantı,40.9905,29.0258,restaurant,Caferağa Mah.,-,4.5
+kadıköy,Çeşm-i Cedit Cafe,40.9920,29.0275,cafe,Rasimpaşa Sk.,-,4.0
+beşiktaş,Kahve Dünyası,41.0442,29.0101,cafe,Akaretler No:8,-,4.1
+beşiktaş,İstanbul Pub,41.0438,29.0095,bar,Barbaros Bulv.,-,3.8
+beşiktaş,Sultanahmet Köftecisi,41.0450,29.0110,restaurant,Ertuğrul Sk.,-,4.3
+üsküdar,Çengelköy Kahvesi,41.0265,29.0432,cafe,Çengelköy Cd.,-,4.4
+üsküdar,Pideci Hasan,41.0270,29.0440,restaurant,Çengelköy Mah.,-,4.2
+şişli,Neşe Dürüm,41.0505,28.9860,restaurant,Halaskargazi Cd.,-,4.0
+şişli,Glutensiz Cafe,41.0510,28.9855,cafe,İnönü Cd.,-,4.1
+fatih,Süleymaniye Kahvesi,41.0167,28.9612,cafe,Süleymaniye Mah.,-,4.3
+fatih,Kuru Fasulye Ali,41.0155,28.9620,restaurant,Langa Cd.,-,4.6
