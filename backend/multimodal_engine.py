@@ -31,6 +31,9 @@ from ibb_transit import (
     _get_db_connection,
 )
 
+from gtfs_shapes import get_metro_line_shape
+from route_config import ROUTE_CONFIG
+
 
 # ============================================================================
 # SABITLER
@@ -395,7 +398,13 @@ def _is_forbidden_bosphorus_walk(
     """
     Istanbul iki yaka arasi yuruyus (Bogaz gecisi) fiilen mumkun degil.
     Bu nedenle bu tip yaya segmentlerini dogrudan reddederiz.
+
+    ROUTE_CONFIG["MULTIMODAL_ENFORCE_WATER_CROSSING_GUARDS"] = False ise
+    bu koruma devre disi birakilir (test amacli veya ozel durumlar icin).
     """
+    if not ROUTE_CONFIG.get("MULTIMODAL_ENFORCE_WATER_CROSSING_GUARDS", True):
+        return False
+
     lat_min = min(from_lat, to_lat)
     lat_max = max(from_lat, to_lat)
     if lat_max < 40.90 or lat_min > 41.28:
@@ -823,96 +832,77 @@ def _get_route_stop_coords(route_code: str, from_stop_code: int, to_stop_code: i
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    # Her iki yonde de dene
+    # Ayni route/direction icinde bir stop birden fazla kez gecebilir.
+    # Bu nedenle tek bir "son gorulen stop_order" yerine tum aday ciftleri degerlendir.
+    candidates_forward: List[Tuple[int, str, int, int, bool]] = []
+    candidates_reverse: List[Tuple[int, str, int, int, bool]] = []
+
     for direction in ["D", "G"]:
-        cursor.execute("""
-            SELECT stop_code, stop_order FROM route_stops
+        cursor.execute(
+            """
+            SELECT stop_code, stop_order
+            FROM route_stops
             WHERE route_code = ? AND direction = ? AND stop_code IN (?, ?)
             ORDER BY stop_order
-        """, (route_code, direction, from_stop_code, to_stop_code))
-
+            """,
+            (route_code, direction, from_stop_code, to_stop_code),
+        )
         rows = cursor.fetchall()
         if len(rows) < 2:
             continue
 
-        # from_stop ve to_stop'un sira numaralarini bul
-        from_order = None
-        to_order = None
-        for r in rows:
-            if r["stop_code"] == from_stop_code:
-                from_order = r["stop_order"]
-            if r["stop_code"] == to_stop_code:
-                to_order = r["stop_order"]
-
-        if from_order is None or to_order is None:
+        from_orders = [int(r["stop_order"]) for r in rows if int(r["stop_code"]) == int(from_stop_code)]
+        to_orders = [int(r["stop_order"]) for r in rows if int(r["stop_code"]) == int(to_stop_code)]
+        if not from_orders or not to_orders:
             continue
 
-        # from_stop, to_stop'tan ONCE gelmeli (dogru yon)
-        if from_order > to_order:
-            continue  # Yanlis yon, diger yonu dene
+        for from_order in from_orders:
+            for to_order in to_orders:
+                if from_order <= to_order:
+                    candidates_forward.append((to_order - from_order, direction, from_order, to_order, False))
+                else:
+                    # Fallback: direction sabitken ters sirali eslesme cikarsa
+                    # araligi yine alip cikista ters cevir.
+                    candidates_reverse.append((from_order - to_order, direction, to_order, from_order, True))
 
-        # Aradaki tum duraklarin koordinatlarini al
-        cursor.execute("""
-            SELECT rs.stop_code, rs.stop_order, s.lat, s.lon
-            FROM route_stops rs
-            LEFT JOIN stops s ON rs.stop_code = s.code
-            WHERE rs.route_code = ? AND rs.direction = ?
-            AND rs.stop_order >= ? AND rs.stop_order <= ?
-            ORDER BY rs.stop_order
-        """, (route_code, direction, from_order, to_order))
+    selected = None
+    if candidates_forward:
+        candidates_forward.sort(key=lambda x: x[0])
+        selected = candidates_forward[0]
+    elif candidates_reverse:
+        candidates_reverse.sort(key=lambda x: x[0])
+        selected = candidates_reverse[0]
 
-        coords = []
-        for row in cursor.fetchall():
-            if row["lat"] and row["lon"]:
-                coords.append([row["lat"], row["lon"]])
+    if not selected:
+        conn.close()
+        return []
 
-        if coords:
-            conn.close()
-            return coords
+    _, direction, start_order, end_order, reverse_needed = selected
+    cursor.execute(
+        """
+        SELECT rs.stop_order, s.lat, s.lon
+        FROM route_stops rs
+        LEFT JOIN stops s ON rs.stop_code = s.code
+        WHERE rs.route_code = ? AND rs.direction = ?
+        AND rs.stop_order >= ? AND rs.stop_order <= ?
+        ORDER BY rs.stop_order
+        """,
+        (route_code, direction, start_order, end_order),
+    )
 
-    # Hicbir yon uymadiysa, yon farketmeksizin dene
-    cursor.execute("""
-        SELECT stop_code, stop_order, direction FROM route_stops
-        WHERE route_code = ? AND stop_code IN (?, ?)
-        ORDER BY stop_order
-    """, (route_code, from_stop_code, to_stop_code))
+    coords: List[List[float]] = []
+    for row in cursor.fetchall():
+        lat = row["lat"]
+        lon = row["lon"]
+        if lat is None or lon is None:
+            continue
+        coords.append([float(lat), float(lon)])
 
-    rows = cursor.fetchall()
-    if len(rows) >= 2:
-        min_order = min(r["stop_order"] for r in rows)
-        max_order = max(r["stop_order"] for r in rows)
-        direction = rows[0]["direction"]
-
-        cursor.execute("""
-            SELECT rs.stop_code, rs.stop_order, s.lat, s.lon
-            FROM route_stops rs
-            LEFT JOIN stops s ON rs.stop_code = s.code
-            WHERE rs.route_code = ? AND rs.direction = ?
-            AND rs.stop_order >= ? AND rs.stop_order <= ?
-            ORDER BY rs.stop_order
-        """, (route_code, direction, min_order, max_order))
-
-        coords = []
-        for row in cursor.fetchall():
-            if row["lat"] and row["lon"]:
-                coords.append([row["lat"], row["lon"]])
-
-        # Eger ilk coord from_stop'a degil to_stop'a yakinsa ters cevir
-        if len(coords) >= 2:
-            from_stop_data = None
-            cursor.execute("SELECT lat, lon FROM stops WHERE code = ?", (from_stop_code,))
-            from_stop_data = cursor.fetchone()
-            if from_stop_data:
-                d_first = _haversine_distance(coords[0][0], coords[0][1], from_stop_data["lat"], from_stop_data["lon"])
-                d_last = _haversine_distance(coords[-1][0], coords[-1][1], from_stop_data["lat"], from_stop_data["lon"])
-                if d_last < d_first:
-                    coords.reverse()
-
-            conn.close()
-            return coords
+    if reverse_needed:
+        coords.reverse()
 
     conn.close()
-    return []
+    return coords
 
 
 def _get_nearby_routes(lat: float, lon: float, radius: int = 500) -> List[Dict]:
@@ -1842,17 +1832,124 @@ def _build_graph_metro_option(
         line_id = int(seg.get("line_id", 0))
         line = line_map.get(line_id, {})
         line_name = str(line.get("name") or f"L{line_id}")
-        route_labels.append(line_name)
         edge_kind = str(seg.get("edge_kind") or "rail")
 
         station_ids = seg.get("station_ids", [])
-        rail_coords = []
-        for sid in station_ids:
-            st = station_map.get(int(sid))
-            if st:
-                rail_coords.append([float(st["lat"]), float(st["lon"])])
+        
+        # Gerçek tünel güzergahı koordinatlarını al (GTFS shapes veya fallback)
+        shape_coords = get_metro_line_shape(line_name)
+        
+        if shape_coords and len(shape_coords) >= 2 and len(station_ids) >= 2:
+            # İlk ve son istasyonun shape üzerindeki pozisyonlarını bul
+            start_st = station_map.get(int(station_ids[0]), {})
+            end_st = station_map.get(int(station_ids[-1]), {})
+            
+            if not start_st or not end_st:
+                # İstasyon verisi yok, station koordinatlarını kullan
+                rail_coords = [[float(station_map.get(int(sid), {}).get("lat", 0)),
+                               float(station_map.get(int(sid), {}).get("lon", 0))]
+                              for sid in station_ids if station_map.get(int(sid))]
+            else:
+                start_lat, start_lon = float(start_st["lat"]), float(start_st["lon"])
+                end_lat, end_lon = float(end_st["lat"]), float(end_st["lon"])
+                
+                # Başlangıç ve bitiş istasyonlarına en yakın shape indekslerini bul
+                best_start_idx = -1
+                best_start_dist = float('inf')
+                best_end_idx = -1
+                best_end_dist = float('inf')
+                
+                for idx, (shape_lat, shape_lon) in enumerate(shape_coords):
+                    dist_start = _haversine_distance(start_lat, start_lon, shape_lat, shape_lon)
+                    dist_end = _haversine_distance(end_lat, end_lon, shape_lat, shape_lon)
+                    
+                    if dist_start < best_start_dist:
+                        best_start_dist = dist_start
+                        best_start_idx = idx
+                    if dist_end < best_end_dist:
+                        best_end_dist = dist_end
+                        best_end_idx = idx
+                
+                # Akıllı İstasyon Snapping: Mesafe 800 metreden uzaksa shape kullanma, direkt koordinatları kullan
+                if best_start_dist > 800.0 or best_end_dist > 800.0:
+                    rail_coords = [[float(station_map.get(int(sid), {}).get("lat", 0)),
+                                   float(station_map.get(int(sid), {}).get("lon", 0))]
+                                  for sid in station_ids if station_map.get(int(sid))]
+                    snapped_indices = []
+                else:
+                    # Tüm istasyonları en yakın shape noktalarına snap et (sırayla)
+                    snapped_indices = []
+                    for sid in station_ids:
+                        st = station_map.get(int(sid))
+                        if not st:
+                            continue
+                        st_lat, st_lon = float(st["lat"]), float(st["lon"])
+                        
+                        best_idx = -1
+                        best_dist = float('inf')
+                        for idx, (shape_lat, shape_lon) in enumerate(shape_coords):
+                            dist = _haversine_distance(st_lat, st_lon, shape_lat, shape_lon)
+                            if dist < best_dist:
+                                best_dist = dist
+                                best_idx = idx
+                        # İstasyonun shape noktasına olan mesafesi 800 metreden azsa snap et
+                        if best_idx >= 0 and best_dist <= 800.0:
+                            snapped_indices.append(best_idx)
+                
+                # Eğer snap edilmiş istasyonlar M2 gibi tek yönlü bir hatta aitse,
+                # sadece aradaki tüm shape noktalarını döndür (tünel çizgisi için)
+                if snapped_indices and len(snapped_indices) >= 2:
+                    # Yonu ilk ve son istasyon snap indeksleri belirler.
+                    first_st_idx = int(snapped_indices[0])
+                    last_st_idx = int(snapped_indices[-1])
+
+                    if first_st_idx <= last_st_idx:
+                        rail_coords = [
+                            [float(shape_coords[i][0]), float(shape_coords[i][1])]
+                            for i in range(first_st_idx, last_st_idx + 1)
+                        ]
+                    else:
+                        # Python range son degeri disladigi icin last_st_idx - 1 kullanilir.
+                        rail_coords = [
+                            [float(shape_coords[i][0]), float(shape_coords[i][1])]
+                            for i in range(first_st_idx, last_st_idx - 1, -1)
+                        ]
+                else:
+                    # Yeterli istasyon yok, sadece start-end arasını al
+                    if best_start_idx < best_end_idx:
+                        rail_coords = [[float(shape_coords[i][0]), float(shape_coords[i][1])] 
+                                       for i in range(best_start_idx, best_end_idx + 1)]
+                    else:
+                        rail_coords = [[float(shape_coords[i][0]), float(shape_coords[i][1])] 
+                                       for i in range(best_end_idx, best_start_idx + 1)][::-1]
+        else:
+            # Shape yok, istasyon koordinatlarını doğrudan kullan
+            rail_coords = []
+            for sid in station_ids:
+                st = station_map.get(int(sid))
+                if st:
+                    rail_coords.append([float(st["lat"]), float(st["lon"])])
+        # Shape snap kotu/eksik kalirsa istasyon koordinatlarindan minimum
+        # guvenilir segmenti geri kur.
+        if len(rail_coords) < 2 and len(station_ids) >= 2:
+            station_fallback: List[List[float]] = []
+            for sid in station_ids:
+                st = station_map.get(int(sid))
+                if not st:
+                    continue
+                lat = st.get("lat")
+                lon = st.get("lon")
+                if lat is None or lon is None:
+                    continue
+                pt = [float(lat), float(lon)]
+                if not station_fallback or station_fallback[-1] != pt:
+                    station_fallback.append(pt)
+            if len(station_fallback) >= 2:
+                rail_coords = station_fallback
+
         if len(rail_coords) < 2:
             continue
+        route_labels.append(line_name)
 
         from_station_name = ""
         to_station_name = ""

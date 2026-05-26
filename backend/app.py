@@ -1,4 +1,4 @@
-"""
+﻿"""
 app.py - Flask API Sunucusu
 
 Frontend ile Backend arasÃındaki kÃƒöprÃƒü.
@@ -15,6 +15,7 @@ import re
 from datetime import datetime
 from functools import partial
 from typing import Any
+from route_config import ROUTE_CONFIG
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -99,6 +100,175 @@ def _first_outside_point(points: list[Any]) -> tuple[int, float, float] | None:
         if not _is_in_istanbul_bbox(lat, lon):
             return idx, lat, lon
     return None
+
+
+def _route_radius_multipliers(points: list[tuple[float, float]]) -> list[float]:
+    """
+    Noktalarin yayilimina gore denenmesi gereken graf yaricap carpani listesi.
+    Iki yaka gibi uzun gecislerde daha genis grafi onde dener.
+    """
+    import math
+
+    base = list(ROUTE_CONFIG.get("ROUTE_GRAPH_RADIUS_MULTIPLIERS", [1.0, 2.8, 4.2]))
+    if not points or len(points) < 2:
+        return base
+
+    def haversine_m(lat1, lon1, lat2, lon2):
+        r = 6_371_000.0
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = math.sin(dlat / 2.0) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2.0) ** 2
+        return r * 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+
+    max_dist = 0.0
+    for i in range(len(points)):
+        for j in range(i + 1, len(points)):
+            dist = haversine_m(points[i][0], points[i][1], points[j][0], points[j][1])
+            if dist > max_dist:
+                max_dist = dist
+
+    pref = float(ROUTE_CONFIG.get("ROUTE_GRAPH_PREF_MULTIPLIER", 2.8))
+    force_wide_m = float(ROUTE_CONFIG.get("ROUTE_GRAPH_FORCE_WIDE_IF_MAX_DISTANCE_M", 2000.0))
+    if max_dist >= force_wide_m and pref in base:
+        base.remove(pref)
+        base.insert(0, pref)
+    return base
+
+
+def _get_graph_for_points_with_multiplier(point_tuples: list[tuple[float, float]], radius_multiplier: float):
+    try:
+        return get_graph_for_points(point_tuples, radius_multiplier=radius_multiplier)
+    except TypeError:
+        # Test monkeypatch'lerinde eski imza olabilir.
+        return get_graph_for_points(point_tuples)
+
+
+def _collect_snap_metrics(
+    G,
+    point_tuples: list[tuple[float, float]],
+) -> tuple[list[dict[str, float]], float]:
+    infos: list[dict[str, float]] = []
+    worst = 0.0
+    for lat, lon in point_tuples:
+        try:
+            _, snap_m = find_nearest_node_with_distance(G, float(lat), float(lon))
+            snap_m = float(snap_m)
+        except Exception:
+            # Test graphleri veya eksik OSM metadata durumunda snap analizi atlanir.
+            snap_m = 0.0
+        infos.append({"lat": float(lat), "lon": float(lon), "snap_m": snap_m})
+        if snap_m > worst:
+            worst = snap_m
+    return infos, worst
+
+
+def _route_index_from_type(route_type: str) -> int:
+    return {"route_1": 0, "route_2": 1, "route_3": 2}.get(route_type, 0)
+
+
+def _build_primary_route_with_retries(
+    point_tuples: list[tuple[float, float]],
+    optimize: bool,
+    route_type: str,
+):
+    """
+    Giderek genisleyen graflarda rota dener.
+    Kabul icin hem rota bulunmasi hem de snap kalitesinin esik altinda olmasi beklenir.
+    """
+    multipliers = _route_radius_multipliers(point_tuples)
+    snap_limit_m = float(ROUTE_CONFIG.get("ROUTE_SNAP_MAX_DISTANCE_M", 900.0))
+    route_index = _route_index_from_type(route_type)
+
+    best_ctx = None
+    for multiplier in multipliers:
+        G = _get_graph_for_points_with_multiplier(point_tuples, float(multiplier))
+        _, worst_snap_m = _collect_snap_metrics(G, point_tuples)
+
+        if optimize and len(point_tuples) > 2:
+            optimized_order = solve_tsp(G, point_tuples)
+        else:
+            optimized_order = list(range(len(point_tuples)))
+        ordered_points = [point_tuples[i] for i in optimized_order]
+        route_nodes = build_alternative_routes(G, ordered_points, route_index)
+
+        if route_nodes:
+            ctx = {
+                "graph": G,
+                "optimized_order": optimized_order,
+                "ordered_points": ordered_points,
+                "route_nodes": route_nodes,
+                "radius_multiplier": float(multiplier),
+                "worst_snap_m": worst_snap_m,
+            }
+            if best_ctx is None or worst_snap_m < best_ctx["worst_snap_m"]:
+                best_ctx = ctx
+            if worst_snap_m <= snap_limit_m:
+                print(f"[API] Route graph secildi: multiplier={float(multiplier):.2f}, worst_snap={worst_snap_m:.1f}m")
+                return ctx
+
+        print(
+            f"[API] Route denemesi: multiplier={float(multiplier):.2f}, "
+            f"worst_snap={worst_snap_m:.1f}m, route_found={bool(route_nodes)}"
+        )
+
+    if best_ctx is not None:
+        print(
+            f"[API] Route fallback secildi: multiplier={best_ctx['radius_multiplier']:.2f}, "
+            f"worst_snap={best_ctx['worst_snap_m']:.1f}m (limit={snap_limit_m:.1f}m)"
+        )
+    return best_ctx
+
+
+def _build_alternative_batch_with_retries(
+    point_tuples: list[tuple[float, float]],
+    optimize: bool,
+):
+    multipliers = _route_radius_multipliers(point_tuples)
+    snap_limit_m = float(ROUTE_CONFIG.get("ROUTE_SNAP_MAX_DISTANCE_M", 900.0))
+    best_ctx = None
+
+    for multiplier in multipliers:
+        G = _get_graph_for_points_with_multiplier(point_tuples, float(multiplier))
+        _, worst_snap_m = _collect_snap_metrics(G, point_tuples)
+
+        if optimize and len(point_tuples) > 2:
+            optimized_order = solve_tsp(G, point_tuples)
+        else:
+            optimized_order = list(range(len(point_tuples)))
+        ordered_points = [point_tuples[i] for i in optimized_order]
+
+        try:
+            batch_results = build_all_alternative_routes_batch(G, ordered_points)
+        except Exception as e:
+            print(f"[API] Alternatif rota batch hatasi (multiplier={float(multiplier):.2f}): {e}")
+            batch_results = []
+
+        if batch_results:
+            ctx = {
+                "graph": G,
+                "optimized_order": optimized_order,
+                "ordered_points": ordered_points,
+                "batch_results": batch_results,
+                "radius_multiplier": float(multiplier),
+                "worst_snap_m": worst_snap_m,
+            }
+            if best_ctx is None or worst_snap_m < best_ctx["worst_snap_m"]:
+                best_ctx = ctx
+            if worst_snap_m <= snap_limit_m:
+                print(f"[API] Alt-route graph secildi: multiplier={float(multiplier):.2f}, worst_snap={worst_snap_m:.1f}m")
+                return ctx
+
+        print(
+            f"[API] Alt-route denemesi: multiplier={float(multiplier):.2f}, "
+            f"worst_snap={worst_snap_m:.1f}m, alternatives={len(batch_results)}"
+        )
+
+    if best_ctx is not None:
+        print(
+            f"[API] Alt-route fallback secildi: multiplier={best_ctx['radius_multiplier']:.2f}, "
+            f"worst_snap={best_ctx['worst_snap_m']:.1f}m (limit={snap_limit_m:.1f}m)"
+        )
+    return best_ctx
 
 
 def _is_place_text_in_istanbul(place_text: Any) -> tuple[bool | None, dict[str, Any]]:
@@ -421,6 +591,7 @@ from flask_compress import Compress
 from graph_manager import (
     get_graph,
     get_graph_for_points,
+    find_nearest_node_with_distance,
     search_pois,
     preload_popular_regions,
     is_preloaded,
@@ -924,25 +1095,15 @@ def api_get_route():
                 field="points",
             )
 
-        point_tuples = [(p[0], p[1]) for p in points]
-        # print(f"[API] Noktalar iÃƒçin graf alÃınÃıyor: {len(points)} nokta"))
-        G = get_graph_for_points(point_tuples)
+        point_tuples = [(float(p[0]), float(p[1])) for p in points]
+        route_ctx = _build_primary_route_with_retries(point_tuples, bool(optimize), route_type)
+        if not route_ctx:
+            return jsonify({"error": "Rota hesaplanamadi. Noktalar icin uygun yol bulunamadi."}), 400
 
-        # 2) SÃıralama: TSP optimizasyonu veya kullanÃıcÃı sÃırasÃı
-        if optimize and len(point_tuples) > 2:
-            # print(f"[API] TSP ÃƒçÃƒözÃƒülÃƒüyor: {len(points)} nokta"))
-            optimized_order = solve_tsp(G, point_tuples)
-        else:
-            # print(f"[API] SÃıralÃı rota: {len(points)} nokta"))
-            optimized_order = list(range(len(point_tuples)))
-
-        # 3) SÃıralanmÃıÃ…ş noktalar
-        ordered_points = [point_tuples[i] for i in optimized_order]
-
-        # 4) Tam rotayÃı oluÃ…ştur (alternatif rota tipi ile)
-        # route_type "route_1"|"route_2"|"route_3" string -> route_index 0|1|2 int (build_alternative_routes int bekliyor)
-        route_index = {"route_1": 0, "route_2": 1, "route_3": 2}.get(route_type, 0)
-        route_nodes = build_alternative_routes(G, ordered_points, route_index)
+        G = route_ctx["graph"]
+        optimized_order = route_ctx["optimized_order"]
+        ordered_points = route_ctx["ordered_points"]
+        route_nodes = route_ctx["route_nodes"]
 
         if not route_nodes:
             return jsonify({"error": "Rota hesaplanamadÃı. Noktalar harita alanÃı dÃıÃ…şÃında olabilir."}), 400
@@ -961,6 +1122,7 @@ def api_get_route():
             "route_coords": route_coords,
             "total_distance_km": stats["total_distance_km"],
             "estimated_walk_minutes": stats["estimated_walk_minutes"],
+            "estimated_route_minutes": stats["estimated_walk_minutes"],
             "google_maps_link": maps_link,
             "route_type": route_type,
         }
@@ -1008,22 +1170,20 @@ def api_get_route_steps():
                 field="points",
             )
 
-        point_tuples = [(p[0], p[1]) for p in points]
-        G = get_graph_for_points(point_tuples)
+        point_tuples = [(float(p[0]), float(p[1])) for p in points]
+        route_ctx = _build_primary_route_with_retries(point_tuples, bool(optimize), route_type)
+        if not route_ctx:
+            return jsonify({"error": "Rota hesaplanamadi."}), 400
 
-        if optimize and len(point_tuples) > 2:
-            optimized_order = solve_tsp(G, point_tuples)
-        else:
-            optimized_order = list(range(len(point_tuples)))
-
-        ordered_points = [point_tuples[i] for i in optimized_order]
-        route_index = {"route_1": 0, "route_2": 1, "route_3": 2}.get(route_type, 0)
-        route_nodes = build_alternative_routes(G, ordered_points, route_index)
+        G = route_ctx["graph"]
+        optimized_order = route_ctx["optimized_order"]
+        ordered_points = route_ctx["ordered_points"]
+        route_nodes = route_ctx["route_nodes"]
 
         if not route_nodes:
             return jsonify({"error": "Rota hesaplanamadÃı."}), 400
 
-        # Basit step extractor: kenar Ãƒüzerindeki 'name' veya 'ref' attribute'una gÃƒöre adÃım oluÃ…ştur
+        # Step extractor: yol ismi/junction bilgisinden UI uyumlu adimlar uret.
         def build_turn_by_turn_steps(G, nodes):
             steps = []
             if not nodes or len(nodes) < 2:
@@ -1031,44 +1191,97 @@ def api_get_route_steps():
 
             current_name = None
             current_dist = 0.0
-            for i in range(len(nodes)-1):
+            current_coords = []
+            cumulative_dist = 0.0
+            current_junction = None
+
+            def get_node_coords(node_id):
+                node_data = G.nodes.get(node_id) or {}
+                if "y" in node_data and "x" in node_data:
+                    return [float(node_data["y"]), float(node_data["x"])]
+                return [0.0, 0.0]
+
+            for i in range(len(nodes) - 1):
                 u = nodes[i]
-                v = nodes[i+1]
+                v = nodes[i + 1]
+
+                if i == 0:
+                    current_coords.append(get_node_coords(u))
+                current_coords.append(get_node_coords(v))
+
                 edge_data = G.get_edge_data(u, v) or {}
                 best = None
                 if edge_data:
                     try:
-                        best = min(edge_data.values(), key=lambda d: d.get('length', float('inf')))
+                        best = min(edge_data.values(), key=lambda d: d.get("length", float("inf")))
                     except Exception:
                         best = list(edge_data.values())[0]
 
                 length = 0.0
                 name = None
+                junction = None
                 if best:
-                    length = float(best.get('length', 0) or 0)
-                    name = best.get('name') or best.get('ref') or best.get('highway')
+                    length = float(best.get("length", 0) or 0)
+                    name = best.get("name") or best.get("ref") or best.get("highway")
+                    junction = best.get("junction")
 
                 if not name:
-                    name = 'yol'
+                    name = "yol"
 
                 if current_name is None:
                     current_name = name
                     current_dist = length
+                    current_junction = junction
                 elif name == current_name:
                     current_dist += length
+                    if junction:
+                        current_junction = junction
                 else:
-                    # flush
-                    minutes = round((current_dist/1000) / float(ROUTE_CONFIG.get('WALK_SPEED_KMH', 5.0)) * 60)
-                    instr = f"{int(round(current_dist))} metre boyunca {current_name} Ãƒüzerinde ilerleyin."
-                    steps.append({"instruction": instr, "distance_m": int(round(current_dist)), "duration_min": minutes})
+                    minutes = round((current_dist / 1000) / float(ROUTE_CONFIG.get("WALK_SPEED_KMH", 5.0)) * 60)
+                    duration_s = int(minutes * 60)
+                    cumulative_dist += current_dist
+                    turn_type = "roundabout" if current_junction == "roundabout" else "straight"
+                    instr = f"{int(round(current_dist))} metre boyunca {current_name} uzerinde ilerleyin."
+                    if turn_type == "roundabout":
+                        instr = f"Kavsaktan gecerek {current_name} uzerinde ilerleyin."
+
+                    steps.append({
+                        "step_id": len(steps) + 1,
+                        "instruction": instr,
+                        "distance_m": int(round(current_dist)),
+                        "duration_s": duration_s,
+                        "duration_min": minutes,
+                        "street_name": current_name,
+                        "turn_type": turn_type,
+                        "coords": list(current_coords[:-1]),
+                        "cumulative_distance_m": int(round(cumulative_dist)),
+                    })
+
                     current_name = name
                     current_dist = length
+                    current_junction = junction
+                    current_coords = [get_node_coords(u), get_node_coords(v)]
 
-            # flush last
             if current_name is not None:
-                minutes = round((current_dist/1000) / float(ROUTE_CONFIG.get('WALK_SPEED_KMH', 5.0)) * 60)
-                instr = f"{int(round(current_dist))} metre boyunca {current_name} Ãƒüzerinde ilerleyin."
-                steps.append({"instruction": instr, "distance_m": int(round(current_dist)), "duration_min": minutes})
+                minutes = round((current_dist / 1000) / float(ROUTE_CONFIG.get("WALK_SPEED_KMH", 5.0)) * 60)
+                duration_s = int(minutes * 60)
+                cumulative_dist += current_dist
+                turn_type = "roundabout" if current_junction == "roundabout" else "straight"
+                instr = f"{int(round(current_dist))} metre boyunca {current_name} uzerinde ilerleyin."
+                if turn_type == "roundabout":
+                    instr = f"Kavsaktan gecerek {current_name} uzerinde ilerleyin."
+
+                steps.append({
+                    "step_id": len(steps) + 1,
+                    "instruction": instr,
+                    "distance_m": int(round(current_dist)),
+                    "duration_s": duration_s,
+                    "duration_min": minutes,
+                    "street_name": current_name,
+                    "turn_type": turn_type,
+                    "coords": list(current_coords),
+                    "cumulative_distance_m": int(round(cumulative_dist)),
+                })
 
             return steps
 
@@ -1151,24 +1364,15 @@ def api_get_alternative_routes():
                 field="points",
             )
 
-        point_tuples = [(p[0], p[1]) for p in points]
+        point_tuples = [(float(p[0]), float(p[1])) for p in points]
+        alt_ctx = _build_alternative_batch_with_retries(point_tuples, bool(optimize))
+        if not alt_ctx:
+            return jsonify({"error": "Hicbir alternatif rota hesaplanamadi."}), 400
 
-        G = get_graph_for_points(point_tuples)
-
-        # TSP optimizasyonu
-        if optimize and len(point_tuples) > 2:
-            optimized_order = solve_tsp(G, point_tuples)
-        else:
-            optimized_order = list(range(len(point_tuples)))
-
-        ordered_points = [point_tuples[i] for i in optimized_order]
-
-        # PERFORMANS: Segment alternatifleri tek seferde hesaplanÃır (3x yerine 1x)
-        try:
-            batch_results = build_all_alternative_routes_batch(G, ordered_points)
-        except Exception as e:
-            print(f"[API] Alternatif rota batch hatasÃı: {e}")
-            batch_results = []
+        G = alt_ctx["graph"]
+        optimized_order = alt_ctx["optimized_order"]
+        ordered_points = alt_ctx["ordered_points"]
+        batch_results = alt_ctx["batch_results"]
 
         alternatives = []
         for alt in batch_results:

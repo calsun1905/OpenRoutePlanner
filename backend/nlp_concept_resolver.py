@@ -16,6 +16,14 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from osm_poi_dictionary import POI_MAPPING
 
+try:
+    from text_utils import tr_lower
+except ImportError:
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent))
+    from text_utils import tr_lower
+
 
 @dataclass
 class PoiResolution:
@@ -56,7 +64,7 @@ _PROTECTED_FULL_FORMS = {
 
 def normalize_text(value: str) -> str:
     text = (value or "").replace("’", "'").replace("`", "'")
-    text = text.casefold()
+    text = tr_lower(text)
     text = re.sub(r"[^a-z0-9çğıöşü\s']+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text

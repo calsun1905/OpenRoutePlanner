@@ -1,10 +1,9 @@
 """
-route_config.py - Rota Motoru Konfigürasyon Sabitleri v3.1
+route_config.py - Rota Motoru Konfigürasyon Sabitleri v3.2
 
 route_engine.py içindeki tüm hardcoded değerlerin merkezi referansı.
-Şu an sadece referans amaçlı  " ilerleyen aşamada route_engine.py buradan okuyacak.
 
-Kullanım (ileride):
+Kullanım:
     from route_config import ROUTE_CONFIG
     walk_speed = ROUTE_CONFIG["WALK_SPEED_KMH"]
 """
@@ -21,13 +20,24 @@ ROUTE_CONFIG = {
     # Varsayılan kaç alternatif rota isteneceği.
     "DEFAULT_NUM_ROUTES": 3,
 
+    # OSM network tipi:
+    # - walk: sadece yurunebilir yollar
+    # - all_public: tum kamusal yollar (kopruler dahil, tercih edilen)
+    "OSM_NETWORK_TYPE": "all_public",
+
     # Graf indirme yarıçapı (metre)
     "GRAPH_RADIUS_MIN_M": 500,
     "GRAPH_RADIUS_PADDING_M": 300,
-    "GRAPH_RADIUS_MAX_M": 3500,
+    # Bogaz gecisi gibi deniz asiri rotalarda kopruleri kapsamak icin ust sinir yuksek tutuldu.
+    "GRAPH_RADIUS_MAX_M": 20000,
+    # API rota hesaplamasinda sirasiyla denenecek yaricap carpanlari.
+    "ROUTE_GRAPH_RADIUS_MULTIPLIERS": [1.0, 2.8, 4.2],
+    # Uzak noktalarda (iki yaka vb.) once genis grafik denensin.
+    "ROUTE_GRAPH_PREF_MULTIPLIER": 2.8,
+    "ROUTE_GRAPH_FORCE_WIDE_IF_MAX_DISTANCE_M": 2000,
 
     # =========================================================================
-    # CACHE YÖNETİMİ  " LRU Cache Ayarları
+    # CACHE YÖNETİMİ — LRU Cache Ayarları
     # =========================================================================
 
     # Graph cache maksimum boyutu (RAM'de tutulan graf sayısı)
@@ -46,29 +56,22 @@ ROUTE_CONFIG = {
     "POI_CACHE_TTL": 1800,
 
     # POI kalici cache tazelik pencereleri
-    # Soft TTL: bu sureden sonra cache gosterilir ama arkada yenileme tetiklenir.
     "POI_CACHE_SOFT_TTL_DAYS": 14,
-    # Hard TTL: bu sureden sonra cache artik gecersiz sayilir, canli sorgu zorunlu olur.
     "POI_CACHE_HARD_TTL_DAYS": 30,
-    # Bos sonuc cache'i daha kisa sureli tutulur (yeni acilan mekanlari yakalamak icin).
     "POI_CACHE_EMPTY_TTL_HOURS": 24,
-    # Ana pois tablosu guncellenmeden once kopyalanan eski surum sayisi (yer + kategori basina).
     "POI_ARCHIVE_MAX_PER_KEY": 5,
 
     # =========================================================================
-    # OVERLAP (ÖRTÜŞMe) EŞİKLERİ  " dynamic_overlap_threshold()
-    # v3.0: Asimetrik formül kullanılıyor (Jaccard değil).
-    # "Yeni rotanın kenarlarının % kaçı eski rotayla örtüşüyor?"
-    # Değer 1.0 = tamamen aynı yol, 0.0 = hiç ortak kenar yok.
+    # OVERLAP (ÖRTÜŞME) EŞİKLERİ — dynamic_overlap_threshold()
     # =========================================================================
 
     "OVERLAP_THRESHOLD_SHORT": 0.90,       # mesafe < 1.0 km
-    "OVERLAP_THRESHOLD_MEDIUM": 0.80,      # 1.0 a‰¤ mesafe < 3.0 km
-    "OVERLAP_THRESHOLD_LONG": 0.75,        # 3.0 a‰¤ mesafe < 7.0 km
-    "OVERLAP_THRESHOLD_VERY_LONG": 0.70,   # mesafe a‰¥ 7.0 km
+    "OVERLAP_THRESHOLD_MEDIUM": 0.80,      # 1.0 <= mesafe < 3.0 km
+    "OVERLAP_THRESHOLD_LONG": 0.75,        # 3.0 <= mesafe < 7.0 km
+    "OVERLAP_THRESHOLD_VERY_LONG": 0.70,   # mesafe >= 7.0 km
 
     # =========================================================================
-    # MESAFE SINIRLARI  " overlap eşiği ve aday sayısı hesaplamalarında
+    # MESAFE SINIRLARI
     # =========================================================================
 
     "DISTANCE_VERY_SHORT_KM": 1.0,
@@ -76,8 +79,7 @@ ROUTE_CONFIG = {
     "DISTANCE_LONG_KM": 7.0,
 
     # =========================================================================
-    # YEN'S K-SHORTEST  " get_max_candidates()
-    # Aday rota sayısı: kısa mesafede az, uzun mesafede fazla denensin.
+    # YEN'S K-SHORTEST — get_max_candidates()
     # =========================================================================
 
     "MAX_CANDIDATES_VERY_SHORT": 50,
@@ -86,87 +88,94 @@ ROUTE_CONFIG = {
     "MAX_CANDIDATES_VERY_LONG": 150,
 
     # =========================================================================
-    # VIA-NODE (ARA NOKTA)  " v3.0 YENİ
-    # Endüstri standardı alternatif rota üretimi.
-    # Ana rotadan uzak büyük kavşaklardan geçmeye zorlar (A a†’ C a†’ B).
+    # VIA-NODE (ARA NOKTA) — v3.0
     # =========================================================================
 
-    # Kaç via-node rotası isteniyor (varsayılan, num_routes-1 olarak hesaplanır)
-    # route_engine.py a†’ find_via_node_routes(num_via_routes=num_routes-1)
     "VIA_NODE_DEFAULT_COUNT": 2,
-
-    # Via-node bounding box genişletme oranı (%30) ve minimum marjin (~200m)
-    # route_engine.py a†’ (lat_max - lat_min) * 0.3, MIN_MARGIN = 0.002
     "VIA_NODE_BBOX_EXPAND_RATIO": 0.3,
     "VIA_NODE_BBOX_MIN_MARGIN": 0.002,
-
-    # Via-node olabilmek için minimum kavşak derecesi (degree)
-    # route_engine.py a†’ if degree >= 3
     "VIA_NODE_MIN_DEGREE": 3,
-
-    # En fazla kaç aday via-node denenir
-    # route_engine.py a†’ scored[:30]
     "VIA_NODE_MAX_CANDIDATES": 30,
-
-    # Via-node rotaları arası maksimum overlap (kendi aralarında)
-    # route_engine.py a†’ if overlap > 0.70
     "VIA_NODE_SELF_OVERLAP_LIMIT": 0.70,
-
-    # Via-node rotasının ana rotaya kıyasla kabul edilen maks uzunluk oranı
-    # route_engine.py a†’ max_distance_ratio=1.5
     "VIA_NODE_MAX_DISTANCE_RATIO": 1.5,
-
-    # Rota sampling oranı (performans için her kaçıncı nokta alınır)
-    # route_engine.py a†’ main_coords[::max(1, len(main_coords) // 20)]
     "VIA_NODE_ROUTE_SAMPLE_COUNT": 20,
 
     # =========================================================================
-    # GÖVDE-ONLY PENALTY  " v3.0 YENİ
-    # Zikzak önleme: Rotanın baş/son kısmına dokunma, sadece gövdeye ceza.
+    # GÖVDE-ONLY PENALTY — v3.0
     # =========================================================================
 
-    # Baş ve sondan atlanacak kenar oranı
-    # route_engine.py a†’ get_body_edges(edges, skip_ratio=0.10)
     "BODY_EDGES_SKIP_RATIO": 0.10,
 
     # =========================================================================
-    # DİSJOINT PATHS  " find_disjoint_paths() [ESKİ - v3.0'da kullanılmıyor]
+    # DİSJOINT PATHS
     # =========================================================================
 
     "DISJOINT_NUM_PATHS": 2,
     "MAX_REALISTIC_ROUTES": 3,
 
     # =========================================================================
-    # PENALTY-BASED GENERATION  " apply_penalty_to_graph(), find_routes_with_penalty()
-    # v3.0: Her iterasyonda penalty graf YENİDEN oluşturuluyor.
+    # PENALTY-BASED GENERATION
     # =========================================================================
 
-    # Cezalandırma çarpanı: kullanılmış kenar bu kadar pahalı görünür.
     "PENALTY_FACTOR": 2.0,
-
-    # Penalty çağrısında kaç ekstra aday denen
     "PENALTY_EXTRA_CANDIDATES": 1,
 
     # =========================================================================
     # CONNECTİVİTY BAZLI DİNAMİK EŞİK ÇARPANLARI
-    # dynamic_overlap_threshold_connectivity() içinde kullanılır.
     # =========================================================================
 
-    "CONNECTIVITY_HIGH_MULTIPLIER": 0.75,    # connectivity a‰¥ 3
-    "CONNECTIVITY_MEDIUM_MULTIPLIER": 0.85,  # connectivity == 2
-    "CONNECTIVITY_LOW_MULTIPLIER": 0.95,     # connectivity == 1
+    "CONNECTIVITY_HIGH_MULTIPLIER": 0.75,
+    "CONNECTIVITY_MEDIUM_MULTIPLIER": 0.85,
+    "CONNECTIVITY_LOW_MULTIPLIER": 0.95,
 
     # =========================================================================
-    # FALLBACK  " get_fallback_routes()
+    # FALLBACK — get_fallback_routes()
     # =========================================================================
 
     "FALLBACK_NEIGHBOR_LIMIT": 3,
     "FALLBACK_DISTANCE_MULTIPLIER": 1.5,
 
-    # POI — buyuk idari alan (il/ilce) icin parcali (grid) tarama
-    # Bbox en/boyu bu km degerini asinca tek features_from_place yerine izgara hucresi sorgulari.
+    # =========================================================================
+    # POI — büyük idari alan (il/ilçe) için parçalı (grid) tarama
+    # =========================================================================
+
     "POI_BOUNDARY_CHUNK_MIN_KM": 12.0,
     "POI_CHUNK_CELL_KM": 4.0,
     "POI_CHUNK_MAX_CELLS": 36,
+
+    # =========================================================================
+    # ROUTING WEIGHT & BRIDGE PENALTY
+    # Köprü kenarlarına soft penalty uygulayarak kara yolunu tercih ettirir.
+    # =========================================================================
+
+    "ROUTING_WEIGHT_KEY": "routing_length",
+    "BRIDGE_PENALTY_FACTOR": 1.8,
+
+    # =========================================================================
+    # SNAP KALİTE PARAMETRELERİ
+    # find_nearest_node_with_distance() içinde kullanılır.
+    # =========================================================================
+
+    "SNAP_MAX_NEIGHBOR_CANDIDATES": 4,
+    "SNAP_BRIDGE_PENALTY_M": 45.0,
+    "SNAP_EDGE_NEAR_THRESHOLD_M": 25.0,
+    "SNAP_NODE_EDGE_GAP_MAX_M": 110.0,
+    # Kullanici noktasi belirgin sekilde bir yakadaysa, karsi yakadaki node'lara
+    # snap etmeyi guclu sekilde caydirir.
+    "SNAP_CROSS_SHORE_PENALTY_M": 2000.0,
+    # API kabul limiti: bundan daha kotu snap varsa daha genis grafikle tekrar dene.
+    "ROUTE_SNAP_MAX_DISTANCE_M": 900.0,
+
+    # =========================================================================
+    # POINT GRAPH CACHE — disk temizliği
+    # =========================================================================
+
+    "GRAPH_POINT_CACHE_MAX_FILES": 20,
+
+    # =========================================================================
+    # MULTIMODAL — SU GEÇİŞİ KORUMASI
+    # =========================================================================
+
+    "MULTIMODAL_ENFORCE_WATER_CROSSING_GUARDS": True,
 
 }

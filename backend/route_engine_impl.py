@@ -201,10 +201,10 @@ def solve_tsp(G, points: list) -> list:
                 length = nx.shortest_path_length(G, nodes[i], nodes[j], weight=routing_weight)
                 dist_matrix[(nodes[i], nodes[j])] = length
             except nx.NetworkXNoPath:
-                dist_matrix[(nodes[i], nodes[j])] = float("inf")
+                dist_matrix[(nodes[i], nodes[j])] = 999999.0
                 no_path_count += 1
                 no_path_pairs.append((nodes[i], nodes[j]))
-                _route_debug_log(f"[TSP DEBUG] NetworkXNoPath: node {nodes[i]} -> {nodes[j]} (inf)")
+                _route_debug_log(f"[TSP DEBUG] NetworkXNoPath: node {nodes[i]} -> {nodes[j]} (999999.0)")
     
     if no_path_count > 0:
         print(f"[TSP WARN] {no_path_count} cift icin yol bulunamadi (inf atandi)")
@@ -234,12 +234,14 @@ def solve_tsp(G, points: list) -> list:
         return list(range(n))
     
     # TSP sonucunu orijinal indekslere çevir
-    node_to_index = {node: idx for idx, node in enumerate(nodes)}
+    node_to_indices = {}
+    for idx, node in enumerate(nodes):
+        node_to_indices.setdefault(node, []).append(idx)
     ordered_indices = []
     seen = set()
     for node in tsp_route:
-        if node in node_to_index and node not in seen:
-            ordered_indices.append(node_to_index[node])
+        if node in node_to_indices and node not in seen:
+            ordered_indices.extend(node_to_indices[node])
             seen.add(node)
     
     # Eksik indeks varsa sona ekle
@@ -648,17 +650,19 @@ def apply_penalty_to_graph(G: nx.Graph, used_edges: list, penalty_factor: float 
     G_penalty = G.copy()
     routing_key = _routing_weight_key()
 
-    # Her dugum cifti icin en az bir edge var mi kontrol et
+    # Her dugum cifti ve key icin en az bir edge var mi kontrol et
     penalized_edges = set()
     for edge in used_edges:
-        if len(edge) >= 2:
+        if len(edge) >= 3:
+            u, v, k = edge[0], edge[1], edge[2]
+            penalized_edges.add((min(u, v), max(u, v), k))
+        elif len(edge) == 2:
             u, v = edge[0], edge[1]
-            edge_key = (min(u, v), max(u, v))
-            penalized_edges.add(edge_key)
+            penalized_edges.add((min(u, v), max(u, v), 0))
 
     # Penalize edilmis edge'lere yeni weight ekle
     for u, v, key, data in G_penalty.edges(keys=True, data=True):
-        edge_key = (min(u, v), max(u, v))
+        edge_key = (min(u, v), max(u, v), key)
         base_weight = data.get(routing_key, data.get("length", 1))
         try:
             base_weight = float(base_weight)
@@ -853,7 +857,8 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
     main_coords = []
     for n in main_route_nodes:
         data = G.nodes[n]
-        main_coords.append((data.get('y', 0), data.get('x', 0)))
+        if 'y' in data and 'x' in data:
+            main_coords.append((data['y'], data['x']))
 
     main_stats = calculate_route_stats(G, main_route_nodes)
     main_km = main_stats["total_distance_km"]
@@ -883,12 +888,13 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
     candidate_nodes = []
     min_degree = ROUTE_CONFIG.get("VIA_NODE_MIN_DEGREE", 3)
     for node, data in G.nodes(data=True):
-        lat, lon = data.get('y', 0), data.get('x', 0)
-        if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
-            if node not in main_node_set:
-                degree = G.degree(node)
-                if degree >= min_degree:
-                    candidate_nodes.append((node, lat, lon, degree))
+        if 'y' in data and 'x' in data:
+            lat, lon = data['y'], data['x']
+            if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
+                if node not in main_node_set:
+                    degree = G.degree(node)
+                    if degree >= min_degree:
+                        candidate_nodes.append((node, lat, lon, degree))
 
     if not candidate_nodes:
         print(f"[RouteEngine] Via-Node: Bounding box'ta kavşak bulunamadı")

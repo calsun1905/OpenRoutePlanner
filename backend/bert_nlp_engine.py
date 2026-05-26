@@ -130,6 +130,20 @@ except ImportError:
         map_concept_to_osm_queries = None
         PoiResolution = None
 
+try:
+    from text_utils import tr_lower
+except ImportError:
+    try:
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from text_utils import tr_lower
+    except ImportError:
+        def tr_lower(text):
+            if not text: return ""
+            return str(text).replace("İ", "i").replace("I", "ı").lower()
+
+
 
 # =============================================================================
 # SORGU TİPLERİ İÇİN BERT EMBEDding TEMPLATES
@@ -371,7 +385,7 @@ _TR_FOLD_TABLE = str.maketrans(
 def normalize_place_key(value: str) -> str:
     """Yer adı karşılaştırmaları için normalize anahtar üretir."""
     text = (value or "").replace("’", "'").replace("`", "'")
-    text = re.sub(r"\s+", " ", text).strip().casefold()
+    text = tr_lower(re.sub(r"\s+", " ", text).strip())
     text = re.sub(r"[^a-z0-9çğıöşü\s]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return COMMON_ALIASES.get(text, text)
@@ -668,7 +682,7 @@ def normalize_token_with_role(token: str) -> Tuple[str, Optional[str]]:
     Örnek: "Kadıköy'den" -> ("kadıköy", "from")
     """
     cleaned = normalize_query_text(token).strip(".,;:!?()[]{}\"")
-    lowered = cleaned.casefold()
+    lowered = tr_lower(cleaned)
 
     if not lowered:
         return "", None
@@ -1137,7 +1151,7 @@ class PlaceDatabase:
         if deadline_ts is not None and time.monotonic() >= deadline_ts:
             return 0
 
-        normalized_query = (query or "").strip().lower()
+        normalized_query = tr_lower((query or "").strip())
         if len(normalized_query) < 2:
             return 0
 
@@ -1191,7 +1205,7 @@ class PlaceDatabase:
                         display_name=display_name,
                         lat=float(lat),
                         lon=float(lon),
-                        search_terms=f"{short_name.lower()} {display_name.lower()}",
+                        search_terms=f"{tr_lower(short_name)} {tr_lower(display_name)}",
                     )
 
                 time.sleep(self.OSM_RATE_LIMIT)

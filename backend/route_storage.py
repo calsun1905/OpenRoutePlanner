@@ -103,14 +103,56 @@ def _migrate_from_json_if_needed() -> None:
     print(f"[RouteStorage] JSON'dan {len(routes)} rota migrate edildi.")
 
 
-def simplify_coords(coords: List[List[float]], tolerance: int = 3) -> List[List[float]]:
+def simplify_coords(coords: List[List[float]], epsilon: float = 0.00003) -> List[List[float]]:
     """
-    Koordinat listesini sıkıştırır — her N noktadan birini alır.
-    Rota kaydetme hızını artırır.
+    Sıkıştırma için Ramer-Douglas-Peucker (RDP) algoritmasını kullanır.
+    Rota geometrisinin şeklini (virajlar, köşeler) korurken noktaları eler.
     """
     if not coords or len(coords) <= 10:
         return coords
-    return coords[::tolerance]
+        
+    import math
+
+    def _rdp(points: List[List[float]], eps: float) -> List[List[float]]:
+        n = len(points)
+        if n < 3:
+            return points
+            
+        start = points[0]
+        end = points[-1]
+        
+        dmax = 0.0
+        index = -1
+        
+        x1, y1 = start[0], start[1]
+        x2, y2 = end[0], end[1]
+        dx = x2 - x1
+        dy = y2 - y1
+        denom = math.sqrt(dx * dx + dy * dy)
+        
+        for i in range(1, n - 1):
+            p = points[i]
+            if denom == 0:
+                dist = math.sqrt((p[0] - x1) ** 2 + (p[1] - y1) ** 2)
+            else:
+                dist = abs(dy * p[0] - dx * p[1] + x2 * y1 - y2 * x1) / denom
+                
+            if dist > dmax:
+                dmax = dist
+                index = i
+                
+        if dmax > eps:
+            left = _rdp(points[:index + 1], eps)
+            right = _rdp(points[index:], eps)
+            return left[:-1] + right
+        else:
+            return [start, end]
+            
+    try:
+        return _rdp(coords, epsilon)
+    except Exception as e:
+        print(f"[RouteStorage WARNING] RDP failed, using fallback index-skipping: {e}")
+        return coords[::3]
 
 
 def save_route(

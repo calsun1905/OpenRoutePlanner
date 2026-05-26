@@ -20,6 +20,7 @@ except ImportError:
     pd = None
 import networkx as nx
 from route_config import ROUTE_CONFIG
+from text_utils import tr_lower
 
 try:
     from geocoder import geocode
@@ -242,11 +243,13 @@ def _build_tags_cache_suffix(tags: dict) -> str:
     return digest
 
 
-def _cache_path(place_name: str) -> str:
-    """Verilen yer adı için cache dosya yolunu döner."""
+def _cache_path(place_name: str, network_type: str | None = None) -> str:
+    """Verilen yer adi + network tipi icin cache dosya yolunu doner."""
     safe_name = place_name.replace(",", "").replace(" ", "_").lower()
-    return os.path.join(DATA_DIR, f"{safe_name}.graphml")
-
+    if not network_type:
+        return os.path.join(DATA_DIR, f"{safe_name}.graphml")
+    safe_network = str(network_type).replace("-", "_").replace(" ", "_").lower()
+    return os.path.join(DATA_DIR, f"{safe_name}_{safe_network}.graphml")
 
 def _osm_values(value) -> set[str]:
     """Normalize an OSM edge value that may be scalar or list-like."""
@@ -257,8 +260,20 @@ def _osm_values(value) -> set[str]:
     return {str(value).strip().lower()}
 
 
+def _is_bridge_edge(data: dict) -> bool:
+    """Return True if edge is tagged as a bridge-like crossing."""
+    bridge_values = _osm_values((data or {}).get("bridge"))
+    if not bridge_values:
+        return False
+    return any(value not in {"", "no", "false", "0", "none"} for value in bridge_values)
+
+
 def _is_blocked_walk_edge(data: dict) -> bool:
     """Return True for edges that should not be used by outdoor routes."""
+    # Bridge edges are explicitly kept so sea crossings remain routable.
+    if _is_bridge_edge(data):
+        return False
+
     tunnel_values = _osm_values(data.get("tunnel"))
     if any("building_passage" in value for value in tunnel_values):
         return True
@@ -273,6 +288,26 @@ def _is_blocked_walk_edge(data: dict) -> bool:
 
     access_values = _osm_values(data.get("access"))
     return bool(access_values & {"no", "private", "customers"})
+
+
+def _graph_network_type() -> str:
+    """
+    Resolve and validate OSMnx network type from config.
+    Defaults to `all_public` to keep bridge connectivity available.
+    """
+    raw = str(ROUTE_CONFIG.get("OSM_NETWORK_TYPE", "all_public") or "").strip().lower()
+    allowed = {
+        "walk",
+        "drive",
+        "drive_service",
+        "bike",
+        "all",
+        "all_public",
+        "all_private",
+    }
+    if raw in allowed:
+        return raw
+    return "all_public"
 
 
 def _filter_outdoor_walk_graph(G):
@@ -305,27 +340,39 @@ def get_graph(place_name: str = "Kadikoy, Istanbul, Turkey"):
     İlk çağrıda internetten indirir ve .graphml olarak cache'ler.
     Sonraki çağrılarda dosyadan okur (çok daha hızlı).
     """
-    cache_file = _cache_path(place_name)
+    network_type = _graph_network_type()
+    cache_file = _cache_path(place_name, network_type)
 
     if os.path.exists(cache_file):
         print(f"[GraphManager] Cache'den okunuyor: {cache_file}")
         G = ox.load_graphml(cache_file)
     else:
-        print(f"[GraphManager] OSM'den indiriliyor: {place_name}")
-        G = ox.graph_from_place(place_name, network_type="walk")
+        print(f"[GraphManager] OSM'den indiriliyor: {place_name} ({network_type})")
+        G = ox.graph_from_place(place_name, network_type=network_type)
         ox.save_graphml(G, cache_file)
         print(f"[GraphManager] Cache'e kaydedildi: {cache_file}")
 
-    return _filter_outdoor_walk_graph(G)
+    return _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
 
 
-def get_graph_for_points(points: list):
+
+
+def _bosphorus_side(lon: float) -> int:
+    if lon <= 29.010:
+        return -1
+    if lon >= 29.014:
+        return 1
+    return 0
+
+
+def get_graph_for_points(points: list, radius_multiplier: float = 1.0):
     """
     Seçilen noktaların merkezinden, tüm noktaları kapsayacak
     yarıçapla graf indirir. graph_from_point kullanır (bbox'tan çok daha hızlı).
     
     Args:
         points: [(lat, lon), ...] koordinat listesi
+        radius_multiplier: Yarıçap çarpanı (1.0 = varsayılan, 1.8 = köprü deturları için)
     
     Returns:
         networkx.MultiDiGraph: Yürüyüş grafiği
@@ -353,25 +400,82 @@ def get_graph_for_points(points: list):
     
     min_radius = ROUTE_CONFIG.get("GRAPH_RADIUS_MIN_M", 500)
     padding = ROUTE_CONFIG.get("GRAPH_RADIUS_PADDING_M", 300)
-    max_radius = ROUTE_CONFIG.get("GRAPH_RADIUS_MAX_M", 3500)
+    max_radius = ROUTE_CONFIG.get("GRAPH_RADIUS_MAX_M", 20000)
 
-    # Minimum yarıçap + padding uygula. Maksimum değeri config yönetir.
-    radius = min(max_radius, max(min_radius, max_dist + padding))
+    # Minimum yarıçap + padding uygula. Radius multiplier ile çarp.
+    raw_radius = max(min_radius, max_dist + padding)
+    radius = min(max_radius, raw_radius * radius_multiplier)
     
-    # Cache key: merkez + yarıçap
-    cache_key = f"point_{center_lat:.4f}_{center_lon:.4f}_{int(radius)}"
+    # retain_all: radius_multiplier > 1 ise köprü deturları yakalanacak,
+    # tüm bileşenleri tut.
+    retain_all = radius_multiplier > 1.0
+    
+    # Bogaz gecisi tespiti
+    crosses_bosphorus = False
+    if len(points) >= 2:
+        sides = [_bosphorus_side(p[1]) for p in points]
+        if -1 in sides and 1 in sides:
+            crosses_bosphorus = True
+
+    configured_type = _graph_network_type()
+    net_type = configured_type
+    # Kullanicinin network tipi walk olsa bile, deniz asiri geciste kopru baglantilarini
+    # kacirmamak icin all_public'a yukseltilir.
+    if crosses_bosphorus and configured_type == "walk":
+        net_type = "all_public"
+    
+    # Cache key: merkez + yarıçap + net_type
+    cache_key = f"point_{center_lat:.4f}_{center_lon:.4f}_{int(radius)}_{net_type}"
     cache_file = os.path.join(DATA_DIR, f"{cache_key}.graphml")
     
     if os.path.exists(cache_file):
-        print(f"[GraphManager] Cache'den okunuyor: {cache_file}")
-        G = ox.load_graphml(cache_file)
-    else:
-        print(f"[GraphManager] Graf indiriliyor: merkez=({center_lat:.4f}, {center_lon:.4f}), yarıçap={int(radius)}m")
-        G = ox.graph_from_point((center_lat, center_lon), dist=radius, network_type="walk")
+        print(f"[GraphManager] Cache'den okunuyor: {cache_file} ({net_type})")
+        try:
+            G = ox.load_graphml(cache_file)
+            return _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+        except Exception as e:
+            print(f"[GraphManager WARNING] Failed to load cached graph: {e}. Re-downloading...")
+            if os.path.exists(cache_file):
+                try:
+                    os.remove(cache_file)
+                except:
+                    pass
+
+    print(f"[GraphManager] Graf indiriliyor: merkez=({center_lat:.4f}, {center_lon:.4f}), yarıçap={int(radius)}m ({net_type})")
+    try:
+        G = ox.graph_from_point(
+            (center_lat, center_lon),
+            dist=radius,
+            network_type=net_type,
+            retain_all=retain_all,
+        )
         ox.save_graphml(G, cache_file)
         print(f"[GraphManager] Cache'e kaydedildi: {cache_file}")
-    
-    return _filter_outdoor_walk_graph(G)
+        _prune_point_graph_cache()
+        return _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+    except Exception as e:
+        print(f"[GraphManager ERROR] OSMnx failed to load graph for point ({center_lat:.4f}, {center_lon:.4f}) with radius {radius} and type {net_type}: {e}")
+        # Gelişmiş hata kurtarma (Fallback): Kadıköy merkezli varsayılan grafiği yükle
+        fallback_place = "Kadikoy, Istanbul, Turkey"
+        print(f"[GraphManager] Fallback devrede: {fallback_place} grafiği yükleniyor...")
+        fallback_file = _cache_path(fallback_place, net_type)
+        if os.path.exists(fallback_file):
+            try:
+                G = ox.load_graphml(fallback_file)
+                return _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+            except:
+                pass
+        
+        # Kadıköy cache'i de yoksa sıfırdan çekmeyi dene
+        try:
+            G = ox.graph_from_place(fallback_place, network_type=net_type)
+            ox.save_graphml(G, fallback_file)
+            return _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+        except Exception as fallback_exc:
+            print(f"[GraphManager CRITICAL] Fallback graph fetch failed: {fallback_exc}. Returning empty MultiDiGraph.")
+            import networkx as nx
+            G = nx.MultiDiGraph()
+            return G
 
 
 def find_nearest_node(G, lat: float, lon: float) -> int:
@@ -391,21 +495,186 @@ def find_nearest_node(G, lat: float, lon: float) -> int:
         int: En yakın düğüm ID'si
     """
     try:
-        # En yakın yol kenarını bul (u, v, key)
-        u, v, _ = ox.nearest_edges(G, X=lon, Y=lat)
-        
-        # Kenarın iki uç noktasından kullanıcıya en yakın olanı seç
-        u_data = G.nodes[u]
-        v_data = G.nodes[v]
-
-        dist_u = ((u_data["y"] - lat) ** 2 + (u_data["x"] - lon) ** 2)
-        dist_v = ((v_data["y"] - lat) ** 2 + (v_data["x"] - lon) ** 2)
-
-        return u if dist_u <= dist_v else v
+        node_id, _ = find_nearest_node_with_distance(G, lat, lon)
+        return int(node_id)
     except Exception as e:
         # Fallback: nearest_nodes kullan
         print(f"[GraphManager] Manuel nearest node hatası, fallback kullanılıyor: {e}")
         return ox.nearest_nodes(G, X=lon, Y=lat)
+
+
+def _edge_semantic_penalty_m(data: dict) -> float:
+    """Return extra penalty distance (metres) for a given edge based on its tags.
+
+    Currently adds penalty for bridge-tagged edges so that snap-to-graph logic
+    prefers non-bridge neighbours.
+    """
+    penalty = 0.0
+    if _is_bridge_edge(data or {}):
+        penalty += float(ROUTE_CONFIG.get("SNAP_BRIDGE_PENALTY_M", 45.0))
+    return penalty
+
+
+def find_nearest_node_with_distance(G, lat: float, lon: float) -> tuple:
+    """
+    Verilen koordinata en yakın graf düğümünü bulur ve snap mesafesini (metre)
+    döndürür.  Köprü kenarı üzerindeki düğümlere ceza ekleyerek kara komşularını
+    tercih eder.  snap mesafesi, sorgu noktasının kenar geometrisine (çizgiye)
+    olan en kısa mesafesidir.
+
+    Returns:
+        (node_id, snap_distance_m)
+    """
+    import math
+    max_candidates = int(ROUTE_CONFIG.get("SNAP_MAX_NEIGHBOR_CANDIDATES", 4))
+    gap_max_m = float(ROUTE_CONFIG.get("SNAP_NODE_EDGE_GAP_MAX_M", 110.0))
+    edge_near_threshold_m = float(ROUTE_CONFIG.get("SNAP_EDGE_NEAR_THRESHOLD_M", 25.0))
+    cross_shore_penalty_m = float(ROUTE_CONFIG.get("SNAP_CROSS_SHORE_PENALTY_M", 2000.0))
+
+    def _haversine_m(lat1, lon1, lat2, lon2):
+        R = 6_371_000
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = math.sin(dlat / 2) ** 2 + (
+            math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+        )
+        return R * 2 * math.asin(math.sqrt(a))
+
+    def _point_to_segment_m(plat, plon, alat, alon, blat, blon):
+        """Sorgu noktasının (plat, plon) bir kenar segmentine (a->b) olan minimum mesafesi."""
+        # Segment vektörü
+        dx = blon - alon
+        dy = blat - alat
+        seg_len_sq = dx * dx + dy * dy
+        if seg_len_sq < 1e-18:
+            return _haversine_m(plat, plon, alat, alon)
+        # Projeksiyon parametresi t ∈ [0, 1]
+        t = ((plon - alon) * dx + (plat - alat) * dy) / seg_len_sq
+        t = max(0.0, min(1.0, t))
+        proj_lon = alon + t * dx
+        proj_lat = alat + t * dy
+        return _haversine_m(plat, plon, proj_lat, proj_lon)
+
+    def _edge_snap_distance(plat, plon, edata, u_data, v_data):
+        """Kenar geometrisine veya uç noktalarına olan en kısa mesafe."""
+        geom = getattr(edata.get("geometry"), "coords", None)
+        if geom and len(geom) >= 2:
+            best = float("inf")
+            coords = list(geom)
+            for i in range(len(coords) - 1):
+                # geometry coords are (x=lon, y=lat)
+                d = _point_to_segment_m(
+                    plat, plon,
+                    coords[i][1], coords[i][0],
+                    coords[i + 1][1], coords[i + 1][0],
+                )
+                if d < best:
+                    best = d
+            return best
+        # Geometri yoksa uç noktalar arası segment
+        return _point_to_segment_m(
+            plat, plon,
+            u_data["y"], u_data["x"],
+            v_data["y"], v_data["x"],
+        )
+
+    try:
+        u, v, key = ox.nearest_edges(G, X=lon, Y=lat)
+    except Exception:
+        node = ox.nearest_nodes(G, X=lon, Y=lat)
+        nd = G.nodes[node]
+        return node, _haversine_m(lat, lon, nd["y"], nd["x"])
+
+    # Nearest-edge'den snap mesafesini hesapla.
+    u_data = G.nodes[u]
+    v_data = G.nodes[v]
+    edata = G.get_edge_data(u, v)
+    if edata:
+        edata = edata.get(key, edata.get(0, {})) if isinstance(edata, dict) else {}
+    else:
+        edata = {}
+    edge_snap_m = _edge_snap_distance(lat, lon, edata, u_data, v_data)
+
+    # Kenar uç noktalarını + yakın komşuları aday olarak topla.
+    candidates = {u, v}
+    for n in (u, v):
+        for nbr in list(G.successors(n))[:max_candidates]:
+            candidates.add(nbr)
+        for nbr in list(G.predecessors(n))[:max_candidates]:
+            candidates.add(nbr)
+
+    best_node = u
+    best_score = float("inf")
+    best_raw_dist = float("inf")
+    query_side = _bosphorus_side(lon)
+
+    for c in candidates:
+        nd = G.nodes[c]
+        raw_dist = _haversine_m(lat, lon, nd["y"], nd["x"])
+        # Kenar noktaya yakınsa, node bu kenar geometrisinden aşırı uzakta olmamalı.
+        if edge_snap_m <= edge_near_threshold_m and (raw_dist - edge_snap_m) > gap_max_m:
+            continue
+
+        # Komşu kenarlardan semantik ceza hesapla.
+        penalty = 0.0
+        for _, _, ed in G.edges(c, data=True):
+            penalty = max(penalty, _edge_semantic_penalty_m(ed))
+
+        # Kullanıcı noktası belirgin bir yakadaysa, karşı yakaya snap'i caydır.
+        cand_side = _bosphorus_side(float(nd.get("x", lon)))
+        if query_side != 0 and cand_side != 0 and cand_side != query_side:
+            penalty += cross_shore_penalty_m
+
+        score = raw_dist + penalty
+        if score < best_score:
+            best_score = score
+            best_node = c
+            best_raw_dist = raw_dist
+
+    # snap_m: kenar geometrisine olan mesafe (daha doğru) veya node mesafesi
+    # (hangisi küçükse)
+    snap_m = min(edge_snap_m, best_raw_dist)
+    return best_node, snap_m
+
+
+def _apply_routing_edge_weights(G):
+    """
+    Graf kenarlarına routing ağırlığı atar.  Köprü kenarlarına
+    BRIDGE_PENALTY_FACTOR çarpanı uygulanır.
+
+    Returns:
+        G (aynı graf, yerinde güncellenir)
+    """
+    weight_key = str(ROUTE_CONFIG.get("ROUTING_WEIGHT_KEY", "routing_length"))
+    penalty_factor = float(ROUTE_CONFIG.get("BRIDGE_PENALTY_FACTOR", 1.8))
+
+    for u, v, k, data in G.edges(keys=True, data=True):
+        length = float(data.get("length", 0.0))
+        if _is_bridge_edge(data):
+            data[weight_key] = length * penalty_factor
+        else:
+            data[weight_key] = length
+
+    return G
+
+
+def _prune_point_graph_cache():
+    """
+    DATA_DIR içindeki point_*.graphml dosyalarını tarih sırasına göre
+    sıralayıp, GRAPH_POINT_CACHE_MAX_FILES sınırının üzerindeki en eski
+    dosyaları siler.
+    """
+    import glob
+    max_files = int(ROUTE_CONFIG.get("GRAPH_POINT_CACHE_MAX_FILES", 20))
+    pattern = os.path.join(DATA_DIR, "point_*.graphml")
+    files = sorted(glob.glob(pattern), key=os.path.getmtime)
+
+    while len(files) > max_files:
+        oldest = files.pop(0)
+        try:
+            os.remove(oldest)
+        except OSError:
+            pass
 
 
 def _rows_to_poi_list(gdf, category_label: str) -> list:
@@ -469,7 +738,7 @@ def _resolve_search_center(place_name: str):
 
 
 def _bbox_span_km(minx: float, miny: float, maxx: float, maxy: float) -> float:
-    """Yaklasik en/boy (km) — genis bbox tespiti icin."""
+    """Yaklasik en/boy (km) -” genis bbox tespiti icin."""
     center_lat = (miny + maxy) / 2.0
     lat_km = max(1e-6, (maxy - miny)) * 111.0
     lon_km = max(1e-6, (maxx - minx)) * 111.0 * max(0.15, math.cos(math.radians(center_lat)))
@@ -680,11 +949,11 @@ def search_pois_by_tags(
         }
         return ([], empty_meta) if return_meta else []
 
-    category_hint = (category_hint or "semantic").lower()
+    category_hint = tr_lower(category_hint or "semantic")
     search_mode = (search_mode or "auto").strip().lower()
     cache_category = f"{category_hint}|{_build_tags_cache_suffix(normalized_tags)}|mode:{search_mode}"
     print(
-        f"[POI] Arama baslatildi (tags): {place_name}, "
+        f"[POI] arama baslatildi (tags): {place_name}, "
         f"tags={normalized_tags}, hint={category_hint}, mode={search_mode}, force={force_refresh}"
     )
 
@@ -835,7 +1104,7 @@ def search_pois(
         - return_meta=False: list
         - return_meta=True: tuple[list, dict]
     """
-    print(f"[POI] Arama baslatildi: {place_name}, kategori={category}")
+    print(f"[POI] arama baslatildi: {place_name}, kategori={category}")
     from osm_poi_dictionary import POI_MAPPING
 
     normalized_category = category.lower().strip()
@@ -887,7 +1156,7 @@ def search_poi_by_name_fuzzy(query_name: str, place_name: str = None) -> list:
                     results.append((1.0, poi))
                     continue
                     
-                # Fuzzy matching (benzerlik oranı)
+                # fuzzy matching (benzerlik oranı)
                 ratio = difflib.SequenceMatcher(None, query_name_lower, name).ratio()
                 if ratio > 0.65:  # %65 benzerlik sınırı
                     results.append((ratio, poi))
@@ -904,12 +1173,12 @@ def search_poi_by_name_fuzzy(query_name: str, place_name: str = None) -> list:
                 unique_pois.append(poi)
                 
         if unique_pois:
-            print(f"[POI] Fuzzy match başarılı. '{query_name}' için {len(unique_pois)} sonuç.")
+            print(f"[POI] fuzzy match başarılı. '{query_name}' için {len(unique_pois)} sonuç.")
             return unique_pois
     except Exception as e:
-        print(f"[POI] Fuzzy arama hatası: {e}")
+        print(f"[POI] fuzzy arama hatası: {e}")
         
-    print(f"[POI] Fuzzy match bulunamadı: '{query_name}'.")
+    print(f"[POI] fuzzy match bulunamadı: '{query_name}'.")
     return []
 
 

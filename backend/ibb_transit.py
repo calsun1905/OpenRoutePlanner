@@ -13,6 +13,9 @@ import re
 import json
 import math
 import time
+import csv
+import io
+import hashlib
 import sqlite3
 import requests
 from typing import List, Dict, Optional, Tuple, Any
@@ -28,6 +31,7 @@ TRANSIT_DB = os.path.join(CACHE_DIR, "transit.db")
 
 IBB_API_URL = "https://api.ibb.gov.tr/iett/UlasimAnaVeri/HatDurakGuzergah.asmx"
 METRO_API_BASE = "https://api.ibb.gov.tr/MetroIstanbul/api/MetroMobile/V2"
+GTFS_CKAN_URL = "https://data.ibb.gov.tr/api/3/action/package_show?id=public-transport-gtfs-data"
 
 # Rate limiting (IBB API aşırı yüklenmesin)
 _last_request_time = 0.0
@@ -612,6 +616,329 @@ def _derive_line_type(line_name: str) -> str:
     return "other"
 
 
+def _normalize_ascii_token(text: str) -> str:
+    """Metni karsilastirma icin normalize eder."""
+    if not text:
+        return ""
+    return (
+        str(text)
+        .strip()
+        .lower()
+        .replace("ı", "i")
+        .replace("İ", "i")
+        .replace("ğ", "g")
+        .replace("Ğ", "g")
+        .replace("ş", "s")
+        .replace("Ş", "s")
+        .replace("ç", "c")
+        .replace("Ç", "c")
+        .replace("ö", "o")
+        .replace("Ö", "o")
+        .replace("ü", "u")
+        .replace("Ü", "u")
+    )
+
+
+def _gtfs_get_resource_url(resource_name: str) -> Optional[str]:
+    """CKAN API uzerinden GTFS kaynak URL'sini bulur."""
+    try:
+        resp = requests.get(GTFS_CKAN_URL, timeout=40)
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        resources = data.get("result", {}).get("resources", [])
+        wanted = _normalize_ascii_token(resource_name).replace(".txt", "").replace(".csv", "")
+        for r in resources:
+            name = _normalize_ascii_token(str(r.get("name", ""))).replace(".txt", "").replace(".csv", "")
+            if name == wanted:
+                return r.get("url")
+        return None
+    except Exception:
+        return None
+
+
+def _gtfs_download_csv(resource_name: str, force: bool = False) -> Optional[str]:
+    """GTFS CSV dosyasini indirir (cache destekli)."""
+    cache_file = os.path.join(CACHE_DIR, f"gtfs_{resource_name}.csv")
+    if (not force) and os.path.exists(cache_file):
+        try:
+            with open(cache_file, "r", encoding="utf-8", errors="replace") as f:
+                return f.read()
+        except Exception:
+            pass
+
+    url = _gtfs_get_resource_url(resource_name)
+    if not url:
+        return None
+
+    last_err = None
+    for _ in range(3):
+        try:
+            resp = requests.get(url, timeout=120)
+            resp.raise_for_status()
+            content = resp.content.decode("utf-8", errors="replace")
+            with open(cache_file, "w", encoding="utf-8") as f:
+                f.write(content)
+            return content
+        except Exception as e:
+            last_err = e
+            time.sleep(1.2)
+
+    print(f"[GTFS] {resource_name} indirilemedi: {last_err}")
+    return None
+
+
+def _stable_gtfs_station_id(stop_id: str) -> int:
+    """GTFS stop_id icin deterministik, cakisma olasiligi dusuk integer ID."""
+    digest = hashlib.sha1(str(stop_id).encode("utf-8", errors="ignore")).hexdigest()
+    return 700000000 + (int(digest[:10], 16) % 200000000)
+
+
+def sync_marmaray_from_gtfs(force: bool = False) -> Dict[str, int]:
+    """
+    IBB GTFS (routes/trips/stop_times/stops) uzerinden Marmaray hattini
+    metro graph tablolarina ekler/gunceller.
+    """
+    if not force:
+        try:
+            conn = _get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM meta WHERE key = 'marmaray_gtfs_last_sync'")
+            row = cursor.fetchone()
+            if row:
+                age_hours = (time.time() - float(row["value"])) / 3600
+                if age_hours < 24:
+                    cursor.execute("SELECT id FROM metro_lines WHERE functional_code = 'GTFS-MARMARAY' LIMIT 1")
+                    line_row = cursor.fetchone()
+                    if line_row:
+                        line_id = int(line_row["id"])
+                        cursor.execute("SELECT COUNT(*) as c FROM metro_line_stations WHERE line_id = ?", (line_id,))
+                        link_count = int(cursor.fetchone()["c"])
+                        conn.close()
+                        if link_count >= 2:
+                            return {
+                                "marmaray_line_id": line_id,
+                                "marmaray_stations": 0,
+                                "marmaray_links": link_count,
+                            }
+                    else:
+                        conn.close()
+                else:
+                    conn.close()
+            else:
+                conn.close()
+        except Exception:
+            pass
+
+    routes_csv = _gtfs_download_csv("routes", force=force)
+    trips_csv = _gtfs_download_csv("trips", force=force)
+    stop_times_csv = _gtfs_download_csv("stop_times", force=force)
+    stops_csv = _gtfs_download_csv("stops", force=force)
+    if not routes_csv or not trips_csv or not stop_times_csv or not stops_csv:
+        return {"marmaray_line_id": 0, "marmaray_stations": 0, "marmaray_links": 0}
+
+    try:
+        route_rows = list(csv.DictReader(io.StringIO(routes_csv)))
+        trip_rows = list(csv.DictReader(io.StringIO(trips_csv)))
+        stop_rows = list(csv.DictReader(io.StringIO(stops_csv)))
+    except Exception as e:
+        print(f"[GTFS] CSV parse hatasi: {e}")
+        return {"marmaray_line_id": 0, "marmaray_stations": 0, "marmaray_links": 0}
+
+    marmaray_route_ids = set()
+    for r in route_rows:
+        rid = str(r.get("route_id") or "").strip()
+        short_name = _normalize_ascii_token(r.get("route_short_name") or "")
+        long_name = _normalize_ascii_token(r.get("route_long_name") or "")
+        desc = _normalize_ascii_token(r.get("route_desc") or "")
+        if not rid:
+            continue
+        if "marmaray" in f"{short_name} {long_name} {desc}":
+            marmaray_route_ids.add(rid)
+
+    if not marmaray_route_ids:
+        print("[GTFS] Marmaray route_id bulunamadi")
+        return {"marmaray_line_id": 0, "marmaray_stations": 0, "marmaray_links": 0}
+
+    marmaray_trip_ids = set()
+    for t in trip_rows:
+        if str(t.get("route_id") or "").strip() in marmaray_route_ids:
+            tid = str(t.get("trip_id") or "").strip()
+            if tid:
+                marmaray_trip_ids.add(tid)
+
+    if not marmaray_trip_ids:
+        print("[GTFS] Marmaray trip_id bulunamadi")
+        return {"marmaray_line_id": 0, "marmaray_stations": 0, "marmaray_links": 0}
+
+    stop_times_by_trip: Dict[str, List[Tuple[int, str]]] = {}
+    try:
+        st_reader = csv.DictReader(io.StringIO(stop_times_csv))
+        for row in st_reader:
+            tid = str(row.get("trip_id") or "").strip()
+            if tid not in marmaray_trip_ids:
+                continue
+            sid = str(row.get("stop_id") or "").strip()
+            if not sid:
+                continue
+            try:
+                seq = int(float(row.get("stop_sequence") or 0))
+            except Exception:
+                continue
+            if tid not in stop_times_by_trip:
+                stop_times_by_trip[tid] = []
+            stop_times_by_trip[tid].append((seq, sid))
+    except Exception as e:
+        print(f"[GTFS] stop_times parse hatasi: {e}")
+        return {"marmaray_line_id": 0, "marmaray_stations": 0, "marmaray_links": 0}
+
+    best_trip_stops: List[str] = []
+    best_score = (-1, -1)
+    for _, seq_rows in stop_times_by_trip.items():
+        if len(seq_rows) < 2:
+            continue
+        seq_rows.sort(key=lambda x: x[0])
+        ordered: List[str] = []
+        seen = set()
+        for _, sid in seq_rows:
+            if sid in seen:
+                continue
+            seen.add(sid)
+            ordered.append(sid)
+        if len(ordered) < 2:
+            continue
+        score = (len(ordered), len(seq_rows))
+        if score > best_score:
+            best_score = score
+            best_trip_stops = ordered
+
+    if len(best_trip_stops) < 2:
+        print("[GTFS] Marmaray stop dizisi olusturulamadi")
+        return {"marmaray_line_id": 0, "marmaray_stations": 0, "marmaray_links": 0}
+
+    stop_lookup: Dict[str, Dict[str, Any]] = {}
+    for row in stop_rows:
+        sid = str(row.get("stop_id") or "").strip()
+        if sid:
+            stop_lookup[sid] = row
+
+    # Parent station varsa onu tercih et (platform yerine istasyon node'u)
+    canonical_stops: List[str] = []
+    for sid in best_trip_stops:
+        base = stop_lookup.get(sid, {})
+        parent = str(base.get("parent_station") or "").strip()
+        canonical = parent if parent else sid
+        if canonical_stops and canonical_stops[-1] == canonical:
+            continue
+        canonical_stops.append(canonical)
+
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id FROM metro_lines WHERE functional_code = 'GTFS-MARMARAY' OR LOWER(name) = 'marmaray' ORDER BY id LIMIT 1"
+    )
+    row = cursor.fetchone()
+    if row:
+        marmaray_line_id = int(row["id"])
+    else:
+        cursor.execute("SELECT COALESCE(MAX(id), 0) as max_id FROM metro_lines")
+        max_id = int(cursor.fetchone()["max_id"] or 0)
+        marmaray_line_id = max(9000, max_id + 1)
+
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO metro_lines
+        (id, name, short_description, long_description, functional_code, is_active,
+         first_time, last_time, color_r, color_g, color_b, line_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            marmaray_line_id,
+            "Marmaray",
+            "Marmaray",
+            "Halkali-Gebze Marmaray Hatti (GTFS)",
+            "GTFS-MARMARAY",
+            1,
+            "",
+            "",
+            20,
+            83,
+            45,
+            "metro",
+        ),
+    )
+
+    cursor.execute("DELETE FROM metro_line_stations WHERE line_id = ?", (marmaray_line_id,))
+
+    inserted_stations = 0
+    inserted_links = 0
+    order = 1
+    for sid in canonical_stops:
+        stop = stop_lookup.get(sid) or {}
+        if not stop:
+            continue
+        stop_name = _fix_encoding(str(stop.get("stop_name") or stop.get("stop_desc") or sid).strip())
+        try:
+            lat = float(stop.get("stop_lat") or 0)
+            lon = float(stop.get("stop_lon") or 0)
+        except Exception:
+            continue
+        if lat == 0 or lon == 0:
+            continue
+        if not (40.5 <= lat <= 41.5 and 27.5 <= lon <= 30.5):
+            continue
+
+        station_id = _stable_gtfs_station_id(sid)
+        for _ in range(50):
+            cursor.execute("SELECT name, description FROM metro_stations WHERE id = ?", (station_id,))
+            existing = cursor.fetchone()
+            if not existing:
+                break
+            existing_name = _normalize_ascii_token(existing["description"] or existing["name"] or "")
+            if existing_name == _normalize_ascii_token(stop_name):
+                break
+            station_id += 1
+
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO metro_stations
+            (id, name, description, lat, lon, is_active)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (station_id, stop_name, stop_name, lat, lon, 1),
+        )
+        inserted_stations += 1
+
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO metro_line_stations
+            (line_id, station_id, station_order)
+            VALUES (?, ?, ?)
+            """,
+            (marmaray_line_id, station_id, order),
+        )
+        inserted_links += 1
+        order += 1
+
+    cursor.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+        ("marmaray_gtfs_last_sync", str(time.time())),
+    )
+    conn.commit()
+    conn.close()
+
+    print(
+        f"[GTFS] Marmaray sync tamamlandi: line_id={marmaray_line_id}, "
+        f"stations={inserted_stations}, links={inserted_links}"
+    )
+    return {
+        "marmaray_line_id": marmaray_line_id,
+        "marmaray_stations": inserted_stations,
+        "marmaray_links": inserted_links,
+    }
+
+
 def download_metro_data(force: bool = False) -> Dict[str, int]:
     """
     Metro Istanbul API'den tum rayli sistem hat ve istasyonlarini indirir.
@@ -760,12 +1087,14 @@ def initialize_transit_data(force: bool = False) -> dict:
     route_count = download_all_routes(force=force)
     route_stop_count = download_route_stops(max_routes=900, force=force)
     metro_result = download_metro_data(force=force)
+    marmaray_result = sync_marmaray_from_gtfs(force=force)
 
     elapsed = round(time.time() - start_time, 1)
     print(f"[Transit] Toplam sure: {elapsed}s")
     print(
         f"[Transit] {stop_count} durak, {route_count} hat, {route_stop_count} esleme, "
-        f"{metro_result.get('metro_lines', 0)} metro hatti yuklendi"
+        f"{metro_result.get('metro_lines', 0)} metro hatti yuklendi, "
+        f"Marmaray link: {marmaray_result.get('marmaray_links', 0)}"
     )
 
     return {
@@ -773,6 +1102,7 @@ def initialize_transit_data(force: bool = False) -> dict:
         "routes": route_count,
         "route_stops": route_stop_count,
         **metro_result,
+        **marmaray_result,
     }
 
 

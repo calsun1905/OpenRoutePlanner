@@ -12,7 +12,7 @@ _MOJIBAKE_HINTS = (
     "\u00c3",  # Ã
     "\u00c4",  # Ş
     "\u00c5",  # Å
-    "\u00c2",  # Â
+    "\u00c2",  # 
     "\u00e2\u20ac",  # â 
 )
 _CONTROL_CHARS = re.compile(r"[\u0000-\u0008\u000b\u000c\u000e-\u001f]")
@@ -32,7 +32,7 @@ _TR_LEGACY_TRANSLATION = str.maketrans(
     {
         "\u00fd": "\u0131",  # ý -> ı
         "\u00dd": "\u0130",  # Ý -> İ
-        "\u00f0": "\u011f",  # ð -> ğ
+        "\u00f0": "\u011f",  # ğ -> ğ
         "\u00d0": "\u011e",  # Ð -> Ğ
         "\u00fe": "\u015f",  # þ -> ş
         "\u00de": "\u015e",  # Þ -> Ş
@@ -149,3 +149,14 @@ def repair_payload(value: Any) -> Any:
     if isinstance(value, tuple):
         return tuple(repair_payload(item) for item in value)
     return value
+
+
+def tr_lower(text: str | None) -> str:
+    """
+    Turkish-specific lowercasing.
+    Converts 'İ' to 'i' and 'I' to 'ı' correctly before applying standard .lower().
+    """
+    if not text:
+        return ""
+    return str(text).replace("İ", "i").replace("I", "ı").lower()
+
