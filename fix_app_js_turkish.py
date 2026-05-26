@@ -7,7 +7,7 @@ with open('frontend/js/app.js', 'rb') as f:
 # Correct UTF-8 for ş is 0xC5 0x9F
 fixes = [
     (b'\xc3\x85\xc5\xb8', b'\xc5\x9f'),  # Corrupted ş -> ş
-    (b'\xc3\x84\xc2\xb0', b'\xc3\xb0'),  # Corrupted ð -> ð
+    (b'\xc3\x84\xc2\xb0', b'\xc3\xb0'),  # Corrupted ğ -> ğ
     (b'\xc3\x82\xc2\xbf', b'\xc3\xbf'),  # Corrupted ÿ -> ÿ
     (b'\xc3\x83\xc2\xbc', b'\xc3\xbc'),  # Corrupted ü -> ü
     (b'\xc3\x82\xc2\xb1', b'\xc4\xb1'),  # Corrupted ı -> ı
@@ -34,16 +34,16 @@ with open('frontend/js/app.js', 'r', encoding='utf-8', errors='replace') as f:
     text = f.read()
 
 text_fixes = [
-    ('kaydenilmiÅŸ', 'kaydedilmiş'),
-    ('kayd edilmiÅŸ', 'kaydedilmiş'),
-    ('ÅŸ', 'ş'),
-    ('Ã‡', 'Ç'),
-    ('Ã–', 'Ö'),
-    ('Ãœ', 'Ü'),
-    ('Ã‡', 'Ç'),
-    ('Ã¡', 'á'),
-    ('Ã¢', 'â'),
-    ('Ã ', 'İ'),
+    ('kaydedilmiş', 'kaydedilmiş'),
+    ('kaydedilmiş', 'kaydedilmiş'),
+    ('ş', 'ş'),
+    ('Ç', 'Ç'),
+    ('Ö', 'Ö'),
+    ('Ü', 'Ü'),
+    ('Ç', 'Ç'),
+    ('á', 'á'),
+    ('â', 'â'),
+    ('à', 'İ'),
 ]
 
 original = text

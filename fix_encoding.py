@@ -12,7 +12,7 @@ def fix_mojibake_characters(text):
     # Single-layer mojibake (Latin-1 misinterpreted as UTF-8)
     single_layer = [
         ('\xc3\xa2', 'a'),  # â
-        ('\xc3\x82', 'A'),  # Â
+        ('\xc3\x82', 'A'),  # 
         ('\xc3\xa0', 'a'),  # à
         ('\xc3\xa1', 'a'),  # á
         ('\xc3\xa4', 'a'),  # ä
@@ -25,7 +25,7 @@ def fix_mojibake_characters(text):
         ('\xc3\x9c', 'U'),  # Ü
         ('\xc3\xa7', 'c'),  # ç
         ('\xc3\x87', 'C'),  # Ç
-        ('\xc3\xb0', 'i'),  # ð (used as ı)
+        ('\xc3\xb0', 'i'),  # ğ (used as ı)
         ('\xc3\x90', 'I'),  # Ð (used as İ)
         ('\xc3\x9f', 's'),  # ß (used as ş)
         ('\xc3\x98', 'O'),  # Ø (used as Ö)
@@ -108,7 +108,7 @@ def process_file(filepath):
             return False
     
     # Mojibake kontrol - look for common mojibake patterns
-    has_mojibake = bool(re.search(r'[Ã\x83Ã¢\x83ÄÅ§Ã¶Ã¼Ã\x9fÃ\x8d]', text))
+    has_mojibake = bool(re.search(r'[Ã\x83â\x83ÄÅ§öüÃ\x9fÃ\x8d]', text))
     
     if has_mojibake:
         print('FIXING: {}'.format(filepath))

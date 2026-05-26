@@ -75,8 +75,8 @@ def decode_corrupt_utf8(data):
                         0xAD: b'\xc3\xad',  # í
                         0xAE: b'\xc3\xae',  # î
                         0xAF: b'\xc3\xaf',  # ï
-                        0xB0: b'\xc3\xb0',  # ð
-                        0xB1: b'\xc3\xb1',  # ñ
+                        0xB0: b'\xc3\xb0',  # ğ
+                        0xB1: b'\xc3\xb1',  # ı
                         0xB2: b'\xc3\xb2',  # ò
                         0xB3: b'\xc3\xb3',  # ó
                         0xB4: b'\xc3\xb4',  # ô

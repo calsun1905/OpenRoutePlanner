@@ -9,33 +9,33 @@ import re
 # Common mojibake patterns in UTF-8 text
 MOJIBAKE_PATTERNS = [
     # Triple-layer patterns (most corrupted)
-    ('ÃƒÂ¶', 'ö'), ('ÃƒÂ¼', 'ü'), ('ÃƒÂ§', 'ç'), ('ÃƒÂŸ', 'ğ'),
-    ('ÃƒÂ±', 'ı'), ('ÃƒÂ ', 'İ'),
+    ('Ãƒ¶', 'ö'), ('Ãƒ¼', 'ü'), ('Ãƒ§', 'ç'), ('ÃƒŸ', 'ğ'),
+    ('Ãƒ±', 'ı'), ('Ãƒ ', 'İ'),
     
     # Double-layer patterns
-    ('kàƒÂ¶pràƒÂ¼', 'köprü'),
-    ('saàƒÂ¸lar', 'sağlar'),
-    ('iàƒÂ§', 'iç'),
+    ('kàƒ¶pràƒ¼', 'köprü'),
+    ('saàƒ¸lar', 'sağlar'),
+    ('iàƒ§', 'iç'),
     ('deà„Å¸', 'değ'),
-    ('tàƒÂ¼rk', 'türk'),
-    ('bàƒÂ¶l', 'böl'),
-    ('Ã†Å¸', 'ş'),
-    ('Ã…Å¸', 'Ş'),
+    ('tàƒ¼rk', 'türk'),
+    ('bàƒ¶l', 'böl'),
+    ('İÅ¸', 'ş'),
+    ('Ş', 'Ş'),
     
     # Single-layer patterns (less corrupted)
-    ('Ã‡', 'Ç'),
-    ('Ã–', 'Ö'),
-    ('Ãœ', 'Ü'),
-    ('Ã†', 'İ'),
-    ('Ã±', 'ı'),
-    ('Ã§', 'ç'),
-    ('Ã¶', 'ö'),
-    ('Ã¼', 'ü'),
-    ('Ã„Å¸', 'ş'),
-    ('Ã¡', 'á'),
-    ('Ã¢', 'â'),
+    ('Ç', 'Ç'),
+    ('Ö', 'Ö'),
+    ('Ü', 'Ü'),
+    ('İ', 'İ'),
+    ('ı', 'ı'),
+    ('ç', 'ç'),
+    ('ö', 'ö'),
+    ('ü', 'ü'),
+    ('Ş', 'ş'),
+    ('á', 'á'),
+    ('â', 'â'),
     ('à€', ''),
-    ('àƒÂ ', 'İ'),
+    ('àƒ ', 'İ'),
     ('à„Å¸', 'ş'),
 ]
 
@@ -67,9 +67,9 @@ def fix_file_proper(filepath):
                 break
         
         # Clean up any remaining garbage
-        result = re.sub(r'ÃƒÂ[A-Za-z]+', '', result)
         result = re.sub(r'Ãƒ[A-Za-z]+', '', result)
-        result = re.sub(r'àƒÂ[A-Za-z]+', '', result)
+        result = re.sub(r'Ãƒ[A-Za-z]+', '', result)
+        result = re.sub(r'àƒ[A-Za-z]+', '', result)
         result = re.sub(r'à„[A-Za-z]+', '', result)
         
         # Write back
