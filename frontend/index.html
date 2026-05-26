@@ -202,6 +202,31 @@
             </a>
         </div>
 
+        <!-- Weather Simulator Panel (hidden initially) -->
+        <div class="weather-sim-panel" id="weatherSimulatorPanel" style="display: none;">
+            <div class="weather-sim-header">
+                <h3 class="weather-sim-title">☀️ Zaman & Hava Simülatörü</h3>
+            </div>
+            <p class="weather-sim-desc">
+                Yola çıkış saatinizi değiştirerek rota üzerindeki hava tahminlerini simüle edin:
+            </p>
+            <div class="weather-sim-slider-container">
+                <div style="display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 0.9rem; margin-bottom: 6px;">
+                    <span id="simulatorTimeDisplay" style="color: var(--accent-primary);">09:00</span>
+                    <span id="simulatorWeatherLabel" style="font-size: 0.82rem; color: var(--text-secondary); font-weight: 500;">Yükleniyor...</span>
+                </div>
+                <input type="range" id="weatherSimulatorSlider" min="0" max="23" value="9" class="weather-sim-slider">
+                <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); padding: 0 2px;">
+                    <span>00:00</span>
+                    <span>12:00</span>
+                    <span>23:00</span>
+                </div>
+            </div>
+            <div class="forecast-strip" id="simulatorForecastStrip">
+                <!-- Dynamic hourly forecast cards will be injected here -->
+            </div>
+        </div>
+
         <!-- Turn-by-turn Panel (hidden initially) -->
         <div class="section" id="turnByTurnPanel" style="display: none; margin-top: 12px;">
             <h2>🧭 Adım Adım Yönlendirme</h2>

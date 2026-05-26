@@ -2896,3 +2896,174 @@ body::before {
         min-height: 200px;
     }
 }
+
+/* --- Weather & Route Timeline Simulator --- */
+.weather-sim-panel {
+    background: var(--bg-glass, rgba(255, 255, 255, 0.03));
+    border: 1px solid rgba(108, 92, 231, 0.2);
+    border-radius: var(--radius-md, 12px);
+    padding: 14px;
+    margin-top: 14px;
+    box-shadow: var(--shadow-card);
+    transition: all var(--transition-normal);
+}
+
+.weather-sim-panel:hover {
+    border-color: rgba(108, 92, 231, 0.35);
+    box-shadow: 0 8px 32px rgba(108, 92, 231, 0.08);
+}
+
+.weather-sim-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.weather-sim-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.weather-sim-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.weather-sim-slider-container {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: var(--radius-sm, 8px);
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.weather-sim-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+    margin: 10px 0;
+    transition: background 0.3s;
+}
+
+.weather-sim-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-primary, #6c5ce7);
+    border: 2px solid #fff;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(108, 92, 231, 0.5);
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.weather-sim-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    background: var(--accent-secondary, #a29bfe);
+}
+
+.weather-sim-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-primary, #6c5ce7);
+    border: 2px solid #fff;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(108, 92, 231, 0.5);
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.weather-sim-slider::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    background: var(--accent-secondary, #a29bfe);
+}
+
+.forecast-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 12px;
+    margin-top: 12px;
+}
+
+/* Custom Scrollbar for Forecast Strip */
+.forecast-strip::-webkit-scrollbar {
+    height: 4px;
+}
+
+.forecast-strip::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.forecast-strip::-webkit-scrollbar-thumb {
+    background: rgba(108, 92, 231, 0.25);
+    border-radius: 2px;
+}
+
+.forecast-strip::-webkit-scrollbar-thumb:hover {
+    background: rgba(108, 92, 231, 0.4);
+}
+
+.forecast-card {
+    flex: 0 0 72px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: var(--radius-sm, 8px);
+    padding: 8px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.forecast-card:hover {
+    background: rgba(108, 92, 231, 0.08);
+    border-color: rgba(108, 92, 231, 0.25);
+    transform: translateY(-2px);
+}
+
+.forecast-card.active {
+    background: rgba(108, 92, 231, 0.15);
+    border-color: var(--accent-primary, #6c5ce7);
+    box-shadow: 0 0 10px rgba(108, 92, 231, 0.1);
+}
+
+.forecast-card .fc-time {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.forecast-card .fc-emoji {
+    font-size: 1.25rem;
+    margin: 2px 0;
+}
+
+.forecast-card .fc-temp {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.forecast-card .fc-rain {
+    font-size: 0.65rem;
+    color: var(--accent-secondary, #a29bfe);
+    font-weight: 500;
+}

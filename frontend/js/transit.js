@@ -251,6 +251,10 @@
         if (normalized.length < 2) return [];
 
         const modeName = String(mode || "").toLowerCase();
+        if (normalized.length === 2 && (modeName === "rail" || modeName === "bus" || modeName === "ferry")) {
+            return [normalized];
+        }
+
         const maxJumpMeters = modeName === "ferry"
             ? 45000
             : (modeName === "rail"
@@ -342,8 +346,8 @@
                 const latlngs = chunk.map((c) => [c[0], c[1]]);
                 const glow = L.polyline(latlngs, {
                     color: glowColor,
-                    weight: isMetrobus ? 12 : 10,
-                    opacity: isMetrobus ? 0.24 : 0.18,
+                    weight: isMetrobus ? 14 : 12,
+                    opacity: isMetrobus ? 0.35 : 0.28,
                 }).addTo(map);
                 const line = L.polyline(latlngs, {
                     color: lineColor,
@@ -360,7 +364,7 @@
                     color: "#16a34a",
                     weight: 4,
                     opacity: 0.9,
-                    dashArray: "8,6",
+                    dashArray: "2,8", // Dotted path for walking
                 }).addTo(map);
                 transitRouteLayers.push(line);
             });
@@ -368,12 +372,27 @@
     }
 
     function drawStepMarker(lat, lon, num, className, text) {
+        let iconHtml = num;
+        if (num === "W") {
+            iconHtml = "👟";
+        } else if (num === "B") {
+            if (className.includes("metrobus")) iconHtml = "🚨";
+            else if (className.includes("metro")) iconHtml = "🚇";
+            else if (className.includes("tram")) iconHtml = "🚊";
+            else if (className.includes("ferry")) iconHtml = "🚢";
+            else iconHtml = "🚌";
+        } else if (num === "I") {
+            iconHtml = "🛑";
+        } else if (num === "T") {
+            iconHtml = "🔄";
+        }
+
         const marker = L.marker([lat, lon], {
             icon: L.divIcon({
                 className: "transit-step-icon",
-                html: `<div class="step-circle ${className}">${num}</div>`,
-                iconSize: [28, 28],
-                iconAnchor: [14, 14],
+                html: `<div class="step-circle ${className}" style="display:flex;align-items:center;justify-content:center;font-size:1.1rem;background:rgba(15,15,20,0.85);backdrop-filter:blur(4px);border:2px solid currentColor;border-radius:50%;box-shadow:0 4px 10px rgba(0,0,0,0.3);width:100%;height:100%;color:#fff;">${iconHtml}</div>`,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16],
             }),
         }).addTo(map);
         marker.bindTooltip(text || "", {
@@ -396,13 +415,11 @@
         const drawableSegments = option.segments.map((seg, idx) => {
             const displayCoords = getSegmentCoordsForDrawing(seg, transitOnlyView);
             return { seg, idx, displayCoords };
-        }).filter(({ seg, idx, displayCoords }) => {
+        }).filter(({ seg, displayCoords }) => {
             if (!Array.isArray(displayCoords) || displayCoords.length < 2) return false;
             if (transitOnlyView && seg.mode === "walk") {
-                // Transit gorunumunde tum yuruyusu gizleme yerine
-                // sadece zorunlu erisim yuruyuslerini (baslangic/bitis) tut.
-                const isEndpointWalk = idx === 0 || idx === (option.segments.length - 1);
-                return isEndpointWalk;
+                // Cizimde sureklilik icin ara aktarma yuruyuslerini de goster.
+                return true;
             }
             return true;
         });
@@ -446,11 +463,22 @@
             const start = clean[0];
             const end = clean[clean.length - 1];
             if (seg.mode === "walk") {
-                drawStepMarker(start[0], start[1], "W", "step-walk", seg.description || "Walk");
+                drawStepMarker(start[0], start[1], "W", "step-walk", seg.description || "Yürü");
             } else if (seg.mode === "bus" || seg.mode === "rail" || seg.mode === "ferry") {
-                const boardText = seg.mode === "rail" ? "Metroya bin" : (seg.mode === "ferry" ? "Vapura bin" : "Otobuse bin");
-                drawStepMarker(start[0], start[1], "B", "step-board", boardText);
-                drawStepMarker(end[0], end[1], "I", "step-alight", "Inis");
+                const isMetrobus = isMetrobusSegment(seg);
+                const isMetro = seg.mode === "rail" && String(seg.route_code || "").startsWith("M");
+                const isTram = seg.mode === "rail" && String(seg.route_code || "").startsWith("T");
+                
+                let boardClass = "step-board";
+                if (isMetrobus) boardClass += " metrobus";
+                else if (isMetro) boardClass += " metro";
+                else if (isTram) boardClass += " tram";
+                else if (seg.mode === "ferry") boardClass += " ferry";
+                else boardClass += " bus";
+
+                const boardText = isMetrobus ? "Metrobüse bin" : (isMetro ? "Metroya bin" : (isTram ? "Tramvaya bin" : (seg.mode === "ferry" ? "Vapura bin" : "Otobüse bin")));
+                drawStepMarker(start[0], start[1], "B", boardClass, boardText);
+                drawStepMarker(end[0], end[1], "I", "step-alight", "İniş: " + (seg.to_stop || "İstasyon"));
             }
         });
 
@@ -607,6 +635,10 @@
             displayMultimodalResults(data);
             if (typeof showToast === "function") {
                 showToast("Route options calculated", "success");
+            }
+            // Hava durumu uyarısı popup'ını tetikle
+            if (typeof checkRouteWeatherAndShowBanner === "function") {
+                checkRouteWeatherAndShowBanner(selectedPoints);
             }
         } catch (error) {
             if (typeof showToast === "function") {
