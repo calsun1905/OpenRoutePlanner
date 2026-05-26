@@ -106,7 +106,13 @@ def test_openrouter_stream_session_persist_and_context_window(monkeypatch):
         yield {"type": "meta", "model": "nvidia/nemotron-3-super-120b-a12b:free", "usage": {"total_tokens": 12}}
         yield {"type": "done"}
 
-    monkeypatch.setattr(app_module, "openrouter_chat_completion_stream_with_fallback", _fake_stream, raising=False)
+    # The stream endpoint calls openrouter_chat_completion_stream directly
+    # (not the _with_fallback variant) and manages its own fallback loop.
+    monkeypatch.setattr(app_module, "openrouter_chat_completion_stream", _fake_stream, raising=False)
+    monkeypatch.setattr(app_module, "is_openrouter_configured", lambda: True, raising=False)
+    monkeypatch.setattr(app_module, "openrouter_status", lambda: {"default_model": "nvidia/nemotron-3-super-120b-a12b:free"}, raising=False)
+    monkeypatch.setattr(app_module, "record_llm_attempt", lambda **kw: None, raising=False)
+    monkeypatch.setattr(app_module, "is_model_blocked", lambda provider, model: False, raising=False)
 
     def _fake_save_turn(**kwargs):
         captured["save_called"] = True

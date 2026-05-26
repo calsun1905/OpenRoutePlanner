@@ -27,7 +27,7 @@ def test_fetch_pois_requires_geobound_center(monkeypatch):
     monkeypatch.setattr(graph_manager.ox, "features_from_point", lambda *a, **k: called.__setitem__("point", called["point"] + 1))
     monkeypatch.setattr(graph_manager.ox, "features_from_place", lambda *a, **k: called.__setitem__("place", called["place"] + 1))
 
-    gdf = graph_manager._fetch_pois_with_fallback("Malatya, Turkey", {"amenity": "restaurant"})
+    gdf, had_error = graph_manager._fetch_pois_with_fallback("Malatya, Turkey", {"amenity": "restaurant"})
     assert gdf is None
     assert called["point"] == 0
     assert called["place"] == 0
@@ -46,7 +46,7 @@ def test_fetch_pois_fallback_order_a_then_b(monkeypatch):
     monkeypatch.setattr(graph_manager.ox, "features_from_point", fake_point)
     monkeypatch.setattr(graph_manager.ox, "features_from_place", lambda *a, **k: DummyGDF(0))
 
-    gdf = graph_manager._fetch_pois_with_fallback("Malatya, Turkey", {"amenity": "restaurant"})
+    gdf, had_error = graph_manager._fetch_pois_with_fallback("Malatya, Turkey", {"amenity": "restaurant"})
     assert gdf is not None
     assert len(gdf) == 2
     assert calls[0][0] == "point"

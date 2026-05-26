@@ -21,10 +21,10 @@ def test_get_route_steps_basic(monkeypatch):
     G = make_test_graph()
 
     # Patch functions in app module to use our test graph and deterministic behavior
-    monkeypatch.setattr(app, "get_graph_for_points", lambda pts: G, raising=False)
-    monkeypatch.setattr(app, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
-    monkeypatch.setattr(app, "build_alternative_routes", lambda G_, ordered_points, idx: [1, 2, 3], raising=False)
-    monkeypatch.setattr(app, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
+    monkeypatch.setattr(app_module, "get_graph_for_points", lambda pts: G, raising=False)
+    monkeypatch.setattr(app_module, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
+    monkeypatch.setattr(app_module, "build_alternative_routes", lambda G_, ordered_points, idx: [1, 2, 3], raising=False)
+    monkeypatch.setattr(app_module, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
 
     client = app.test_client()
 
@@ -59,10 +59,10 @@ def test_missing_street_name(monkeypatch):
     G.add_node(2, x=29.001, y=41.0005)
     G.add_edge(1, 2, key=0, length=50.0)
 
-    monkeypatch.setattr(app, "get_graph_for_points", lambda pts: G, raising=False)
-    monkeypatch.setattr(app, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
-    monkeypatch.setattr(app, "build_alternative_routes", lambda G_, ordered_points, idx: [1, 2], raising=False)
-    monkeypatch.setattr(app, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
+    monkeypatch.setattr(app_module, "get_graph_for_points", lambda pts: G, raising=False)
+    monkeypatch.setattr(app_module, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
+    monkeypatch.setattr(app_module, "build_alternative_routes", lambda G_, ordered_points, idx: [1, 2], raising=False)
+    monkeypatch.setattr(app_module, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
 
     client = app.test_client()
     points = [[41.0, 29.0], [41.0005, 29.0010]]
@@ -85,10 +85,10 @@ def test_roundabout_detection(monkeypatch):
     G.add_edge(1, 2, key=0, length=100.0, name='Ana Cadde')
     G.add_edge(2, 3, key=0, length=60.0, junction='roundabout', name='Kavsak Sk')
 
-    monkeypatch.setattr(app, "get_graph_for_points", lambda pts: G, raising=False)
-    monkeypatch.setattr(app, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
-    monkeypatch.setattr(app, "build_alternative_routes", lambda G_, ordered_points, idx: [1, 2, 3], raising=False)
-    monkeypatch.setattr(app, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
+    monkeypatch.setattr(app_module, "get_graph_for_points", lambda pts: G, raising=False)
+    monkeypatch.setattr(app_module, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
+    monkeypatch.setattr(app_module, "build_alternative_routes", lambda G_, ordered_points, idx: [1, 2, 3], raising=False)
+    monkeypatch.setattr(app_module, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
 
     client = app.test_client()
     points = [[41.0, 29.0], [41.0005, 29.0010], [41.0010, 29.0020]]
@@ -105,15 +105,15 @@ def test_numeric_string_points_are_parsed_before_routing(monkeypatch):
     G = make_test_graph()
     captured = {}
 
-    monkeypatch.setattr(app, "get_graph_for_points", lambda pts: G, raising=False)
-    monkeypatch.setattr(app, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
+    monkeypatch.setattr(app_module, "get_graph_for_points", lambda pts: G, raising=False)
+    monkeypatch.setattr(app_module, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
 
     def fake_builder(G_, ordered_points, idx):
         captured['ordered_points'] = ordered_points
         return [1, 2, 3]
 
-    monkeypatch.setattr(app, "build_alternative_routes", fake_builder, raising=False)
-    monkeypatch.setattr(app, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
+    monkeypatch.setattr(app_module, "build_alternative_routes", fake_builder, raising=False)
+    monkeypatch.setattr(app_module, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
 
     client = app.test_client()
     points = [["41.0000", "29.0000"], ["41.0005", "29.0010"], ["41.0010", "29.0020"]]
@@ -132,10 +132,10 @@ def test_route_steps_group_consecutive_same_street(monkeypatch):
     G.add_edge(1, 2, key=0, length=90.0, name='Ayni Sokak')
     G.add_edge(2, 3, key=0, length=110.0, name='Ayni Sokak')
 
-    monkeypatch.setattr(app, "get_graph_for_points", lambda pts: G, raising=False)
-    monkeypatch.setattr(app, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
-    monkeypatch.setattr(app, "build_alternative_routes", lambda G_, ordered_points, idx: [1, 2, 3], raising=False)
-    monkeypatch.setattr(app, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
+    monkeypatch.setattr(app_module, "get_graph_for_points", lambda pts: G, raising=False)
+    monkeypatch.setattr(app_module, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
+    monkeypatch.setattr(app_module, "build_alternative_routes", lambda G_, ordered_points, idx: [1, 2, 3], raising=False)
+    monkeypatch.setattr(app_module, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
 
     client = app.test_client()
     points = [[41.0, 29.0], [41.0005, 29.001], [41.001, 29.002]]
@@ -152,10 +152,10 @@ def test_route_steps_group_consecutive_same_street(monkeypatch):
 def test_get_route_includes_estimated_route_minutes_alias(monkeypatch):
     G = make_test_graph()
 
-    monkeypatch.setattr(app, "get_graph_for_points", lambda pts, radius_multiplier=1.0: G, raising=False)
-    monkeypatch.setattr(app, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
-    monkeypatch.setattr(app, "build_alternative_routes", lambda G_, ordered_points, idx: [1, 2, 3], raising=False)
-    monkeypatch.setattr(app, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
+    monkeypatch.setattr(app_module, "get_graph_for_points", lambda pts, radius_multiplier=1.0: G, raising=False)
+    monkeypatch.setattr(app_module, "solve_tsp", lambda G_, pts: list(range(len(pts))), raising=False)
+    monkeypatch.setattr(app_module, "build_alternative_routes", lambda G_, ordered_points, idx: [1, 2, 3], raising=False)
+    monkeypatch.setattr(app_module, "nodes_to_coords", lambda G_, nodes: [[G_.nodes[n]['y'], G_.nodes[n]['x']] for n in nodes], raising=False)
 
     client = app.test_client()
     points = [[41.0000, 29.0000], [41.0005, 29.0010], [41.0010, 29.0020]]

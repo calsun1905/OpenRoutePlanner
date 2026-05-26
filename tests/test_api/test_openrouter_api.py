@@ -77,7 +77,13 @@ def test_openrouter_chat_stream_success(monkeypatch):
         yield {"type": "meta", "model": "google/gemma-3-27b-it:free", "usage": {"total_tokens": 5}}
         yield {"type": "done"}
 
-    monkeypatch.setattr(app_module, "openrouter_chat_completion_stream_with_fallback", _fake_stream, raising=False)
+    # The stream endpoint calls openrouter_chat_completion_stream directly
+    # (not the _with_fallback variant) and manages its own fallback loop.
+    monkeypatch.setattr(app_module, "openrouter_chat_completion_stream", _fake_stream, raising=False)
+    monkeypatch.setattr(app_module, "is_openrouter_configured", lambda: True, raising=False)
+    monkeypatch.setattr(app_module, "openrouter_status", lambda: {"default_model": "google/gemma-3-27b-it:free"}, raising=False)
+    monkeypatch.setattr(app_module, "record_llm_attempt", lambda **kw: None, raising=False)
+    monkeypatch.setattr(app_module, "is_model_blocked", lambda provider, model: False, raising=False)
 
     rv = client.post("/api/llm/openrouter/chat/stream", json={"query": "selam"})
     assert rv.status_code == 200

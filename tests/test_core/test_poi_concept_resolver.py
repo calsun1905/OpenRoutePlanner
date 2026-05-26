@@ -73,3 +73,9 @@ def test_resolve_query_returns_osm_queries():
 def test_map_concept_to_osm_queries_fallback_name():
     queries = map_concept_to_osm_queries("xzy-bilinmeyen")
     assert queries == [{"name": "xzy bilinmeyen"}]
+
+
+def test_turkish_casing_resolves_firin():
+    res = resolve_poi_concept("FIRIN")
+    assert res.status == "success"
+    assert res.concept == "fırın"
