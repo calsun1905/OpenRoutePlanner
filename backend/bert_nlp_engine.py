@@ -19,9 +19,42 @@ import time
 import threading
 import requests
 import json
+import random
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 import numpy as np
+
+# OSM API Retry Ayarları
+_ORP_OSM_RETRY_MAX = max(1, int(os.getenv("ORP_OSM_RETRY_MAX", "3")))
+_ORP_OSM_RETRY_DELAY = max(0.5, float(os.getenv("ORP_OSM_RETRY_DELAY", "1.0")))
+
+
+def _osm_retry_request(url: str, **kwargs) -> requests.Response:
+    """
+    OSM API istekleri için retry mekanizması.
+    Rate limit ve geçici ağ hatalarına karşı dayanıklılık sağlar.
+    """
+    last_exception = None
+    for attempt in range(_ORP_OSM_RETRY_MAX):
+        try:
+            response = requests.get(url, **kwargs)
+            # 429 Too Many Requests veya 5xx hatalarında retry yap
+            if response.status_code == 429 or response.status_code >= 500:
+                if attempt < _ORP_OSM_RETRY_MAX - 1:
+                    # Exponential backoff with jitter
+                    delay = _ORP_OSM_RETRY_DELAY * (2 ** attempt) + random.uniform(0, 0.5)
+                    print(f"[OSM Retry] Status {response.status_code}, {delay:.1f}s bekleyecek (deneme {attempt + 1}/{_ORP_OSM_RETRY_MAX})")
+                    time.sleep(delay)
+                    continue
+            return response
+        except requests.exceptions.RequestException as e:
+            last_exception = e
+            if attempt < _ORP_OSM_RETRY_MAX - 1:
+                delay = _ORP_OSM_RETRY_DELAY * (2 ** attempt) + random.uniform(0, 0.5)
+                print(f"[OSM Retry] Hata: {e}, {delay:.1f}s bekleyecek (deneme {attempt + 1}/{_ORP_OSM_RETRY_MAX})")
+                time.sleep(delay)
+            continue
+    raise last_exception if last_exception else RuntimeError(f"OSM API retry failed after {_ORP_OSM_RETRY_MAX} attempts")
 
 # BERT engine'i import et
 try:
@@ -767,7 +800,7 @@ class PlaceDatabase:
 
     def __init__(
         self,
-        use_osm: bool = False,
+        use_osm: bool = None,
         prefer_osm_first: bool = False,
         seed_dynamic_cache: bool = True,
         seed_local_places: bool = True,
@@ -779,7 +812,17 @@ class PlaceDatabase:
         self._place_name_to_index = {}  # {name: index}
         self._normalized_place_lookup = {}  # {normalized_key: canonical_name}
         self._embeddings = None  # np.ndarray matrix
-        self._use_osm = use_osm  # OSM API açık mı?
+        
+        # OSM usage from env ORP_USE_OSM (default False if not set)
+        osm_from_env = os.getenv("ORP_USE_OSM", "").lower()
+        if osm_from_env in ("1", "true", "yes", "on"):
+            self._use_osm = True
+        elif osm_from_env in ("0", "false", "no", "off"):
+            self._use_osm = False
+        else:
+            # Fallback to parameter if env not set
+            self._use_osm = use_osm if use_osm is not None else False
+        
         self._prefer_osm_first = prefer_osm_first
         self._osm_timeout_sec = max(0.5, _env_float("ORP_BERT_OSM_TIMEOUT_SEC", 3.0))
         self._osm_prefetch_budget_sec = max(0.0, _env_float("ORP_BERT_OSM_PREFETCH_BUDGET_SEC", 2.5))
@@ -1043,7 +1086,7 @@ class PlaceDatabase:
                 "limit": limit
             }
 
-            response = requests.get(
+            response = _osm_retry_request(
                 self.OSM_API_URL,
                 params=params,
                 headers={"User-Agent": "OpenRoutePlanner/1.0"},
@@ -1117,7 +1160,7 @@ class PlaceDatabase:
                 "limit": limit
             }
 
-            response = requests.get(
+            response = _osm_retry_request(
                 self.OSM_API_URL,
                 params=params,
                 headers={"User-Agent": "OpenRoutePlanner/1.0"},
