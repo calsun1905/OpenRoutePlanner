@@ -24,15 +24,15 @@ replacements = {
     # Türkçe karakterler
     'Ä±': 'ı',
     'ÄŸ': 'ğ',
-    'Ã§': 'ç',
-    'Ã¶': 'ö',
-    'Ã¼': 'ü',
+    'ç': 'ç',
+    'ö': 'ö',
+    'ü': 'ü',
     'ÅŸ': 'ş',
     'Ä°': 'İ',
-    'Ã‡': 'Ç',
+    'Ç': 'Ç',
     'Ä': 'Ğ',
-    'Ã–': 'Ö',
-    'Ãœ': 'Ü',
+    'Ö': 'Ö',
+    'Ü': 'Ü',
     'Åž': 'Ş',
     
     # Özel karakterler
@@ -48,11 +48,11 @@ replacements = {
     'deÄŸilse': 'değilse',
     'deÄŸil': 'değil',
     'dÄ±ÅŸÄ±': 'dışı',
-    'yÃ¼klendi': 'yüklendi',
+    'yüklendi': 'yüklendi',
     'bulunamadÄ±': 'bulunamadı',
     'kurulu': 'kurulu',
-    'modÃ¼lÃ¼': 'modülü',
-    'klasÃ¶rÃ¼nÃ¼n': 'klasörünün',
+    'modülü': 'modülü',
+    'klasörünün': 'klasörünün',
 }
 
 fixed_count = 0

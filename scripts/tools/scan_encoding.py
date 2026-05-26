@@ -14,7 +14,7 @@ os.chdir(_project_root)
 # Bozuk karakter pattern'leri
 BAD_PATTERNS = [
     'â€"', 'â€™', 'â€œ', 'â€�', 'â€¦',
-    'Ã', 'Ä', 'Å', 'Ã©', 'Ã§'
+    'Ã', 'Ä', 'Å', 'Ã©', 'ç'
 ]
 
 files_to_check = [

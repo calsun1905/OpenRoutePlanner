@@ -2471,49 +2471,49 @@ Not: Her dosya icin satir araligi bazli aciklama verildi. Python dosyalarinda fo
 - Satir araligi incelemesi:
   - L1-L55: UI/stil/markup icerigi
 
-### 112. `gÃ¼nlÃ¼k-rapor/03.03.2026/03.03.2026-gÃ¼n-sonu.txt`
+### 112. `günlük-rapor/03.03.2026/03.03.2026-gün-sonu.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 113. `gÃ¼nlÃ¼k-rapor/03.03.2026/03.03.2026.txt`
+### 113. `günlük-rapor/03.03.2026/03.03.2026.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 114. `gÃ¼nlÃ¼k-rapor/04.03.2026/04.03.2026.txt`
+### 114. `günlük-rapor/04.03.2026/04.03.2026.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 115. `gÃ¼nlÃ¼k-rapor/07.03.2026/07.03.2026.txt`
+### 115. `günlük-rapor/07.03.2026/07.03.2026.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 116. `gÃ¼nlÃ¼k-rapor/08.03.2026/08.03.2026.txt`
+### 116. `günlük-rapor/08.03.2026/08.03.2026.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 117. `gÃ¼nlÃ¼k-rapor/09.03.2026/09.03.2026.txt`
+### 117. `günlük-rapor/09.03.2026/09.03.2026.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 118. `gÃ¼nlÃ¼k-rapor/11.03.2026/11.03.2026.txt`
+### 118. `günlük-rapor/11.03.2026/11.03.2026.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 119. `gÃ¼nlÃ¼k-rapor/15.03.2026/15.03.2026.txt`
+### 119. `günlük-rapor/15.03.2026/15.03.2026.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 120. `gÃ¼nlÃ¼k-rapor/27.02.2026/27.02.2026-akÅŸam.txt`
+### 120. `günlük-rapor/27.02.2026/27.02.2026-akÅŸam.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 121. `gÃ¼nlÃ¼k-rapor/27.02.2026/27.02.2026.txt`
+### 121. `günlük-rapor/27.02.2026/27.02.2026.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 122. `gÃ¼nlÃ¼k-rapor/28.02.2026/28.02.2026-akÅŸam-2.txt`
+### 122. `günlük-rapor/28.02.2026/28.02.2026-akÅŸam-2.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 123. `gÃ¼nlÃ¼k-rapor/28.02.2026/28.02.2026-akÅŸam-3.txt`
+### 123. `günlük-rapor/28.02.2026/28.02.2026-akÅŸam-3.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 124. `gÃ¼nlÃ¼k-rapor/28.02.2026/28.02.2026-akÅŸam.txt`
+### 124. `günlük-rapor/28.02.2026/28.02.2026-akÅŸam.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 125. `gÃ¼nlÃ¼k-rapor/28.02.2026/28.02.2026-gece.txt`
+### 125. `günlük-rapor/28.02.2026/28.02.2026-gece.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 126. `gÃ¼nlÃ¼k-rapor/28.02.2026/28.02.2026-sabah.txt`
+### 126. `günlük-rapor/28.02.2026/28.02.2026-sabah.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
 ### 127. `openrouter-model-envanteri.txt`

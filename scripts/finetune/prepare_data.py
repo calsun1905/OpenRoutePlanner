@@ -12,16 +12,16 @@ from common import abs_path, ensure_dir, load_json, write_json
 
 
 MOJIBAKE_MAP = {
-    "Ã§": "c",
+    "ç": "c",
     "Ä±": "i",
-    "Ã¶": "o",
-    "Ã¼": "u",
+    "ö": "o",
+    "ü": "u",
     "ÅŸ": "s",
     "ÄŸ": "g",
-    "Ã‡": "C",
+    "Ç": "C",
     "Ä°": "I",
-    "Ã–": "O",
-    "Ãœ": "U",
+    "Ö": "O",
+    "Ü": "U",
     "Åž": "S",
     "Äž": "G",
     "Â": "",
@@ -155,7 +155,7 @@ def has_repeated_char_run(text: str, max_run: int = 4) -> bool:
 
 
 def has_mojibake_artifacts(text: str) -> bool:
-    bad_tokens = ("Ã", "â€", "ðŸ", "�")
+    bad_tokens = ("Ã", "a ", "ðŸ", "�")
     return any(t in text for t in bad_tokens)
 
 

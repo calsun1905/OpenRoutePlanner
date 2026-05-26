@@ -16,11 +16,11 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
         rel="stylesheet">
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=1.0.11">
+    <link rel="stylesheet" href="css/style.css?v=1.1.0">
     <link rel="stylesheet" href="css/transit.css?v=1.0.1">
 
     <!-- Favicon -->
@@ -465,51 +465,34 @@
     <aside class="right-chat-panel" id="rightChatPanel">
         <div class="right-chat-header">
             <div class="right-chat-header-top">
-                <h2>LLM Sohbet</h2>
-                <button id="rightChatCollapse" class="btn btn-ghost btn-sm" type="button">Paneli Daralt</button>
+                <h2>LLM Asistan</h2>
+                <button id="rightChatCollapse" class="btn btn-ghost btn-sm" type="button">Daralt</button>
             </div>
-            <p>OpenRouter, Google Gemini veya Local LLM</p>
+            <p>OpenRouter, Gemini ve Local LLM ile hizli sohbet</p>
             <div class="right-chat-session-controls">
-                <button id="mainLlmNewSession" class="btn btn-primary btn-sm" type="button">Yeni Sohbet</button>
+                <button id="mainLlmNewSession" class="btn btn-primary btn-sm" type="button">Yeni Oturum</button>
                 <select id="mainLlmSessionSelect" class="search-input"></select>
                 <button id="mainLlmArchiveSession" class="btn btn-ghost btn-sm" type="button">Oturumu Arsivle</button>
             </div>
         </div>
         <div class="llm-chat-box" id="mainLlmBox">
-            <div class="llm-provider-switch">
-                <label><input type="radio" name="mainLlmProvider" value="openrouter" checked> OpenRouter</label>
-                <label><input type="radio" name="mainLlmProvider" value="gemini"> Gemini</label>
-                <label><input type="radio" name="mainLlmProvider" value="local"> Local</label>
-            </div>
-            <div class="llm-mode-switch">
-                <label><input type="radio" name="mainLlmMode" value="auto" checked> Otomatik Fallback</label>
-                <label><input type="radio" name="mainLlmMode" value="manual"> Manuel Model</label>
-            </div>
-            <div class="llm-mode-panels">
-                <div id="mainLlmAutoPanel" class="llm-mode-panel active">
-                    Sistem modeli otomatik dener, hata olursa fallback modeline gecer.
-                </div>
-                <div id="mainLlmManualPanel" class="llm-mode-panel">
-                    Sadece sectigin modelle istek atilir. Fallback kullanilmaz.
+            <div class="llm-control-group">
+                <div class="llm-control-title">Saglayici</div>
+                <div class="llm-provider-switch">
+                    <label><input type="radio" name="mainLlmProvider" value="openrouter" checked><span>OpenRouter</span></label>
+                    <label><input type="radio" name="mainLlmProvider" value="gemini"><span>Gemini</span></label>
+                    <label><input type="radio" name="mainLlmProvider" value="local"><span>Local</span></label>
                 </div>
             </div>
-            <div class="llm-manual-controls">
-                <select id="mainLlmCategory" disabled>
-                    <option value="all">Tum Modeller</option>
-                    <option value="ok">Sorunsuz Calisanlar</option>
-                    <option value="stalled">Tikananlar</option>
-                    <option value="limit">Limit Hatasi (429)</option>
-                    <option value="credit">Para/Kredi Gerektiren (402)</option>
-                    <option value="embedding">Embedding/VL (chat uyumsuz)</option>
-                    <option value="other">Diger/Belirsiz</option>
-                </select>
+            <div class="llm-control-group">
+                <div class="llm-control-title">Model Secimi</div>
+            </div>
+            <div class="llm-manual-controls llm-model-controls">
                 <select id="mainLlmModelSelect" disabled>
-                    <option value="">Model sec...</option>
+                    <option value="">Otomatik (onerilen)</option>
                 </select>
-                <input id="mainLlmCustomModel" class="search-input" type="text" placeholder="Model slug (opsiyonel)" disabled>
             </div>
-            <div class="llm-status-line">
-                <span id="mainLlmStatusText">Baglanti kontrol ediliyor...</span>
+            <div class="llm-status-line llm-active-line">
                 <span id="mainLlmActiveModel">Aktif model: -</span>
             </div>
             <div id="mainLlmChatLog" class="llm-chat-log"></div>
@@ -635,7 +618,7 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
     <!-- App JS -->
-    <script src="js/app.js?v=1.0.14"></script>
+    <script src="js/app.js?v=1.1.0"></script>
     <script src="js/transit.js?v=1.0.1"></script>
 </body>
 

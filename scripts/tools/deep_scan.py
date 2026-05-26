@@ -14,7 +14,7 @@ os.chdir(_project_root)
 # Bozuk karakter pattern'leri (genişletilmiş)
 BAD_PATTERNS = [
     # Türkçe karakterler
-    'Ä±', 'ÄŸ', 'Ã§', 'Ã¶', 'Ã¼', 'ÅŸ', 'Ä°', 'Ã‡', 'Ä', 'Ã–', 'Ãœ', 'Åž',
+    'Ä±', 'ÄŸ', 'ç', 'ö', 'ü', 'ÅŸ', 'Ä°', 'Ç', 'Ä', 'Ö', 'Ü', 'Åž',
     # Özel karakterler
     'â€"', 'â€™', 'â€œ', 'â€�', 'â€¦', 'âœ', 'âš', 'ğŸ',
     # Diğer

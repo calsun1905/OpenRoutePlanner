@@ -1,5 +1,5 @@
-/**
- * app.js — OpenTrip Frontend Application
+﻿/**
+ * app.js a " OpenTrip Frontend Application
  *
  * Harita etkileşimi, API iletişimi, rota gösterimi ve POI arama.
  */
@@ -18,10 +18,11 @@ const ISTANBUL_CENTER = [40.9903, 29.0291];
 let selectedPoints = [];
 let markers = [];
 let routePolyline = null;
-let routeGlowPolylines = [];  // Glow efektleri için ayrı takip
+let routeGlowPolylines = [];  // Glow efektleri için ayrñ takip
 let poiMarkers = [];
 let lastPoiSearch = null;
 let currentRouteData = null;
+let currentRouteOptimize = false;
 let alternativeRoutesCache = {};  // Alternatif rota verileri cache'i (BUG FIX 07.03.2026)
 let currentNlpResult = null;
 
@@ -30,10 +31,10 @@ const map = L.map("map", {
     zoomControl: false,
 }).setView(ISTANBUL_CENTER, 14); // Kadikoy merkez
 
-// Custom zoom control (sağ üste)
+// Custom zoom control (saÄŸ üste)
 L.control.zoom({ position: "topright" }).addTo(map);
 
-// Tile Layer — OpenStreetMap Standard (Canlı, detaylı, dükkanlar görünür)
+// Tile Layer a " OpenStreetMap Standard (Canlñ, detaylñ, dükkanlar görünür)
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
@@ -96,13 +97,7 @@ const elNlpResults = document.getElementById("nlpResults");
 const elNlpLoading = document.getElementById("nlpLoading");
 const elMainLlmBox = document.getElementById("mainLlmBox");
 const elMainLlmProviderRadios = Array.from(document.querySelectorAll("input[name='mainLlmProvider']"));
-const elMainLlmModeRadios = Array.from(document.querySelectorAll("input[name='mainLlmMode']"));
-const elMainLlmAutoPanel = document.getElementById("mainLlmAutoPanel");
-const elMainLlmManualPanel = document.getElementById("mainLlmManualPanel");
-const elMainLlmCategory = document.getElementById("mainLlmCategory");
 const elMainLlmModelSelect = document.getElementById("mainLlmModelSelect");
-const elMainLlmCustomModel = document.getElementById("mainLlmCustomModel");
-const elMainLlmStatusText = document.getElementById("mainLlmStatusText");
 const elMainLlmActiveModel = document.getElementById("mainLlmActiveModel");
 const elMainLlmChatLog = document.getElementById("mainLlmChatLog");
 const elMainLlmInput = document.getElementById("mainLlmInput");
@@ -171,7 +166,7 @@ function createPoiIcon(emoji) {
     });
 }
 
-// Helper: geçerli bir alan değeri mi? (undefined/null/''/'nan' ise geçersiz say)
+// Helper: geçerli bir alan deÄŸeri mi? (undefined/null/''/'nan' ise geçersiz say)
 function isValidField(v) {
     return v !== undefined && v !== null && String(v).trim() !== '' && String(v).toLowerCase() !== 'nan';
 }
@@ -183,6 +178,7 @@ map.on("dblclick", function (e) {
 });
 
 function addPoint(lat, lng) {
+    const hadRoute = Boolean(currentRouteData);
     const latNum = Number(lat);
     const lonNum = Number(lng);
     if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) {
@@ -197,7 +193,7 @@ function addPoint(lat, lng) {
     const index = selectedPoints.length;
     selectedPoints.push([latNum, lonNum]);
 
-    // Hava durumu widget'ını bu noktaya göre güncelle
+    // Hava durumu widget'ñnñ bu noktaya göre güncelle
     fetchWeatherWidget(latNum, lonNum);
 
     // Marker ekle
@@ -205,7 +201,7 @@ function addPoint(lat, lng) {
         icon: createNumberedIcon(index + 1),
     }).addTo(map);
 
-    // Sağ tıklama menüsü - Konumu Kaydet
+    // SaÄŸ tñklama menüsü - Konumu Kaydet
     marker.on('contextmenu', function (e) {
         openSaveLocationModal(latNum, lonNum, `Nokta ${index + 1}`);
     });
@@ -223,20 +219,23 @@ function addPoint(lat, lng) {
 
     markers.push(marker);
 
+    if (hadRoute) {
+        clearRoute();
+    }
     updatePointsList();
     updateButtons();
 
-    showToast(`Nokta ${index + 1} eklendi`, "info");
+    showToast(hadRoute ? "Nokta eklendi. Rota icin tekrar hesaplayin." : `Nokta ${index + 1} eklendi`, "info");
     return true;
 }
 
 function removePoint(index) {
-    // Marker'ı kaldır
+    // Marker'ñ kaldñr
     map.removeLayer(markers[index]);
     markers.splice(index, 1);
     selectedPoints.splice(index, 1);
 
-    // Marker numaralarını güncelle
+    // Marker numaralarñnñ güncelle
     markers.forEach((m, i) => {
         m.setIcon(createNumberedIcon(i + 1));
         m.setPopupContent(
@@ -248,7 +247,7 @@ function removePoint(index) {
     updateButtons();
     clearRoute();
 
-    // Son kalan noktanın hava durumunu göster, yoksa harita merkezi
+    // Son kalan noktanñn hava durumunu göster, yoksa harita merkezi
     if (selectedPoints.length > 0) {
         const last = selectedPoints[selectedPoints.length - 1];
         fetchWeatherWidget(last[0], last[1]);
@@ -320,21 +319,21 @@ function handleDrop(e, targetIndex) {
         return;
     }
 
-    // Array'de yer değiştir
+    // Array'de yer deÄŸiştir
     const draggedPoint = selectedPoints.splice(draggedIndex, 1)[0];
     selectedPoints.splice(targetIndex, 0, draggedPoint);
 
-    // Marker'ları da güncelle
+    // Marker'larñ da güncelle
     const draggedMarker = markers.splice(draggedIndex, 1)[0];
     markers.splice(targetIndex, 0, draggedMarker);
 
     // UI güncelle
     updatePointsList();
 
-    // Eğer rota varsa, rota sırasını güncelle
+    // EÄŸer rota varsa, rota sñrasñnñ güncelle
     if (currentRouteData) {
         clearRoute();
-        showToast('Nokta sırası değiştirildi. Rota için tekrar hesaplayın.', 'info');
+        showToast('Nokta sñrasñ deÄŸiştirildi. Rota için tekrar hesaplayñn.', 'info');
     }
 }
 
@@ -342,7 +341,7 @@ function updatePointsList() {
     elPointCount.textContent = selectedPoints.length;
 
     if (selectedPoints.length === 0) {
-        elPointsList.innerHTML = `<div class="empty-state"><p>Haritaya tıklayarak nokta ekleyin</p></div>`;
+        elPointsList.innerHTML = `<div class="empty-state"><p>Haritaya tñklayarak nokta ekleyin</p></div>`;
         return;
     }
 
@@ -355,7 +354,7 @@ function updatePointsList() {
                  ondragover="handleDragOver(event)"
                  ondragleave="handleDragLeave(event)"
                  ondrop="handleDrop(event, ${i})">
-                <div class="drag-handle" title="Sıralamak için sürükle">
+                <div class="drag-handle" title="Sñralamak için sürükle">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                         <circle cx="9" cy="6" r="1.5"/>
                         <circle cx="15" cy="6" r="1.5"/>
@@ -395,9 +394,9 @@ async function calculateRoute() {
         return;
     }
 
-    showLoading("Rota hesaplanıyor...\nHarita verisi ilk kez indiriliyorsa biraz zaman alabilir.");
+    showLoading("Rota hesaplanñyor...\nHarita verisi ilk kez indiriliyorsa biraz zaman alabilir.");
 
-    const optimize = false; // TSP optimizasyonu devre dışı
+    const optimize = false; // TSP optimizasyonu devre dñşñ
 
     try {
         const response = await fetch(`${API_BASE}/get-route`, {
@@ -415,18 +414,20 @@ async function calculateRoute() {
             throw new Error(data.error || "Bilinmeyen hata");
         }
 
-        currentRouteData = data;
-        drawRoute(data);
-        showRouteInfo(data);
+        const routeData = { ...data, optimize };
+        drawRoute(routeData);
+        currentRouteOptimize = optimize;
+        currentRouteData = routeData;
+        showRouteInfo(currentRouteData);
         await fetchRouteSteps();
-        updateButtons();  // Buton durumlarını güncelle
-        showToast("Rota başarıyla hesaplandı! \u{2705}", "success");
+        updateButtons();  // Buton durumlarñnñ güncelle
+        showToast("Rota başarñyla hesaplandñ! \u{2705}", "success");
 
-        // Hava durumu uyarılarını göster (arka planda, rotayı engelleme)
+        // Hava durumu uyarñlarñnñ göster (arka planda, rotayñ engelleme)
         checkRouteWeatherAndShowBanner(selectedPoints);
 
     } catch (error) {
-        console.error("Rota hesaplama hatası:", error);
+        console.error("Rota hesaplama hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -438,7 +439,7 @@ function drawRoute(data) {
 
     if (!data.route_coords || data.route_coords.length === 0) return;
 
-    // Rota çizgisini çiz — gradient efektli
+    // Rota çizgisini çiz a " gradient efektli
     routePolyline = L.polyline(data.route_coords, {
         color: "#6c5ce7",
         weight: 5,
@@ -456,24 +457,26 @@ function drawRoute(data) {
     }).addTo(map);
     routeGlowPolylines.push(glow);
 
-    // Haritayı rotaya sığdır
+    // Haritayñ rotaya sñÄŸdñr
     map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
 }
 
 function clearRoute() {
     clearTransitRoute();
+    clearRouteSteps();
 
     if (routePolyline) {
         map.removeLayer(routePolyline);
         routePolyline = null;
     }
 
-    // Glow katmanlarını temizle (routeGlowPolylines takip listesiyle)
+    // Glow katmanlarñnñ temizle (routeGlowPolylines takip listesiyle)
     routeGlowPolylines.forEach(layer => map.removeLayer(layer));
     routeGlowPolylines = [];
 
     elRouteInfo.style.display = "none";
     currentRouteData = null;
+    currentRouteOptimize = false;
 }
 
 function showRouteInfo(data) {
@@ -490,8 +493,8 @@ function showRouteInfo(data) {
 
 // ========== POI SEARCH ==========
 /**
- * POI buton metninden (örn. "🏛️ Belediye") harita işareti emojisi ve Türkçe etiket üretir.
- * index.html'deki data-category API'ye gider; emoji/etiket butonun ilk satırından okunur.
+ * POI buton metninden (örn. "ğŸ›ø Belediye") harita işareti emojisi ve Türkçe etiket üretir.
+ * index.html'deki data-category API'ye gider; emoji/etiket butonun ilk satñrñndan okunur.
  */
 function parsePoiButtonLabel(buttonText) {
     const raw = (buttonText || "").trim();
@@ -572,7 +575,7 @@ async function searchPois(category, markerEmoji, markerLabel, opts = {}) {
     // Yeni dropdown'lardan veri al
     const province = elProvinceSelect.value;
     const districtRaw = (elDistrictSelect.value || "").trim();
-    const districtNorm = districtRaw.toLocaleLowerCase("tr-TR").replace(/ç/g, "c").replace(/ş/g, "s").replace(/ı/g, "i").replace(/İ/g, "i");
+    const districtNorm = districtRaw.toLocaleLowerCase("tr-TR").replace(/ç/g, "c").replace(/ş/g, "s").replace(/ñ/g, "i").replace(/ð/g, "i");
     const district = districtNorm.includes("ilce secin") ? "" : districtRaw;
 
     // Eger il secilmemisse uyari ver
@@ -649,7 +652,7 @@ function displayPois(pois, category, markerEmoji, markerLabel) {
             icon: createPoiIcon(emoji),
         }).addTo(map);
 
-        // Zengin popup kartı oluştur
+        // Zengin popup kartñ oluştur
         const popupContent = buildPoiPopup(poi, emoji, label);
         marker.bindPopup(popupContent, {
             maxWidth: 280,
@@ -666,7 +669,7 @@ function displayPois(pois, category, markerEmoji, markerLabel) {
 function buildPoiPopup(poi, emoji, label) {
     let html = `<div class="poi-card">`;
 
-    // Başlık
+    // Başlñk
     html += `<div class="poi-card-header">`;
     html += `<span class="poi-card-emoji">${emoji}</span>`;
     html += `<div>`;
@@ -675,7 +678,7 @@ function buildPoiPopup(poi, emoji, label) {
     html += `</div>`;
     html += `</div>`;
 
-    // Açıklama
+    // Açñklama
     if (poi.description) {
         html += `<p class="poi-card-desc">${poi.description}</p>`;
     }
@@ -717,7 +720,7 @@ function clearPois() {
     poiMarkers = [];
     elBtnClearPois.style.display = "none";
 
-    // POI butonlarının active sınıfını kaldır
+    // POI butonlarñnñn active sñnñfñnñ kaldñr
     document.querySelectorAll(".btn-poi").forEach((btn) => btn.classList.remove("active"));
 }
 
@@ -738,7 +741,7 @@ function showToast(message, type = "info") {
     toast.textContent = message;
     elToastContainer.appendChild(toast);
 
-    // 3 saniye sonra kaldır
+    // 3 saniye sonra kaldñr
     setTimeout(() => {
         toast.style.opacity = "0";
         toast.style.transform = "translateX(40px)";
@@ -791,13 +794,13 @@ locationIconBtns.forEach(btn => {
     });
 });
 
-// POI butonları
+// POI butonlarñ
 document.querySelectorAll(".btn-poi").forEach((btn) => {
     btn.addEventListener("click", function () {
         const category = this.dataset.category;
         const { emoji: markerEmoji, label: markerLabel } = parsePoiButtonLabel(this.textContent);
 
-        // Toggle active sınıfı
+        // Toggle active sñnñfñ
         document.querySelectorAll(".btn-poi").forEach((b) => b.classList.remove("active"));
         this.classList.add("active");
 
@@ -805,24 +808,24 @@ document.querySelectorAll(".btn-poi").forEach((btn) => {
     });
 });
 
-// İlk bildirim
-showToast("Haritaya tıklayarak başlayın! \u{1F5FA}\u{FE0F}", "info");
+// ðlk bildirim
+showToast("Haritaya tñklayarak başlayñn! \u{1F5FA}\u{FE0F}", "info");
 
-// Kaydedilmiş rotaları ve yerleri yükle
+// Kaydedilmiş rotalarñ ve yerleri yükle
 loadSavedRoutes();
 loadSavedLocations();
 
-// Hava durumu widget'inı başlat
+// Hava durumu widget'inñ başlat
 initWeatherWidget();
 
 // ========== PLACE SEARCH (GEOCODING) ==========
 
-// Debounce: yazmayı bitirdikten sonra öneri isteği at
-// İyileştirme: Request cancellation + adaptive delay
+// Debounce: yazmayñ bitirdikten sonra öneri isteÄŸi at
+// ðyileştirme: Request cancellation + adaptive delay
 let suggestDebounceTimer = null;
 let suggestAbortController = null;
 const SUGGEST_DELAY_MS = 400;
-const SUGGEST_DELAY_MS_SHORT = 200;  // Kısa sorgular için daha hızlı
+const SUGGEST_DELAY_MS_SHORT = 200;  // Kñsa sorgular için daha hñzlñ
 
 elPlaceSearchInput.addEventListener("input", function () {
     const query = elPlaceSearchInput.value.trim();
@@ -831,12 +834,12 @@ elPlaceSearchInput.addEventListener("input", function () {
         elSearchResults.style.display = "none";
         clearTimeout(suggestDebounceTimer);
         if (suggestAbortController) {
-            suggestAbortController.abort();  // Bekleyen isteği iptal et
+            suggestAbortController.abort();  // Bekleyen isteÄŸi iptal et
         }
         return;
     }
 
-    // Önceki isteği iptal et
+    // Önceki isteÄŸi iptal et
     if (suggestAbortController) {
         suggestAbortController.abort();
     }
@@ -844,7 +847,7 @@ elPlaceSearchInput.addEventListener("input", function () {
     // Yeni AbortController oluştur
     suggestAbortController = new AbortController();
 
-    // Adaptive delay: kısa sorgular daha hızlı, uzun sorgular daha yavaş
+    // Adaptive delay: kñsa sorgular daha hñzlñ, uzun sorgular daha yavaş
     const delay = query.length < 4 ? SUGGEST_DELAY_MS_SHORT : SUGGEST_DELAY_MS;
 
     clearTimeout(suggestDebounceTimer);
@@ -869,7 +872,7 @@ elNlpInput.addEventListener("keypress", function (e) {
     }
 });
 
-// Dışarı tıklanınca önerileri kapat
+// Dñşarñ tñklanñnca önerileri kapat
 document.addEventListener("click", function (e) {
     if (!elPlaceSearchInput.contains(e.target) && !elSearchResults.contains(e.target)) {
         elSearchResults.style.display = "none";
@@ -878,7 +881,7 @@ document.addEventListener("click", function (e) {
 
 /**
  * Yazarken öneri listesi getirir (autocomplete)
- * İyileştirme: AbortController ile request cancellation
+ * ðyileştirme: AbortController ile request cancellation
  */
 async function fetchSuggestions(query, signal = null) {
     try {
@@ -899,7 +902,7 @@ async function fetchSuggestions(query, signal = null) {
             </div>
         `).join("");
 
-        // Öneri tıklama
+        // Öneri tñklama
         elSearchResults.querySelectorAll(".search-suggestion-item").forEach((el) => {
             el.addEventListener("click", () => {
                 const lat = parseFloat(el.dataset.lat);
@@ -911,11 +914,11 @@ async function fetchSuggestions(query, signal = null) {
             });
         });
     } catch (err) {
-        // AbortError ise sessizce geç (kullanıcı hala yazıyor)
+        // AbortError ise sessizce geç (kullanñcñ hala yazñyor)
         if (err.name === 'AbortError') {
             return;
         }
-        console.error("Öneri hatası:", err);
+        console.error("Öneri hatasñ:", err);
         elSearchResults.style.display = "none";
     }
 }
@@ -932,11 +935,11 @@ async function searchPlace() {
     }
 
     if (query.length < 2) {
-        showToast("Arama terimi çok kısa", "error");
+        showToast("Arama terimi çok kñsa", "error");
         return;
     }
 
-    showLoading("Yer aranıyor...");
+    showLoading("Yer aranñyor...");
 
     try {
         const response = await fetch(`${API_BASE}/geocode`, {
@@ -948,14 +951,14 @@ async function searchPlace() {
         const data = await response.json();
 
         if (!response.ok || data.status === "error") {
-            throw new Error(data.message || "Yer bulunamadı");
+            throw new Error(data.message || "Yer bulunamadñ");
         }
 
         displaySearchResult(data);
         showToast(`Bulundu: ${data.display_name}`, "success");
 
     } catch (error) {
-        console.error("Geocoding hatası:", error);
+        console.error("Geocoding hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
         elSearchResults.style.display = "none";
     } finally {
@@ -999,13 +1002,13 @@ function displaySearchResult(data) {
 }
 
 /**
- * Arama sonucuna tıklanınca haritaya ekler
+ * Arama sonucuna tñklanñnca haritaya ekler
  */
 function selectSearchResult(lat, lon, name) {
     if (!focusMapInIstanbul(lat, lon, 16)) return;
     if (!addPoint(lat, lon)) return;
 
-    // Input ve sonuçları temizle
+    // Input ve sonuçlarñ temizle
     elPlaceSearchInput.value = "";
     elSearchResults.style.display = "none";
 
@@ -1013,7 +1016,7 @@ function selectSearchResult(lat, lon, name) {
 }
 
 /**
- * HTML kaçış karakterleri
+ * HTML kaçñş karakterleri
  */
 function escapeHtml(text) {
     const div = document.createElement("div");
@@ -1033,7 +1036,7 @@ async function geocodePlaceName(placeName) {
 
     const data = await response.json();
     if (!response.ok || data.status === "error") {
-        throw new Error(data.message || `"${placeName}" bulunamadı`);
+        throw new Error(data.message || `"${placeName}" bulunamadñ`);
     }
 
     return data;
@@ -1046,20 +1049,20 @@ function setNlpLoading(isLoading) {
 
 function buildNlpSummary(result) {
     if (result.type === "route") {
-        return `${escapeHtml(result.origin || "?" )} › ${escapeHtml(result.destination || "?")}`;
+        return `${escapeHtml(result.origin || "?" )} a º ${escapeHtml(result.destination || "?")}`;
     }
     if (result.type === "multi") {
-        return (result.locations || []).map(escapeHtml).join(" › ");
+        return (result.locations || []).map(escapeHtml).join(" a º ");
     }
     if (result.type === "poi") {
         const poiConcept = String(result.poi_concept || "").trim();
         const poiText = poiConcept ? `"${escapeHtml(poiConcept)}"` : "mekan";
-        return `${escapeHtml(result.location || "Bilinmeyen konum")} için ${poiText} araması`;
+        return `${escapeHtml(result.location || "Bilinmeyen konum")} için ${poiText} aramasñ`;
     }
     if (result.type === "single") {
-        return `${escapeHtml(result.destination || "Bilinmeyen hedef")} hedef olarak algılandı`;
+        return `${escapeHtml(result.destination || "Bilinmeyen hedef")} hedef olarak algñlandñ`;
     }
-    return escapeHtml(result.error || "Sorgu anlaşılamadı");
+    return escapeHtml(result.error || "Sorgu anlaşñlamadñ");
 }
 
 function renderNlpResults(result) {
@@ -1067,7 +1070,7 @@ function renderNlpResults(result) {
 
     const confidence = typeof result.confidence === "number"
         ? `%${Math.round(result.confidence * 100)}`
-        : "—";
+        : "-";
 
     const detectedPlaces = Array.isArray(result.detected_places) ? result.detected_places : [];
     const placesHtml = detectedPlaces.length > 0
@@ -1088,7 +1091,7 @@ function renderNlpResults(result) {
     } else if (result.type === "single" && result.destination) {
         actions.push(`<button class="nlp-action-btn primary" data-action="focus-nlp">Haritada Göster</button>`);
     } else if (result.type === "poi" && result.location) {
-        actions.push(`<button class="nlp-action-btn primary" data-action="focus-nlp">Mekanları Goster</button>`);
+        actions.push(`<button class="nlp-action-btn primary" data-action="focus-nlp">Mekanlarñ Goster</button>`);
     }
 
     elNlpResults.innerHTML = `
@@ -1130,13 +1133,13 @@ async function analyzeNaturalLanguageQuery() {
 
         const data = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || "NLP analizi başarısız");
+            throw new Error(data.error || "NLP analizi başarñsñz");
         }
 
         renderNlpResults(data);
-        showToast(`AI analiz tamamlandı (${data.engine || "nlp"})`, "success");
+        showToast(`AI analiz tamamlandñ (${data.engine || "nlp"})`, "success");
     } catch (error) {
-        console.error("NLP analizi hatası:", error);
+        console.error("NLP analizi hatasñ:", error);
         elNlpResults.innerHTML = `<div class="nlp-error">${escapeHtml(error.message)}</div>`;
         elNlpResults.style.display = "block";
         showToast(`Hata: ${error.message}`, "error");
@@ -1159,11 +1162,11 @@ async function applyNlpResult() {
     }
 
     if (targetPlaces.length < 2) {
-        showToast("Uygulanacak yeterli konum bulunamadı", "error");
+        showToast("Uygulanacak yeterli konum bulunamadñ", "error");
         return;
     }
 
-    showLoading("AI sonucu haritaya uygulanıyor...");
+    showLoading("AI sonucu haritaya uygulanñyor...");
 
     try {
         clearAllPoints();
@@ -1175,7 +1178,7 @@ async function applyNlpResult() {
 
         await calculateRoute();
     } catch (error) {
-        console.error("NLP uygulama hatası:", error);
+        console.error("NLP uygulama hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -1189,7 +1192,7 @@ async function focusNlpLocation() {
 
     const placeName = currentNlpResult.location || currentNlpResult.destination;
     if (!placeName) {
-        showToast("Gösterilecek konum bulunamadı", "error");
+        showToast("Gösterilecek konum bulunamadñ", "error");
         return;
     }
 
@@ -1208,9 +1211,9 @@ async function focusNlpLocation() {
 
             const place = await geocodePlaceName(placeName);
             if (!focusMapInIstanbul(place.lat, place.lon, 14)) return;
-            showToast(`"${placeName}" için "${poiConcept}" mekanları gosterildi`, "success");
+            showToast(`"${placeName}" için "${poiConcept}" mekanlarñ gosterildi`, "success");
         } catch (error) {
-            console.error("NLP POI gösterme hatası:", error);
+            console.error("NLP POI gösterme hatasñ:", error);
             showToast(`Hata: ${error.message}`, "error");
         }
         return;
@@ -1224,7 +1227,7 @@ async function focusNlpLocation() {
         if (!addPoint(place.lat, place.lon)) return;
         showToast(`"${placeName}" haritada gösterildi`, "success");
     } catch (error) {
-        console.error("NLP konum gösterme hatası:", error);
+        console.error("NLP konum gösterme hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -1335,21 +1338,21 @@ const mainLlmExtraKnownModels = [
 ];
 
 const mainLlmMojibakeReplacements = {
-    "Ã¼": "ü",
-    "Ãœ": "Ü",
-    "Ã¶": "ö",
-    "Ã–": "Ö",
-    "Ã§": "ç",
-    "Ã‡": "Ç",
-    "Ä±": "ı",
-    "Ä°": "İ",
-    "ÅŸ": "ş",
-    "Åž": "Ş",
-    "ÄŸ": "ğ",
-    "Äž": "Ğ",
-    "â€“": "-",
-    "â€”": "-",
-    "â€¦": "...",
+    "ÃƒÂ¼": "ü",
+    "ÃƒÅ“": "Ü",
+    "ÃƒÂ¶": "ö",
+    "Ãƒâ€“": "Ö",
+    "ÃƒÂ§": "ç",
+    "Ãƒâ€¡": "Ç",
+    "Ã„Â±": "ı",
+    "Ã„Â°": "İ",
+    "Ã…Å¸": "ş",
+    "Ã…Å¾": "Ş",
+    "Ã„Å¸": "ğ",
+    "Ã„Å¾": "Ğ",
+    "Ã¢â‚¬â€œ": "-",
+    "Ã¢â‚¬â€": "-",
+    "Ã¢â‚¬Â¦": "...",
 };
 
 function mainLlmRepairText(text) {
@@ -1360,7 +1363,7 @@ function mainLlmRepairText(text) {
         out = out.split(bad).join(good);
     }
 
-    if (/[ÃÂÄÅâ]/.test(out)) {
+    if (/[ÃÄÅÂ]/.test(out)) {
         try {
             out = decodeURIComponent(escape(out));
         } catch (_) {
@@ -1371,7 +1374,7 @@ function mainLlmRepairText(text) {
         }
     }
 
-    return out.replace(/Â/g, "").trim();
+    return out.replace(/Ã‚/g, "").trim();
 }
 
 function mainLlmRepairTokenText(text) {
@@ -1382,7 +1385,7 @@ function mainLlmRepairTokenText(text) {
         out = out.split(bad).join(good);
     }
 
-    if (/[ÃƒÃ‚Ã„Ã…Ã¢]/.test(out)) {
+    if (/[ÃÄÅÂ]/.test(out)) {
         try {
             out = decodeURIComponent(escape(out));
         } catch (_) {
@@ -1403,8 +1406,7 @@ function mainLlmGetProvider() {
 }
 
 function mainLlmGetMode() {
-    const checked = elMainLlmModeRadios.find((radio) => radio.checked);
-    return checked ? checked.value : "auto";
+    return mainLlmSelectedManualModel() ? "manual" : "auto";
 }
 
 function mainLlmLocalCacheKey(sessionId) {
@@ -1443,17 +1445,17 @@ function mainLlmLoadLocalCache(sessionId) {
 }
 
 function mainLlmSetStatus(text) {
-    if (elMainLlmStatusText) {
-        elMainLlmStatusText.textContent = mainLlmRepairText(text || "-");
+    if (!elMainLlmActiveModel) return;
+    const safe = mainLlmRepairText(text || "");
+    if (safe) {
+        elMainLlmActiveModel.setAttribute("data-status", safe);
     }
 }
 
 function mainLlmSetActiveModel(model, triedModels) {
     if (!elMainLlmActiveModel) return;
     const cleanedModel = mainLlmRepairText(model || "-");
-    const cleanedTried = Array.isArray(triedModels) ? triedModels.map((m) => mainLlmRepairText(m)) : [];
-    const tried = cleanedTried.length ? ` | denenen: ${cleanedTried.join(" -> ")}` : "";
-    elMainLlmActiveModel.textContent = `Aktif model: ${cleanedModel}${tried}`;
+    elMainLlmActiveModel.textContent = `Aktif model: ${cleanedModel}`;
 }
 
 function mainLlmClassifyModel(model) {
@@ -1469,8 +1471,6 @@ function mainLlmClassifyModel(model) {
 }
 
 function mainLlmSelectedManualModel() {
-    const customModel = String(elMainLlmCustomModel?.value || "").trim();
-    if (customModel) return customModel;
     return String(elMainLlmModelSelect?.value || "").trim();
 }
 
@@ -1566,25 +1566,11 @@ function mainLlmRenderMessages() {
 
 function mainLlmUpdateModeUi() {
     if (!elMainLlmBox) return;
-    const isManual = mainLlmGetMode() === "manual";
-
-    if (elMainLlmAutoPanel) {
-        elMainLlmAutoPanel.classList.toggle("active", !isManual);
-    }
-    if (elMainLlmManualPanel) {
-        elMainLlmManualPanel.classList.toggle("active", isManual);
-    }
     elMainLlmProviderRadios.forEach((radio) => {
         radio.disabled = mainLlmStreaming;
     });
-    if (elMainLlmCategory) {
-        elMainLlmCategory.disabled = !isManual || mainLlmStreaming;
-    }
     if (elMainLlmModelSelect) {
-        elMainLlmModelSelect.disabled = !isManual || mainLlmStreaming;
-    }
-    if (elMainLlmCustomModel) {
-        elMainLlmCustomModel.disabled = !isManual || mainLlmStreaming;
+        elMainLlmModelSelect.disabled = mainLlmStreaming;
     }
     if (elMainLlmSessionSelect) {
         elMainLlmSessionSelect.disabled = mainLlmStreaming;
@@ -1598,72 +1584,58 @@ function mainLlmUpdateModeUi() {
 }
 
 function mainLlmRefreshModelOptions() {
-    if (!elMainLlmModelSelect || !elMainLlmCategory) return;
+    if (!elMainLlmModelSelect) return;
 
+    const provider = mainLlmGetProvider();
     const currentSelected = elMainLlmModelSelect.value;
     elMainLlmModelSelect.innerHTML = "";
     const placeholder = document.createElement("option");
     placeholder.value = "";
-    placeholder.textContent = "Model sec...";
+    placeholder.textContent = "Otomatik (onerilen)";
     elMainLlmModelSelect.appendChild(placeholder);
 
-    const selectedCategory = elMainLlmCategory.value || "all";
-    const groups = {
-        blocked: [],
-        ok: [],
-        stalled: [],
-        limit: [],
-        credit: [],
-        embedding: [],
-        other: [],
-    };
-    const labels = {
-        blocked: "Gecici Devre Disi (cooldown)",
-        ok: "Sorunsuz Calisanlar",
-        stalled: "Tikananlar",
-        limit: "Limit Hatasi (429)",
-        credit: "Para/Kredi Gerektiren (402)",
-        embedding: "Embedding/VL (chat uyumsuz)",
-        other: "Diger/Belirsiz",
-    };
-
     const unique = new Set();
+    const items = [];
     const addModel = (model) => {
         const m = String(model || "").trim();
         if (!m || unique.has(m)) return;
         unique.add(m);
-        groups[mainLlmClassifyModel(m)].push(m);
+        items.push(m);
     };
 
     mainLlmManualCandidates.forEach(addModel);
-    mainLlmExtraKnownModels.forEach(addModel);
     if (mainLlmStatusInfo) {
         addModel(mainLlmStatusInfo.default_model);
         (mainLlmStatusInfo.fallback_models || []).forEach(addModel);
     }
 
-    ["blocked", "ok", "stalled", "limit", "credit", "embedding", "other"].forEach((category) => {
-        if (selectedCategory !== "all" && selectedCategory !== category) return;
-        const items = groups[category];
-        if (!items.length) return;
-        items.sort();
-        const optGroup = document.createElement("optgroup");
-        optGroup.label = labels[category];
-        items.forEach((model) => {
-            const option = document.createElement("option");
-            option.value = model;
-            const health = mainLlmHealthByModel.get(model);
-            if (category === "blocked") {
-                const sec = Number(health?.remaining_cooldown_sec || 0);
-                const mins = sec > 0 ? Math.ceil(sec / 60) : 0;
-                option.textContent = mins > 0 ? `${model} (yaklasik ${mins} dk sonra)` : `${model} (cooldown)`;
-                option.disabled = true;
-            } else {
-                option.textContent = model;
-            }
-            optGroup.appendChild(option);
-        });
-        elMainLlmModelSelect.appendChild(optGroup);
+    const filtered = items.filter((model) => {
+        const m = String(model || "").trim().toLowerCase();
+        if (!m) return false;
+        if (provider === "gemini") {
+            return m.startsWith("gemini-") || m.includes("gemini");
+        }
+        if (provider === "openrouter") {
+            return !(m.startsWith("gemini-") || m.includes("gemini"));
+        }
+        // local provider: endpoint/status zaten local modelleri dondurur
+        return true;
+    });
+
+    filtered.sort((a, b) => a.localeCompare(b));
+    filtered.forEach((model) => {
+        const option = document.createElement("option");
+        option.value = model;
+        const health = mainLlmHealthByModel.get(model);
+        if (mainLlmBlockedModels.has(model)) {
+            const sec = Number(health?.remaining_cooldown_sec || 0);
+            const mins = sec > 0 ? Math.ceil(sec / 60) : 0;
+            option.textContent = mins > 0 ? `${model} (yaklasik ${mins} dk sonra)` : `${model} (cooldown)`;
+            option.disabled = true;
+        } else {
+            option.textContent = model;
+        }
+        elMainLlmModelSelect.appendChild(option);
     });
 
     if (currentSelected && [...elMainLlmModelSelect.options].some((o) => o.value === currentSelected)) {
@@ -1802,9 +1774,6 @@ function mainLlmToggleBusy(isBusy) {
     if (elMainLlmInput) elMainLlmInput.disabled = isBusy;
     if (elMainLlmSend) elMainLlmSend.disabled = isBusy;
     if (elMainLlmClear) elMainLlmClear.disabled = isBusy;
-    elMainLlmModeRadios.forEach((radio) => {
-        radio.disabled = isBusy;
-    });
     mainLlmUpdateModeUi();
 }
 
@@ -1852,9 +1821,6 @@ async function mainLlmCheckStatus() {
             const blockedCount = mainLlmBlockedModels.size;
             mainLlmSetStatus(blockedCount > 0 ? `Hazir (${blockedCount} model cooldown)` : "Hazir");
             mainLlmSetActiveModel(data.default_model, data.fallback_models || []);
-            if (elMainLlmModelSelect && !elMainLlmModelSelect.value && data.default_model) {
-                elMainLlmModelSelect.value = data.default_model;
-            }
         } else if (response.ok && data.available && !data.configured) {
             const msg = provider === "gemini"
                 ? "GEMINI_API_KEY / GOOGLE_API_KEY tanimli degil"
@@ -1868,6 +1834,10 @@ async function mainLlmCheckStatus() {
             mainLlmSetStatus(`${svc} servisi hazir degil`);
         }
     } catch (error) {
+        mainLlmStatusInfo = null;
+        mainLlmManualCandidates.length = 0;
+        mainLlmRefreshModelOptions();
+        mainLlmSetActiveModel("-", []);
         mainLlmSetStatus("Sunucuya baglanilamadi");
     }
 }
@@ -1881,14 +1851,10 @@ async function mainLlmSendMessage() {
         await mainLlmEnsureActiveSession();
     }
 
-    const isManual = mainLlmGetMode() === "manual";
-    const forcedModel = isManual ? mainLlmSelectedManualModel() : "";
+    const forcedModel = mainLlmSelectedManualModel();
+    const isAutoMode = !forcedModel;
 
-    if (isManual && !forcedModel) {
-        showToast("Manuel modda model sec veya yaz", "warning");
-        return;
-    }
-    if (isManual && forcedModel && mainLlmBlockedModels.has(forcedModel)) {
+    if (forcedModel && mainLlmBlockedModels.has(forcedModel)) {
         showToast("Bu model gecici olarak cooldown durumunda. Baska model sec.", "warning");
         return;
     }
@@ -1914,7 +1880,7 @@ async function mainLlmSendMessage() {
                     session_id: mainLlmActiveSessionId,
                     query: prompt,
                     model: forcedModel || undefined,
-                    use_fallback: !isManual,
+                    use_fallback: !forcedModel,
                     top_k: 5,
                     include_chunks: false,
                 }),
@@ -1973,7 +1939,7 @@ async function mainLlmSendMessage() {
                 session_id: mainLlmActiveSessionId,
                 query: prompt,
                 model: forcedModel || undefined,
-                use_fallback: !isManual,
+                use_fallback: !forcedModel,
             }),
         });
 
@@ -2033,7 +1999,7 @@ async function mainLlmSendMessage() {
 
                     if (payload.phase === "start") {
                         mainLlmSetStatus(`Model deneniyor: ${mainLlmRepairText(payload.model || "")}`);
-                        if (mainLlmGetMode() === "auto") {
+                        if (isAutoMode) {
                             mainLlmAppendMeta(assistantBox, `Deneniyor: ${mainLlmRepairText(payload.model || "")}`);
                         }
                     } else if (payload.phase === "fallback") {
@@ -2044,7 +2010,7 @@ async function mainLlmSendMessage() {
                         );
                     } else if (payload.phase === "success") {
                         mainLlmSetStatus("Hazir");
-                        if (mainLlmGetMode() === "auto") {
+                        if (isAutoMode) {
                             mainLlmAppendMeta(assistantBox, `Basarili model: ${mainLlmRepairText(payload.model || "")}`);
                         }
                     }
@@ -2108,14 +2074,6 @@ async function mainLlmSendMessage() {
 
 function initMainLlmChat() {
     if (!elMainLlmBox) return;
-
-    elMainLlmModeRadios.forEach((radio) => {
-        radio.addEventListener("change", mainLlmUpdateModeUi);
-    });
-
-    if (elMainLlmCategory) {
-        elMainLlmCategory.addEventListener("change", mainLlmRefreshModelOptions);
-    }
     if (elMainLlmSend) {
         elMainLlmSend.addEventListener("click", mainLlmSendMessage);
     }
@@ -2141,7 +2099,6 @@ function initMainLlmChat() {
     elMainLlmProviderRadios.forEach((radio) => {
         radio.addEventListener("change", () => {
             if (elMainLlmModelSelect) elMainLlmModelSelect.value = "";
-            if (elMainLlmCustomModel) elMainLlmCustomModel.value = "";
             mainLlmCheckStatus();
         });
     });
@@ -2206,7 +2163,7 @@ function initMainLlmChat() {
 // ========== ALTERNATIVE ROUTES ==========
 
 /**
- * Alternatif rotaları gösterir
+ * Alternatif rotalarñ gösterir
  */
 async function showAlternativeRoutes() {
     if (selectedPoints.length < 2) {
@@ -2214,9 +2171,9 @@ async function showAlternativeRoutes() {
         return;
     }
 
-    showLoading("Alternatif rotalar hesaplanıyor...");
+    showLoading("Alternatif rotalar hesaplanñyor...");
 
-    const optimize = false; // TSP optimizasyonu devre dışı
+    const optimize = false; // TSP optimizasyonu devre dñşñ
 
     try {
         const response = await fetch(`${API_BASE}/get-alternative-routes`, {
@@ -2234,11 +2191,12 @@ async function showAlternativeRoutes() {
             throw new Error(data.error || "Bilinmeyen hata");
         }
 
-        displayAlternativeRoutes(data.alternatives);
+        currentRouteOptimize = optimize;
+        displayAlternativeRoutes(data.alternatives, data.optimized_order || selectedPoints.map((_, index) => index), optimize);
         showToast(`${data.alternatives.length} alternatif rota bulundu! \u{2728}`, "success");
 
     } catch (error) {
-        console.error("Alternatif rota hatası:", error);
+        console.error("Alternatif rota hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -2246,9 +2204,9 @@ async function showAlternativeRoutes() {
 }
 
 /**
- * Alternatif rotaları listeler
+ * Alternatif rotalarñ listeler
  */
-function displayAlternativeRoutes(alternatives) {
+function displayAlternativeRoutes(alternatives, optimizedOrder = null, optimize = false) {
     elAlternativesPanel.style.display = "block";
     
     // Cache'i doldur (BUG FIX: 07.03.2026 - alternativeRoutesCache init)
@@ -2258,7 +2216,9 @@ function displayAlternativeRoutes(alternatives) {
             distance_km: alt.distance_km,
             duration_minutes: alt.duration_minutes,
             route_coords: alt.route_coords,
-            google_maps_link: alt.google_maps_link
+            google_maps_link: alt.google_maps_link,
+            optimized_order: optimizedOrder,
+            optimize
         };
     });
 
@@ -2290,7 +2250,7 @@ function displayAlternativeRoutes(alternatives) {
                     data-action-select-alt
                     data-type="${escapeHtml(alt.type)}"
                     data-coords='${JSON.stringify(alt.route_coords)}'>
-                    Bu Rotayı Seç
+                    Bu Rotayñ Seç
                 </button>
             </div>
         `;
@@ -2303,17 +2263,16 @@ function displayAlternativeRoutes(alternatives) {
 }
 
 /**
- * Seçilen alternatif rotayı haritada gösterir
+ * Seçilen alternatif rotayñ haritada gösterir
  */
 function selectAlternativeRoute(routeType, routeCoords) {
-    const prevRouteData = currentRouteData ? { ...currentRouteData } : null;
     clearRoute();
 
     // Rota renklerini belirle - basit sistem
     const routeColors = {
         route_1: "#6c5ce7",     // Mor
         route_2: "#00cec9",     // Turkuaz
-        route_3: "#feca57"      // Sarı
+        route_3: "#feca57"      // Sarñ
     };
 
     // Eski tip compatibility (shortest/fastest/balanced)
@@ -2323,7 +2282,7 @@ function selectAlternativeRoute(routeType, routeCoords) {
 
     const color = routeColors[routeType] || "#6c5ce7";
 
-    // Rotayı çiz
+    // Rotayñ çiz
     routePolyline = L.polyline(routeCoords, {
         color: color,
         weight: 5,
@@ -2340,32 +2299,49 @@ function selectAlternativeRoute(routeType, routeCoords) {
     }).addTo(map);
     routeGlowPolylines.push(glow);
 
-    // Haritayı rotaya sığdır
+    // Haritayñ rotaya sñÄŸdñr
     map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
 
-    // Active sınıfını güncelle
+    // Active sñnñfñnñ güncelle
     document.querySelectorAll(".alternative-card").forEach(card => {
         card.classList.remove("active");
     });
-    document.querySelector(`[data-route-type="${routeType}"]`).classList.add("active");
+    const activeCard = document.querySelector(`[data-route-type="${routeType}"]`);
+    if (activeCard) {
+        activeCard.classList.add("active");
+    }
 
-    // currentRouteData'yı seçilen alternatif rota ile güncelle
-    if (alternativeRoutesCache[routeType]) {
-        const altData = alternativeRoutesCache[routeType];
+    // currentRouteData'yñ seçilen alternatif rota ile güncelle
+    const altData = alternativeRoutesCache[routeType];
+    if (altData) {
         currentRouteData = {
             route_coords: routeCoords,
             total_distance_km: altData.distance_km,
             estimated_walk_minutes: altData.duration_minutes,
             route_type: routeType,
-            google_maps_link: altData.google_maps_link
+            google_maps_link: altData.google_maps_link,
+            optimized_order: altData.optimized_order,
+            optimize: altData.optimize
         };
+        currentRouteOptimize = Boolean(altData.optimize);
+    } else {
+        // Cache beklenmedik sekilde bos ise, en azindan route_type/coords ile step cagrisi devam etsin.
+        currentRouteData = {
+            route_coords: routeCoords,
+            route_type: routeType,
+            optimize: currentRouteOptimize
+        };
+        console.warn("Alternatif rota cache kaydi bulunamadi:", routeType);
     }
 
     if (currentRouteData) {
-        showRouteInfo(currentRouteData);
+        if (altData) {
+            showRouteInfo(currentRouteData);
+        }
+        fetchRouteSteps();
     }
 
-    // Butonları güncelle
+    // Butonlarñ güncelle
     updateButtons();
 
     const routeNames = {
@@ -2381,11 +2357,11 @@ function selectAlternativeRoute(routeType, routeCoords) {
 // ========== SAVE ROUTE ==========
 
 /**
- * Rota kaydetme modalını açar
+ * Rota kaydetme modalñnñ açar
  */
 function openSaveRouteModal() {
     if (!currentRouteData) {
-        showToast("Önce bir rota hesaplayın!", "error");
+        showToast("Önce bir rota hesaplayñn!", "error");
         return;
     }
 
@@ -2394,7 +2370,7 @@ function openSaveRouteModal() {
 }
 
 /**
- * Rota kaydetme modalını kapatır
+ * Rota kaydetme modalñnñ kapatñr
  */
 function closeSaveRouteModal() {
     elSaveRouteModal.style.display = "none";
@@ -2405,7 +2381,7 @@ function closeSaveRouteModal() {
 }
 
 /**
- * Rotayı kaydeder
+ * Rotayñ kaydeder
  */
 async function confirmSaveRoute() {
     const name = document.getElementById("routeName").value.trim();
@@ -2413,16 +2389,16 @@ async function confirmSaveRoute() {
     const tagsInput = document.getElementById("routeTags").value.trim();
 
     if (!name) {
-        showToast("Rota adı gerekli!", "error");
+        showToast("Rota adñ gerekli!", "error");
         return;
     }
 
     if (!currentRouteData) {
-        showToast("Kaydedilecek rota bulunamadı!", "error");
+        showToast("Kaydedilecek rota bulunamadñ!", "error");
         return;
     }
 
-    // Etiketleri ayır
+    // Etiketleri ayñr
     const tags = tagsInput ? tagsInput.split(",").map(t => t.trim()).filter(t => t) : [];
 
     showLoading("Rota kaydediliyor...");
@@ -2446,15 +2422,15 @@ async function confirmSaveRoute() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Kaydetme hatası");
+            throw new Error(data.error || "Kaydetme hatasñ");
         }
 
         closeSaveRouteModal();
         loadSavedRoutes(); // Listeyi yenile
-        showToast(`"${name}" rotası kaydedildi! \u{2705}`, "success");
+        showToast(`"${name}" rotasñ kaydedildi! \u{2705}`, "success");
 
     } catch (error) {
-        console.error("Rota kaydetme hatası:", error);
+        console.error("Rota kaydetme hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -2462,7 +2438,7 @@ async function confirmSaveRoute() {
 }
 
 /**
- * Kaydedilmiş rotaları yükler
+ * Kaydedilmiş rotalarñ yükler
  */
 async function loadSavedRoutes() {
     try {
@@ -2476,13 +2452,13 @@ async function loadSavedRoutes() {
         displaySavedRoutes(data.routes);
 
     } catch (error) {
-        console.error("Rota yükleme hatası:", error);
+        console.error("Rota yükleme hatasñ:", error);
         elSavedRoutesList.innerHTML = `<div class="empty-state"><p>Rotalar yüklenemedi</p></div>`;
     }
 }
 
 /**
- * Kaydedilmiş rotaları listeler
+ * Kaydedilmiş rotalarñ listeler
  */
 function displaySavedRoutes(routes) {
     if (!routes || routes.length === 0) {
@@ -2535,7 +2511,7 @@ function displaySavedRoutes(routes) {
 }
 
 /**
- * Kaydedilmiş rotayı yükler
+ * Kaydedilmiş rotayñ yükler
  */
 async function loadRoute(routeId) {
     showLoading("Rota yükleniyor...");
@@ -2550,30 +2526,34 @@ async function loadRoute(routeId) {
 
         const route = data.route;
 
-        // Mevcut noktaları temizle
+        // Mevcut noktalarñ temizle
         clearAllPoints();
 
-        // Rotanın noktalarını ekle
+        // Rotanñn noktalarñnñ ekle
         route.points.forEach(([lat, lon]) => {
             addPoint(lat, lon);
         });
 
-        // Rotayı çiz
-        currentRouteData = {
+        // Rotayñ çiz
+        const routeData = {
             route_coords: route.route_coords,
             total_distance_km: route.distance_km,
             estimated_walk_minutes: route.duration_minutes,
-            route_type: route.route_type
+            route_type: route.route_type,
+            optimize: false
         };
 
-        drawRoute(currentRouteData);
+        drawRoute(routeData);
+        currentRouteData = routeData;
+        currentRouteOptimize = false;
         showRouteInfo(currentRouteData);
-        updateButtons();  // Buton durumlarını güncelle
+        await fetchRouteSteps();
+        updateButtons();  // Buton durumlarñnñ güncelle
 
-        showToast(`"${route.name}" rotası yüklendi! \u{2705}`, "success");
+        showToast(`"${route.name}" rotasñ yüklendi! \u{2705}`, "success");
 
     } catch (error) {
-        console.error("Rota yükleme hatası:", error);
+        console.error("Rota yükleme hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -2581,7 +2561,7 @@ async function loadRoute(routeId) {
 }
 
 /**
- * Rotayı favorilere ekler/çıkarır
+ * Rotayñ favorilere ekler/çñkarñr
  */
 async function toggleRouteFavorite(routeId) {
     try {
@@ -2592,25 +2572,25 @@ async function toggleRouteFavorite(routeId) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Favori işlemi başarısız");
+            throw new Error(data.error || "Favori işlemi başarñsñz");
         }
 
         loadSavedRoutes(); // Listeyi yenile
 
-        const message = data.is_favorite ? "Favorilere eklendi \u{2B50}" : "Favorilerden çıkarıldı";
+        const message = data.is_favorite ? "Favorilere eklendi \u{2B50}" : "Favorilerden çñkarñldñ";
         showToast(message, "success");
 
     } catch (error) {
-        console.error("Favori işlemi hatası:", error);
+        console.error("Favori işlemi hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     }
 }
 
 /**
- * Rotayı siler
+ * Rotayñ siler
  */
 async function deleteRoute(routeId) {
-    if (!confirm("Bu rotayı silmek istediğinizden emin misiniz?")) {
+    if (!confirm("Bu rotayñ silmek istediÄŸinizden emin misiniz?")) {
         return;
     }
 
@@ -2622,14 +2602,14 @@ async function deleteRoute(routeId) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Silme işlemi başarısız");
+            throw new Error(data.error || "Silme işlemi başarñsñz");
         }
 
         loadSavedRoutes(); // Listeyi yenile
         showToast("Rota silindi \u{1F5D1}\u{FE0F}", "success");
 
     } catch (error) {
-        console.error("Rota silme hatası:", error);
+        console.error("Rota silme hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     }
 }
@@ -2642,7 +2622,7 @@ async function deleteRoute(routeId) {
  */
 function showTimelinePlanner() {
     if (!currentRouteData || selectedPoints.length < 2) {
-        showToast("Önce bir rota hesaplayın!", "error");
+        showToast("Önce bir rota hesaplayñn!", "error");
         return;
     }
 
@@ -2655,7 +2635,7 @@ function showTimelinePlanner() {
  */
 async function generateTimeline() {
     if (!currentRouteData) {
-        showToast("Önce bir rota hesaplayın!", "error");
+        showToast("Önce bir rota hesaplayñn!", "error");
         return;
     }
 
@@ -2663,17 +2643,17 @@ async function generateTimeline() {
     const visitDuration = parseInt(document.getElementById("visitDuration").value);
 
     if (!startTime) {
-        showToast("Başlangıç saati seçin!", "error");
+        showToast("Başlangñç saati seçin!", "error");
         return;
     }
 
     showLoading("Zaman çizelgesi oluşturuluyor...");
 
     try {
-        // Noktalar arası mesafeleri hesapla
+        // Noktalar arasñ mesafeleri hesapla
         const segmentDistances = calculateSegmentDistances();
 
-        // Nokta bilgilerini hazırla
+        // Nokta bilgilerini hazñrla
         const points = selectedPoints.map((point, index) => ({
             name: `Nokta ${index + 1}`,
             lat: point[0],
@@ -2696,14 +2676,14 @@ async function generateTimeline() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Zaman çizelgesi oluşturulamadı");
+            throw new Error(data.error || "Zaman çizelgesi oluşturulamadñ");
         }
 
         displayTimeline(data);
         showToast("Zaman çizelgesi oluşturuldu! \u{2705}", "success");
 
     } catch (error) {
-        console.error("Timeline hatası:", error);
+        console.error("Timeline hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -2718,7 +2698,7 @@ function calculateSegmentDistances() {
         return [];
     }
 
-    // Basit yaklaşım: toplam mesafeyi nokta sayısına böl
+    // Basit yaklaşñm: toplam mesafeyi nokta sayñsñna böl
     const numSegments = selectedPoints.length - 1;
     const avgDistance = currentRouteData.total_distance_km / numSegments;
 
@@ -2737,7 +2717,7 @@ function displayTimeline(timeline) {
     let html = `
         <div class="timeline-summary">
             <div class="timeline-stat">
-                <span class="timeline-stat-label">Başlangıç</span>
+                <span class="timeline-stat-label">Başlangñç</span>
                 <span class="timeline-stat-value">\u{1F553} ${timeline.start_time}</span>
             </div>
             <div class="timeline-stat">
@@ -2763,21 +2743,21 @@ function displayTimeline(timeline) {
                     <div class="timeline-point-name">${escapeHtml(item.point_name)}</div>
                     <div class="timeline-times">
                         <span class="timeline-time">
-                            <span class="timeline-time-label">Varış:</span>
+                            <span class="timeline-time-label">Varñş:</span>
                             <span class="timeline-time-value">${item.arrival_time}</span>
                         </span>
                         <span class="timeline-time">
-                            <span class="timeline-time-label">Ayrılış:</span>
+                            <span class="timeline-time-label">Ayrñlñş:</span>
                             <span class="timeline-time-value">${item.departure_time}</span>
                         </span>
                     </div>
                     <div class="timeline-duration">
-                        \u{23F1}\u{FE0F} ${item.visit_duration_minutes} dakika kalış
+                        \u{23F1}\u{FE0F} ${item.visit_duration_minutes} dakika kalñş
                     </div>
                     ${item.weather ? `
                     <div class="timeline-weather">
                         <span class="tl-weather-emoji">${item.weather.weather_emoji || '\u{2601}\u{FE0F}'}</span>
-                        <span class="tl-weather-temp">${item.weather.temperature != null ? Math.round(item.weather.temperature) + '°C' : ''}</span>
+                        <span class="tl-weather-temp">${item.weather.temperature != null ? Math.round(item.weather.temperature) + 'İC' : ''}</span>
                         <span class="tl-weather-desc">${escapeHtml(item.weather.weather_tr || item.weather.weather_description || '')}</span>
                     </div>
                     ${item.weather.advice && item.weather.advice.items && item.weather.advice.items.length > 0 ? `
@@ -2804,7 +2784,7 @@ function displayTimeline(timeline) {
 
 // ========== SAVED LOCATIONS (KAYITLI YERLER) ==========
 
-// İkon haritası — Kayıtlı yerler için emoji eşlemesi
+// ðkon haritasñ a " Kayñtlñ yerler için emoji eşlemesi
 const locationEmojiMap = {
     marker: "\u{1F4CD}",
     home: "\u{1F3E0}",
@@ -2830,15 +2810,15 @@ const locationEmojiMap = {
 };
 
 /**
- * Konum kaydetme modalını açar
+ * Konum kaydetme modalñnñ açar
  */
 window.openSaveLocationModal = function (lat, lon, defaultName = "") {
     elLocationLat.value = lat;
     elLocationLon.value = lon;
     elLocationName.value = defaultName;
-    elLocationAddress.value = ""; // Reverse geocoding ile de doldurulabilir (şimdilik boş kalsın)
+    elLocationAddress.value = ""; // Reverse geocoding ile de doldurulabilir (şimdilik boş kalsñn)
 
-    // Default marker'ı sıfırla
+    // Default marker'ñ sñfñrla
     locationIconBtns.forEach(b => b.classList.remove("active"));
     const defaultBtn = document.querySelector('#locationIconSelector [data-icon="marker"]');
     if (defaultBtn) defaultBtn.classList.add("active");
@@ -2865,7 +2845,7 @@ async function confirmSaveLocation() {
     const iconType = activeIconBtn ? activeIconBtn.dataset.icon : "marker";
 
     if (!name) {
-        showToast("Konum adı gerekli!", "error");
+        showToast("Konum adñ gerekli!", "error");
         return;
     }
 
@@ -2892,7 +2872,7 @@ async function confirmSaveLocation() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Kaydetme hatası");
+            throw new Error(data.error || "Kaydetme hatasñ");
         }
 
         closeSaveLocationModal();
@@ -2900,7 +2880,7 @@ async function confirmSaveLocation() {
         showToast(`"${name}" konumu kaydedildi! \u{2705}`, "success");
 
     } catch (error) {
-        console.error("Konum kaydetme hatası:", error);
+        console.error("Konum kaydetme hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     } finally {
         hideLoading();
@@ -2908,7 +2888,7 @@ async function confirmSaveLocation() {
 }
 
 /**
- * Sunucudan kayıtlı konumları getir ve ekrana çiz
+ * Sunucudan kayñtlñ konumlarñ getir ve ekrana çiz
  */
 async function loadSavedLocations() {
     try {
@@ -2926,14 +2906,14 @@ async function loadSavedLocations() {
         }
 
     } catch (error) {
-        console.error("Konum yükleme hatası:", error);
+        console.error("Konum yükleme hatasñ:", error);
         elSavedLocationsList.innerHTML = `<div class="empty-state"><p>Yer imleri yüklenemedi</p></div>`;
     }
 }
 
 function displaySavedLocationsSidebar(locations) {
     if (!locations || locations.length === 0) {
-        elSavedLocationsList.innerHTML = `<div class="empty-state"><p>Henüz kayıtlı yeriniz yok</p></div>`;
+        elSavedLocationsList.innerHTML = `<div class="empty-state"><p>Henüz kayñtlñ yeriniz yok</p></div>`;
         return;
     }
 
@@ -2951,7 +2931,7 @@ function displaySavedLocationsSidebar(locations) {
                 <div class="saved-location-icon">${emoji}</div>
                 <div class="saved-location-info">
                     <h3 class="saved-location-name">${escapeHtml(loc.name)}</h3>
-                    <p class="saved-location-address">Kullanım: ${loc.times_used || 0}</p>
+                    <p class="saved-location-address">Kullanñm: ${loc.times_used || 0}</p>
                 </div>
                 <div class="saved-location-actions" data-stop-propagation>
                     <button class="ic-btn ic-btn-favorite" data-action-toggle-loc-fav data-id="${escapeHtml(loc.id)}" title="Favori">
@@ -2976,7 +2956,7 @@ window.zoomToLocation = function (lat, lon, name) {
 };
 
 /**
- * Kayıtlı konumun favori durumunu değiştirir
+ * Kayñtlñ konumun favori durumunu deÄŸiştirir
  */
 async function toggleLocationFavorite(locationId) {
     try {
@@ -2987,20 +2967,20 @@ async function toggleLocationFavorite(locationId) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Favori işlemi başarısız");
+            throw new Error(data.error || "Favori işlemi başarñsñz");
         }
 
         loadSavedLocations();
-        showToast(data.is_favorite ? "Favorilere eklendi \u{2B50}" : "Favorilerden çıkarıldı", "success");
+        showToast(data.is_favorite ? "Favorilere eklendi \u{2B50}" : "Favorilerden çñkarñldñ", "success");
 
     } catch (error) {
-        console.error("Favori işlemi hatası:", error);
+        console.error("Favori işlemi hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     }
 }
 
 async function deleteSavedLocation(locationId) {
-    if (!confirm("Bu konumu silmek istediğinizden emin misiniz?")) {
+    if (!confirm("Bu konumu silmek istediÄŸinizden emin misiniz?")) {
         return;
     }
 
@@ -3012,20 +2992,20 @@ async function deleteSavedLocation(locationId) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Silme işlemi başarısız");
+            throw new Error(data.error || "Silme işlemi başarñsñz");
         }
 
-        loadSavedLocations(); // Backendi ve haritayı yenile
+        loadSavedLocations(); // Backendi ve haritayñ yenile
         showToast("Konum silindi \u{1F5D1}\u{FE0F}", "success");
 
     } catch (error) {
-        console.error("Konum silme hatası:", error);
+        console.error("Konum silme hatasñ:", error);
         showToast(`Hata: ${error.message}`, "error");
     }
 }
 
 /**
- * Haritadaki markerları çizer
+ * Haritadaki markerlarñ çizer
  */
 function drawSavedLocationsOnMap(locations) {
     clearSavedLocationMarkers();
@@ -3058,7 +3038,7 @@ function toggleSavedLocationsVisibility() {
     showSavedLocationsOnMap = !showSavedLocationsOnMap;
 
     if (showSavedLocationsOnMap) {
-        // İkonu aktif göz yap
+        // ðkonu aktif göz yap
         elIconLocationVisible.innerHTML = `
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
             <circle cx="12" cy="12" r="3" />
@@ -3066,7 +3046,7 @@ function toggleSavedLocationsVisibility() {
         elIconLocationVisible.style.stroke = "currentColor";
         loadSavedLocations(); // Yeniden yükleyip çizsin
     } else {
-        // İkonu kapalı göz yap
+        // ðkonu kapalñ göz yap
         elIconLocationVisible.innerHTML = `
             <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path>
             <line x1="1" y1="1" x2="23" y2="23"></line>
@@ -3077,8 +3057,8 @@ function toggleSavedLocationsVisibility() {
 }
 
 // ========== EVENT DELEGATION - XSS Güvenlik Düzeltmeleri ==========
-// Tüm inline onclick handlers yerine tek bir event listener kullanılır
-// Bu, XSS saldırılarını önler ve daha iyi performans sağlar
+// Tüm inline onclick handlers yerine tek bir event listener kullanñlñr
+// Bu, XSS saldñrñlarñnñ önler ve daha iyi performans saÄŸlar
 
 document.addEventListener("click", function(e) {
     // Find closest element with data attribute (handles nested clicks)
@@ -3184,9 +3164,9 @@ async function fetchWeatherWidget(lat, lon) {
         if (!data.success) return;
 
         const cur = data.data.current;
-        document.getElementById("weatherWidgetEmoji").textContent = cur.weather_emoji || "\u{2601}\u{FE0F}";
-        document.getElementById("weatherWidgetTemp").textContent = `${Math.round(cur.temperature)}°C`;
-        document.getElementById("weatherWidgetDesc").textContent = cur.weather_tr || cur.weather_description || "—";
+        document.getElementById("weatherWidgetEmoji").textContent = cur.weather_emoji || "\u2601";
+        document.getElementById("weatherWidgetTemp").textContent = `${Math.round(cur.temperature)} C`;
+        document.getElementById("weatherWidgetDesc").textContent = cur.weather_tr || cur.weather_description || "Hava";
 
         // Göster ve 5 sn sonra otomatik kaybet
         el.style.display = "block";
@@ -3196,15 +3176,15 @@ async function fetchWeatherWidget(lat, lon) {
             el.classList.add("auto-hide");
         }, 5000);
     } catch (e) {
-        // fail silently — widget gösterilmez
+        // fail silently; widget gosterilmez
     }
 }
 
 function initWeatherWidget() {
-    // Sayfa açıldığında harita merkezinden başla
+    // Sayfa açñldñÄŸñnda harita merkezinden başla
     const center = map.getCenter();
     fetchWeatherWidget(center.lat, center.lng);
-    // Nokta eklenmediği sürece harita hareketiyle güncelleme yapma
+    // Nokta eklenmediÄŸi sürece harita hareketiyle güncelleme yapma
 }
 
 // ========== WEATHER BANNER ==========
@@ -3219,7 +3199,7 @@ function formatLocalDateISO(date) {
     return `${y}-${m}-${d}`;
 }
 
-// Kullanıcı startTime alanını bilinçli değiştirdiyse forecast modunu aç
+// Kullanñcñ startTime alanñnñ bilinçli deÄŸiştirdiyse forecast modunu aç
 (function initWeatherStartTimePreference() {
     const startTimeInput = document.getElementById("startTime");
     if (!startTimeInput) return;
@@ -3243,13 +3223,13 @@ async function checkRouteWeatherAndShowBanner(points) {
             lat: p[0], lon: p[1], name: `Nokta ${i + 1}`
         }));
 
-        // Kullanıcı özel saat seçtiyse, route-weather için forecast modunu aç
+        // Kullanñcñ özel saat seçtiyse, route-weather için forecast modunu aç
         const startTimeInput = document.getElementById("startTime");
         const startTimeValue = (startTimeInput?.value || "").trim();
 
         let hasTime = _weatherUseCustomStartTime && /^\d{2}:\d{2}$/.test(startTimeValue);
 
-        // Geçmiş saat seçildiyse (bugün için), anlık moda düş
+        // Geçmiş saat seçildiyse (bugün için), anlñk moda düş
         if (hasTime) {
             const now = new Date();
             const [hh, mm] = startTimeValue.split(":").map(Number);
@@ -3283,7 +3263,7 @@ async function checkRouteWeatherAndShowBanner(points) {
         const criticalAdvice = data.data.critical_advice || null;
         showWeatherBanner(routeWeather, criticalAdvice);
     } catch (e) {
-        // sessiz hata – banner olmadan devam
+        // sessiz hata a " banner olmadan devam
     }
 }
 
@@ -3318,7 +3298,7 @@ function showWeatherBanner(routeWeather, criticalAdvice = null) {
     if (!banner) return;
 
     const iconMap = { info: "\u{2139}\u{FE0F}", warning: "\u{26A0}\u{FE0F}", danger: "\u{1F6A8}" };
-    const titleMap = { info: "Hava Durumu Bilgisi", warning: "Hava Durumu Uyarısı", danger: "Tehlikeli Hava Koşulları" };
+    const titleMap = { info: "Hava Durumu Bilgisi", warning: "Hava Durumu Uyarñsñ", danger: "Tehlikeli Hava Koşullarñ" };
 
     let html = `
         <div class="weather-banner-header">
@@ -3359,7 +3339,7 @@ function hideWeatherBanner() {
 }
 
 
-// ========== TÜRKİYE VERİSİ YÖNETİMİ ==========
+// ========== TÜRKðYE VERðSð YÖNETðMð ==========
 let turkiyeData = null;
 
 // Türkiye verisini yükle
@@ -3374,7 +3354,7 @@ async function loadTurkiyeData() {
     }
 }
 
-// Bölge dropdown'ını doldur
+// Bölge dropdown'ñnñ doldur
 function initializeRegionDropdown() {
     if (!turkiyeData) return;
     
@@ -3387,7 +3367,7 @@ function initializeRegionDropdown() {
     });
 }
 
-// Bölge seçildiğinde illeri doldur
+// Bölge seçildiÄŸinde illeri doldur
 elRegionSelect.addEventListener('change', function() {
     const selectedRegion = this.value;
     
@@ -3395,12 +3375,12 @@ elRegionSelect.addEventListener('change', function() {
         elProvinceSelect.disabled = true;
         elProvinceSelect.innerHTML = '<option value="">Önce Bölge Seçin</option>';
         elDistrictSelect.disabled = true;
-        elDistrictSelect.innerHTML = '<option value="">Önce İl Seçin</option>';
+        elDistrictSelect.innerHTML = '<option value="">Önce ðl Seçin</option>';
         return;
     }
     
     const provinces = turkiyeData[selectedRegion];
-    elProvinceSelect.innerHTML = '<option value="">İl Seçin</option>';
+    elProvinceSelect.innerHTML = '<option value="">ðl Seçin</option>';
     
     Object.keys(provinces).forEach(province => {
         const option = document.createElement('option');
@@ -3411,22 +3391,22 @@ elRegionSelect.addEventListener('change', function() {
     
     elProvinceSelect.disabled = false;
     elDistrictSelect.disabled = true;
-    elDistrictSelect.innerHTML = '<option value="">Önce İl Seçin</option>';
+    elDistrictSelect.innerHTML = '<option value="">Önce ðl Seçin</option>';
 });
 
-// İl seçildiğinde ilçeleri doldur
+// ðl seçildiÄŸinde ilçeleri doldur
 elProvinceSelect.addEventListener('change', function() {
     const selectedRegion = elRegionSelect.value;
     const selectedProvince = this.value;
     
     if (!selectedProvince) {
         elDistrictSelect.disabled = true;
-        elDistrictSelect.innerHTML = '<option value="">Önce İl Seçin</option>';
+        elDistrictSelect.innerHTML = '<option value="">Önce ðl Seçin</option>';
         return;
     }
     
     const districts = turkiyeData[selectedRegion][selectedProvince];
-    elDistrictSelect.innerHTML = '<option value="">İlçe Seçin (Opsiyonel)</option>';
+    elDistrictSelect.innerHTML = '<option value="">ðlçe Seçin (Opsiyonel)</option>';
     
     districts.forEach(district => {
         const option = document.createElement('option');
@@ -3438,7 +3418,7 @@ elProvinceSelect.addEventListener('change', function() {
     elDistrictSelect.disabled = false;
 });
 
-// İlçe seçildiğinde haritayı oraya odakla
+// ðlçe seçildiÄŸinde haritayñ oraya odakla
 elDistrictSelect.addEventListener('change', async function() {
     const selectedProvince = elProvinceSelect.value;
     const selectedDistrict = this.value;
@@ -3451,15 +3431,15 @@ elDistrictSelect.addEventListener('change', async function() {
             if (data && data.length > 0) {
                 const { lat, lon } = data[0];
                 focusMapInIstanbul(lat, lon, 14);
-                showToast(`${selectedDistrict}, ${selectedProvince} konumuna odaklandı`, 'success');
+                showToast(`${selectedDistrict}, ${selectedProvince} konumuna odaklandñ`, 'success');
             }
         } catch (error) {
-            console.error('Konum bulunamadı:', error);
+            console.error('Konum bulunamadñ:', error);
         }
     }
 });
 
-// Sayfa yüklendiğinde Türkiye verisini yükle
+// Sayfa yüklendiÄŸinde Türkiye verisini yükle
 
 // ========== TURN-BY-TURN & TTS ==========
 const elTurnByTurnPanel = document.getElementById('turnByTurnPanel');
@@ -3471,15 +3451,31 @@ let ttsQueue = [];
 let ttsUtterance = null;
 let ttsPlaying = false;
 
+function clearRouteSteps() {
+    stopVoicePlayback();
+    if (elTurnByTurnList) {
+        elTurnByTurnList.innerHTML = "";
+    }
+    if (elTurnByTurnPanel) {
+        elTurnByTurnPanel.style.display = 'none';
+    }
+}
+
 async function fetchRouteSteps() {
+    clearRouteSteps();
     if (!selectedPoints || selectedPoints.length < 2) return;
+    const routeType = currentRouteData?.route_type || "route_1";
+    const optimize = Boolean(currentRouteData?.optimize ?? currentRouteOptimize);
     try {
         const resp = await fetch(`${API_BASE}/get-route-steps`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ points: selectedPoints, optimize: false })
+            body: JSON.stringify({ points: selectedPoints, optimize, route_type: routeType })
         });
-        if (!resp.ok) return;
+        if (!resp.ok) {
+            console.warn('Rota adimlari alinamadi:', resp.status);
+            return;
+        }
         const data = await resp.json();
         if (data && data.steps && data.steps.length > 0) {
             displayRouteSteps(data.steps);
@@ -3487,7 +3483,7 @@ async function fetchRouteSteps() {
             if (elTurnByTurnPanel) elTurnByTurnPanel.style.display = 'none';
         }
     } catch (e) {
-        // silent
+        console.warn('Rota adimlari alinamadi:', e);
     }
 }
 
@@ -3498,10 +3494,10 @@ function displayRouteSteps(steps) {
 }
 
 function startVoicePlayback() {
-    if (!('speechSynthesis' in window)) { showToast('Tarayıcı TTS desteklemiyor','warning'); return; }
+    if (!('speechSynthesis' in window)) { showToast('Tarayñcñ TTS desteklemiyor','warning'); return; }
     if (!elTurnByTurnList) return;
     const items = Array.from(elTurnByTurnList.querySelectorAll('.turn-step')).map(el=> el.textContent.trim());
-    if (!items.length) { showToast('Adım yok','warning'); return; }
+    if (!items.length) { showToast('Adñm yok','warning'); return; }
     stopVoicePlayback();
     ttsQueue = items;
     ttsPlaying = true;
@@ -3596,7 +3592,7 @@ function renderRouteDecisionPanel() {
     panel.innerHTML = `
         <div style="font-weight:700; margin-bottom:4px;">Akilli Rota Karari</div>
         <div style="font-size:0.92rem; line-height:1.45;">
-            <div><strong>${routeLabel}</strong> secildi • ${distance} km • ${duration} dk</div>
+            <div><strong>${routeLabel}</strong> secildi a ¢ ${distance} km a ¢ ${duration} dk</div>
             <div style="margin-top:4px;">Hava etkisi: ${weatherText}</div>
             ${warningHtml}
         </div>
@@ -3799,5 +3795,6 @@ if (typeof clearPois === "function") {
         }
     };
 }
+
 
 
