@@ -2495,19 +2495,19 @@ Not: Her dosya icin satir araligi bazli aciklama verildi. Python dosyalarinda fo
 ### 119. `günlük-rapor/15.03.2026/15.03.2026.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 120. `günlük-rapor/27.02.2026/27.02.2026-akÅŸam.txt`
+### 120. `günlük-rapor/27.02.2026/27.02.2026-akşam.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
 ### 121. `günlük-rapor/27.02.2026/27.02.2026.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 122. `günlük-rapor/28.02.2026/28.02.2026-akÅŸam-2.txt`
+### 122. `günlük-rapor/28.02.2026/28.02.2026-akşam-2.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 123. `günlük-rapor/28.02.2026/28.02.2026-akÅŸam-3.txt`
+### 123. `günlük-rapor/28.02.2026/28.02.2026-akşam-3.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
-### 124. `günlük-rapor/28.02.2026/28.02.2026-akÅŸam.txt`
+### 124. `günlük-rapor/28.02.2026/28.02.2026-akşam.txt`
 - Durum: Dosya git'te takipli ama yerelde bulunamadi.
 
 ### 125. `günlük-rapor/28.02.2026/28.02.2026-gece.txt`

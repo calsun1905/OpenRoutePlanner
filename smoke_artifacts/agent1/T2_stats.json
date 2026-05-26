@@ -1,0 +1,9 @@
+﻿{
+    "stats":  {
+                  "districts":  37,
+                  "districts_with_pois":  14,
+                  "poi_types":  15,
+                  "total_pois":  123
+              },
+    "success":  true
+}

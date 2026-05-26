@@ -1,0 +1,302 @@
+﻿{
+    "count":  37,
+    "districts":  [
+                      {
+                          "il":  "istanbul",
+                          "key":  "adalar",
+                          "lat":  40.87,
+                          "lon":  29.13,
+                          "name":  "Adalar",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "arnavutköy",
+                          "lat":  41.27,
+                          "lon":  28.73,
+                          "name":  "Arnavutköy",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "ataşehir",
+                          "lat":  40.99,
+                          "lon":  29.13,
+                          "name":  "Ataşehir",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "avcılar",
+                          "lat":  40.99,
+                          "lon":  28.72,
+                          "name":  "Avcılar",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "bağcılar",
+                          "lat":  41.04,
+                          "lon":  28.86,
+                          "name":  "Bağcılar",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "bahçelievler",
+                          "lat":  41.0,
+                          "lon":  28.86,
+                          "name":  "Bahçelievler",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "bakırköy",
+                          "lat":  40.98,
+                          "lon":  28.82,
+                          "name":  "Bakırköy",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "başakşehir",
+                          "lat":  41.09,
+                          "lon":  28.79,
+                          "name":  "Başakşehir",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "bayrampaşa",
+                          "lat":  41.05,
+                          "lon":  28.9,
+                          "name":  "Bayrampaşa",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "beşiktaş",
+                          "lat":  41.04,
+                          "lon":  29.01,
+                          "name":  "Beşiktaş",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "beylikdüzü",
+                          "lat":  41.01,
+                          "lon":  28.64,
+                          "name":  "Beylikdüzü",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "beyoğlu",
+                          "lat":  41.04,
+                          "lon":  28.98,
+                          "name":  "Beyoğlu",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "büyükçekmece",
+                          "lat":  41.02,
+                          "lon":  28.58,
+                          "name":  "Büyükçekmece",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "çatalca",
+                          "lat":  41.15,
+                          "lon":  28.46,
+                          "name":  "Çatalca",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "çekmeköy",
+                          "lat":  41.03,
+                          "lon":  29.17,
+                          "name":  "Çekmeköy",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "esenler",
+                          "lat":  41.06,
+                          "lon":  28.88,
+                          "name":  "Esenler",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "eyüpsultan",
+                          "lat":  41.05,
+                          "lon":  28.93,
+                          "name":  "Eyüpsultan",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "fatih",
+                          "lat":  41.02,
+                          "lon":  28.95,
+                          "name":  "Fatih",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "gaziosmanpaşa",
+                          "lat":  41.07,
+                          "lon":  28.9,
+                          "name":  "Gaziosmanpaşa",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "güngören",
+                          "lat":  41.01,
+                          "lon":  28.89,
+                          "name":  "Güngören",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "kadıköy",
+                          "lat":  40.99,
+                          "lon":  29.03,
+                          "name":  "Kadıköy",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "kağıthane",
+                          "lat":  41.07,
+                          "lon":  28.96,
+                          "name":  "Kağıthane",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "kartal",
+                          "lat":  40.98,
+                          "lon":  29.19,
+                          "name":  "Kartal",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "küçükçekmece",
+                          "lat":  40.99,
+                          "lon":  28.79,
+                          "name":  "Küçükçekmece",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "maltepe",
+                          "lat":  40.94,
+                          "lon":  29.15,
+                          "name":  "Maltepe",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "pendik",
+                          "lat":  40.88,
+                          "lon":  29.23,
+                          "name":  "Pendik",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "sancaktepe",
+                          "lat":  40.99,
+                          "lon":  29.23,
+                          "name":  "Sancaktepe",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "sarıyer",
+                          "lat":  41.1,
+                          "lon":  29.04,
+                          "name":  "Sarıyer",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "silivri",
+                          "lat":  41.07,
+                          "lon":  28.24,
+                          "name":  "Silivri",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "sultanbeyli",
+                          "lat":  40.96,
+                          "lon":  29.28,
+                          "name":  "Sultanbeyli",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "sultangazi",
+                          "lat":  41.08,
+                          "lon":  28.87,
+                          "name":  "Sultangazi",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "şile",
+                          "lat":  41.18,
+                          "lon":  29.61,
+                          "name":  "Şile",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "şişli",
+                          "lat":  41.05,
+                          "lon":  28.99,
+                          "name":  "Şişli",
+                          "yakla":  "avrupa"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "tuzla",
+                          "lat":  40.86,
+                          "lon":  29.3,
+                          "name":  "Tuzla",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "ümraniye",
+                          "lat":  41.01,
+                          "lon":  29.1,
+                          "name":  "Ümraniye",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "üsküdar",
+                          "lat":  41.02,
+                          "lon":  29.02,
+                          "name":  "Üsküdar",
+                          "yakla":  "anadolu"
+                      },
+                      {
+                          "il":  "istanbul",
+                          "key":  "zeytinburnu",
+                          "lat":  41.01,
+                          "lon":  28.91,
+                          "name":  "Zeytinburnu",
+                          "yakla":  "avrupa"
+                      }
+                  ],
+    "success":  true
+}

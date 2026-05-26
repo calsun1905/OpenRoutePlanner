@@ -1,0 +1,11 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.13.6, pytest-8.0.0, pluggy-1.6.0
+rootdir: C:\Users\batuf\Documents\GitHub\openroute\OpenRoutePlanner
+configfile: pytest.ini
+[CompleteEngine] 37 ile, 15 POI tipi, 123 mekan
+collected 20 items
+
+test_api.py ...............
+backend\test_gtfs_shapes_fallback.py .....
+
+============================= 20 passed in 0.62s ==============================

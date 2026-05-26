@@ -1,0 +1,96 @@
+﻿{
+    "count":  15,
+    "success":  true,
+    "types":  [
+                  {
+                      "aliases":  "kafe cafe café coffee kahve çay çayhane kırato",
+                      "description":  "Kafeler ve kahve dükkanları",
+                      "key":  "kafe",
+                      "osm_tags":  "amenity=cafe amenity=fast_food"
+                  },
+                  {
+                      "aliases":  "restaurant restoran lokanta yemek yemekhane 食堂",
+                      "description":  "Restoranlar ve yemek yerleri",
+                      "key":  "restaurant",
+                      "osm_tags":  "amenity=restaurant"
+                  },
+                  {
+                      "aliases":  "bar pub gece club kulüp bistro bira",
+                      "description":  "Barlar ve gece kulüpleri",
+                      "key":  "bar",
+                      "osm_tags":  "amenity=bar amenity=nightclub"
+                  },
+                  {
+                      "aliases":  "market bakkal market süper süpermarket şarküteri",
+                      "description":  "Marketler ve bakkallar",
+                      "key":  "market",
+                      "osm_tags":  "shop=supermarket shop=grocery"
+                  },
+                  {
+                      "aliases":  "eczane pharmacy ilaç derman",
+                      "description":  "Eczaneler",
+                      "key":  "eczane",
+                      "osm_tags":  "amenity=pharmacy"
+                  },
+                  {
+                      "aliases":  "hastane hospital sağlık tıp doktor klinik",
+                      "description":  "Hastaneler ve klinikler",
+                      "key":  "hospital",
+                      "osm_tags":  "amenity=hospital amenity=clinic"
+                  },
+                  {
+                      "aliases":  "okul school dersane eğitim üniversite",
+                      "description":  "Okullar ve eğitim kurumları",
+                      "key":  "school",
+                      "osm_tags":  "amenity=school amenity=university"
+                  },
+                  {
+                      "aliases":  "park bahçe yeşil rekreasyon spor fitness",
+                      "description":  "Parklar ve yeşil alanlar",
+                      "key":  "park",
+                      "osm_tags":  "leisure=park leisure=fitness"
+                  },
+                  {
+                      "aliases":  "banka bank atm finans para",
+                      "description":  "Bankalar ve ATM\u0027ler",
+                      "key":  "bank",
+                      "osm_tags":  "amenity=bank amenity=atm"
+                  },
+                  {
+                      "aliases":  "cami mosque namaz mescit",
+                      "description":  "Camiler ve ibadet yerleri",
+                      "key":  "mosque",
+                      "osm_tags":  "amenity=place_of_worship"
+                  },
+                  {
+                      "aliases":  "otel hotel pansiyon konaklama hostel",
+                      "description":  "Oteller ve konaklama",
+                      "key":  "hotel",
+                      "osm_tags":  "tourism=hotel"
+                  },
+                  {
+                      "aliases":  "atm bankamatik nakit para çekme",
+                      "description":  "ATM\u0027ler",
+                      "key":  "atm",
+                      "osm_tags":  "amenity=atm"
+                  },
+                  {
+                      "aliases":  "park otopark araç garaj",
+                      "description":  "Otoparklar",
+                      "key":  "parking",
+                      "osm_tags":  "amenity=parking"
+                  },
+                  {
+                      "aliases":  "benzin akaryakıt bp shell lpg doğalgaz",
+                      "description":  "Benzin istasyonları",
+                      "key":  "gas",
+                      "osm_tags":  "amenity=fuel"
+                  },
+                  {
+                      "aliases":  "polis karakol emniyet güvenlik",
+                      "description":  "Polis ve güvenlik",
+                      "key":  "police",
+                      "osm_tags":  "amenity=police"
+                  }
+              ]
+}
