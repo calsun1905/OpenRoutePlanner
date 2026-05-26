@@ -69,7 +69,7 @@ def _init_cache_db() -> sqlite3.Connection:
     """
     conn = sqlite3.connect(CACHE_DB)
 
-    # Performans optimizasyonları (PERFORMANS_OPTIMIZASYON_PLANI.md â€” Faz 1)
+    # Performans optimizasyonları (PERFORMANS_OPTIMIZASYON_PLANI.md â " Faz 1)
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous = NORMAL;")
     conn.execute("PRAGMA cache_size = -1048576;")   # 1 GB RAM cache
@@ -313,7 +313,7 @@ def geocode(place_name: str) -> dict:
             "cached": True
         }
 
-    # 2) Local places (önceden tanımlı yerler â€” API'ye gitmeden)
+    # 2) Local places (önceden tanımlı yerler â " API'ye gitmeden)
     from local_places import lookup as local_places_lookup
     local_result = local_places_lookup(place_name)
     if local_result:

@@ -17,9 +17,44 @@ from networkx.algorithms.approximation import traveling_salesman_problem
 from networkx.algorithms.connectivity import edge_disjoint_paths, edge_connectivity
 from graph_manager import find_nearest_node
 from route_config import ROUTE_CONFIG
+import os
+import builtins
 import time
 import math
 from typing import Dict, List, Tuple, Optional
+
+
+def _safe_print(*args, **kwargs):
+    try:
+        builtins.print(*args, **kwargs)
+    except UnicodeEncodeError:
+        safe_args = [str(arg).encode("ascii", "ignore").decode("ascii") for arg in args]
+        builtins.print(*safe_args, **kwargs)
+
+
+print = _safe_print
+
+
+def _routing_weight_key() -> str:
+    return str(ROUTE_CONFIG.get("ROUTING_WEIGHT_KEY", "routing_length"))
+
+
+def _route_speed_kmh() -> float:
+    try:
+        speed = float(ROUTE_CONFIG.get("ROUTE_SPEED_KMH", ROUTE_CONFIG.get("WALK_SPEED_KMH", 5.0)))
+    except (TypeError, ValueError):
+        speed = 5.0
+    return max(1.0, speed)
+
+
+def _route_debug_enabled() -> bool:
+    raw = os.getenv("ROUTE_DEBUG", "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _route_debug_log(message: str):
+    if _route_debug_enabled():
+        print(message)
 
 
 def shortest_path(G, origin_node: int, dest_node: int) -> list:
@@ -35,7 +70,7 @@ def shortest_path(G, origin_node: int, dest_node: int) -> list:
         list[int]: Düğüm ID listesi (rota)
     """
     try:
-        path = nx.shortest_path(G, origin_node, dest_node, weight="length")
+        path = nx.shortest_path(G, origin_node, dest_node, weight=_routing_weight_key())
         return path
     except nx.NetworkXNoPath:
         print(f"[RouteEngine] {origin_node} -> {dest_node} arası yol bulunamadı!")
@@ -48,18 +83,36 @@ def _node_coord(G, node_id: int) -> List[float]:
     return [data["y"], data["x"]]  # y=lat, x=lon
 
 
+def _best_edge_data(G, u: int, v: int):
+    """Return the shortest parallel edge for a node pair."""
+    edge_data = G.get_edge_data(u, v)
+    if not edge_data:
+        return None, None
+    routing_key = _routing_weight_key()
+    key, data = min(
+        edge_data.items(),
+        key=lambda item: item[1].get(routing_key, item[1].get("length", float("inf"))),
+    )
+    return key, data
+
+
+def _is_valid_path(G, path_nodes: list) -> bool:
+    """Check that every consecutive node pair is connected in route direction."""
+    if not path_nodes:
+        return False
+    return all(G.has_edge(path_nodes[i], path_nodes[i + 1]) for i in range(len(path_nodes) - 1))
+
+
 def _extract_edge_coords(G, u: int, v: int) -> List[List[float]]:
     """
     Iki node arasindaki edge geometrisini [lat, lon] listesine cevirir.
     Geometri yoksa veya okunamazsa [u, v] node koordinatlarini dondurur.
     """
     default_coords = [_node_coord(G, u), _node_coord(G, v)]
-    edge_data = G.get_edge_data(u, v)
-    if not edge_data:
+    _, best = _best_edge_data(G, u, v)
+    if not best:
         return default_coords
 
-    # Birden fazla paralel edge varsa "length" en kisa olani sec.
-    best = min(edge_data.values(), key=lambda d: d.get("length", float("inf")))
     geom = best.get("geometry")
     if geom is None:
         return default_coords
@@ -137,22 +190,39 @@ def solve_tsp(G, points: list) -> list:
     # TSP için tam bir alt grafik (complete subgraph) gerekli
     # Her düğüm çifti arası en kısa yol uzunluğunu hesapla
     dist_matrix = {}
+    no_path_count = 0
+    no_path_pairs = []
+    routing_weight = _routing_weight_key()
     for i in range(n):
         for j in range(n):
             if i == j:
                 continue
             try:
-                length = nx.shortest_path_length(G, nodes[i], nodes[j], weight="length")
+                length = nx.shortest_path_length(G, nodes[i], nodes[j], weight=routing_weight)
                 dist_matrix[(nodes[i], nodes[j])] = length
             except nx.NetworkXNoPath:
                 dist_matrix[(nodes[i], nodes[j])] = float("inf")
+                no_path_count += 1
+                no_path_pairs.append((nodes[i], nodes[j]))
+                _route_debug_log(f"[TSP DEBUG] NetworkXNoPath: node {nodes[i]} -> {nodes[j]} (inf)")
+    
+    if no_path_count > 0:
+        print(f"[TSP WARN] {no_path_count} cift icin yol bulunamadi (inf atandi)")
+        _route_debug_log(
+            f"[TSP DEBUG] Eksik baglanti ciftleri: {no_path_pairs[:5]}{'...' if len(no_path_pairs) > 5 else ''}"
+        )
     
     # TSP alt grafını oluştur
     tsp_graph = nx.Graph()
     for i in range(n):
         for j in range(i + 1, n):
             w = dist_matrix.get((nodes[i], nodes[j]), float("inf"))
-            tsp_graph.add_edge(nodes[i], nodes[j], weight=w)
+            if math.isfinite(w):
+                tsp_graph.add_edge(nodes[i], nodes[j], weight=w)
+
+    if tsp_graph.number_of_edges() == 0:
+        print("[RouteEngine] TSP alt-graf bos, sirali rota kullaniliyor.")
+        return list(range(n))
     
     # NetworkX TSP approximation kullan
     try:
@@ -199,6 +269,9 @@ def build_full_route(G, ordered_points: list) -> list:
         dest = find_nearest_node(G, ordered_points[i + 1][0], ordered_points[i + 1][1])
         
         segment = shortest_path(G, origin, dest)
+        if not segment:
+            print(f"[RouteEngine] Segment {i+1} tamamlanamadi; tam rota iptal edildi")
+            return []
         
         if segment:
             # İlk segment hariç, başlangıç düğümünü ekleme (önceki segmentin sonuyla aynı)
@@ -226,11 +299,9 @@ def calculate_route_stats(G, route_nodes: list) -> dict:
     for i in range(len(route_nodes) - 1):
         try:
             # MultiDiGraph'ta birden fazla kenar olabilir, en kısasını al
-            edge_data = G.get_edge_data(route_nodes[i], route_nodes[i + 1])
-            if edge_data and len(edge_data) > 0:
-                # MultiDiGraph: ilk kenarın uzunluğunu al
-                first_key = list(edge_data.keys())[0]
-                length = edge_data[first_key].get("length", 0)
+            _, best_edge = _best_edge_data(G, route_nodes[i], route_nodes[i + 1])
+            if best_edge:
+                length = best_edge.get("length", 0)
                 total_length += length
         except Exception as e:
             print(f"[RouteEngine] Kenar uzunluğu hesaplama hatası (segment {i}): {e}")
@@ -239,12 +310,13 @@ def calculate_route_stats(G, route_nodes: list) -> dict:
     total_km = round(total_length / 1000, 2)
 
     # Ortalama yürüme hızı: config'den al
-    walk_speed_kmh = ROUTE_CONFIG.get("WALK_SPEED_KMH", 5.0)
-    walk_minutes = round((total_km / walk_speed_kmh) * 60)
+    route_speed_kmh = _route_speed_kmh()
+    walk_minutes = round((total_km / route_speed_kmh) * 60)
     
     return {
         "total_distance_km": total_km,
         "estimated_walk_minutes": walk_minutes,
+        "estimated_route_minutes": walk_minutes,
     }
 
 
@@ -273,11 +345,9 @@ def path_to_edges(G, path_nodes):
     """
     edges = []
     for i in range(len(path_nodes) - 1):
-        edge_data = G.get_edge_data(path_nodes[i], path_nodes[i + 1])
-        if edge_data and len(edge_data) > 0:
-            # MultiDiGraph'te ilk key'i al
-            first_key = list(edge_data.keys())[0]
-            edges.append((path_nodes[i], path_nodes[i + 1], first_key))
+        key, _ = _best_edge_data(G, path_nodes[i], path_nodes[i + 1])
+        if key is not None:
+            edges.append((path_nodes[i], path_nodes[i + 1], key))
     return edges
 
 
@@ -310,6 +380,19 @@ def count_edge_overlap(edges1, edges2):
         return 0.0
 
     intersection = len(set1 & set2)
+    
+    # DEBUG LOG: Yönlü vs yönsuz overlap karşılaştırması
+    directional_set1 = {(e[0], e[1]) for e in edges1 if len(e) >= 2}
+    directional_set2 = {(e[0], e[1]) for e in edges2 if len(e) >= 2}
+    directional_intersection = len(directional_set1 & directional_set2)
+    
+    _route_debug_log(f"[OVERLAP DEBUG] edges1={len(edges1)}, edges2={len(edges2)}")
+    _route_debug_log(f"[OVERLAP DEBUG] Yönsuz overlap: {intersection}/{len(set2)} = {intersection/len(set2):.2%}")
+    _route_debug_log(f"[OVERLAP DEBUG] Yönlü overlap: {directional_intersection}/{len(directional_set2)} = {directional_intersection/len(directional_set2):.2%}")
+    
+    if intersection != directional_intersection:
+        _route_debug_log(f"[OVERLAP DEBUG] Yonlu/yonsuz overlap farki: {abs(intersection - directional_intersection)} edge")
+    
     # Asimetrik: "Yeni rotanın (set2) ne kadarı eski rotayla örtüşüyor?"
     return intersection / len(set2) if len(set2) > 0 else 0.0
 
@@ -546,50 +629,46 @@ def dynamic_overlap_threshold_connectivity(distance_km: float, connectivity: int
 
 def apply_penalty_to_graph(G: nx.Graph, used_edges: list, penalty_factor: float = None) -> nx.Graph:
     """
-    Kullanılan kenarlara ceza uygulayarak grafiği kopyalar.
+    Kullanilan kenarlara ceza uygulayarak grafigi kopyalar.
 
-    Penalty-based generation: Önceden kullanılan yolları pahalı hale getirir,
-    böylece sonraki aramalar FARKLI yolları tercih eder.
-
-    BUG FIX v2.0.1:
-    - MultiDiGraph için güvenli approach
-    - Tekil 'penalty_length' attribute ile çalış
-    - weight='penalty_length' ile doğrudan kullanılabilir
+    Penalty-based generation: Onceden kullanilan yollari pahali hale getirir,
+    boylece sonraki aramalar farkli yollari tercih eder.
 
     Args:
-        G: Orijinal NetworkX grafiği
-        used_edges: Kullanılan kenar listesi [(u, v, key), ...]
-        penalty_factor: Cezalandırma çarpanı (varsayılan 2x)
+        G: Orijinal NetworkX grafigi
+        used_edges: Kullanilan kenar listesi [(u, v, key), ...]
+        penalty_factor: Cezalandirma carpani (varsayilan 2x)
 
     Returns:
-        nx.Graph: Penalize edilmiş graf kopyası
+        nx.Graph: Penalize edilmis graf kopyasi
     """
     if penalty_factor is None:
         penalty_factor = ROUTE_CONFIG.get("PENALTY_FACTOR", 2.0)
 
     G_penalty = G.copy()
+    routing_key = _routing_weight_key()
 
-    # Her düğüm çifti için en az bir edge var mı kontrol et
+    # Her dugum cifti icin en az bir edge var mi kontrol et
     penalized_edges = set()
-
     for edge in used_edges:
         if len(edge) >= 2:
             u, v = edge[0], edge[1]
-            # Yönsuz normalize et
             edge_key = (min(u, v), max(u, v))
             penalized_edges.add(edge_key)
 
-    # Penalize edilmiş edge'lere yeni weight ekle
+    # Penalize edilmis edge'lere yeni weight ekle
     for u, v, key, data in G_penalty.edges(keys=True, data=True):
         edge_key = (min(u, v), max(u, v))
+        base_weight = data.get(routing_key, data.get("length", 1))
+        try:
+            base_weight = float(base_weight)
+        except (TypeError, ValueError):
+            base_weight = 1.0
 
         if edge_key in penalized_edges:
-            # Bu kenar kullanıldı, cezalandır
-            original_length = data.get('length', 1)
-            data['penalty_length'] = original_length * penalty_factor
+            data["penalty_length"] = base_weight * penalty_factor
         else:
-            # Kullanılmadı, normal length
-            data['penalty_length'] = data.get('length', 1)
+            data["penalty_length"] = base_weight
 
     return G_penalty
 
@@ -668,7 +747,7 @@ def get_fallback_routes(G, origin_node: int, dest_node: int) -> list:
 
     # Level 1: Basit Dijkstra
     try:
-        shortest_nodes = nx.shortest_path(G, origin_node, dest_node, weight="length")
+        shortest_nodes = nx.shortest_path(G, origin_node, dest_node, weight=_routing_weight_key())
         shortest_stats = calculate_route_stats(G, shortest_nodes)
         fallbacks.append({
             "type": "route_1",
@@ -687,16 +766,23 @@ def get_fallback_routes(G, origin_node: int, dest_node: int) -> list:
     # Level 2: Komşu node'ları dene (en fazla 2 tane)
     if len(fallbacks) < 3:
         try:
-            origin_neighbors = list(G.neighbors(origin_node))[:3]
-            dest_neighbors = list(G.neighbors(dest_node))[:3]
+            origin_neighbors = list(G.successors(origin_node)) if hasattr(G, "successors") else list(G.neighbors(origin_node))
+            if hasattr(G, "predecessors"):
+                dest_neighbors = list(G.predecessors(dest_node))
+            else:
+                dest_neighbors = list(G.neighbors(dest_node))
+            origin_neighbors = origin_neighbors[:3]
+            dest_neighbors = dest_neighbors[:3]
 
             for o_n in origin_neighbors:
                 for d_n in dest_neighbors:
                     if len(fallbacks) >= 3:
                         break
                     try:
-                        alt_path = nx.shortest_path(G, o_n, d_n, weight="length")
+                        alt_path = nx.shortest_path(G, o_n, d_n, weight=_routing_weight_key())
                         full_path = [origin_node] + alt_path + [dest_node]
+                        if not _is_valid_path(G, full_path):
+                            continue
                         stats = calculate_route_stats(G, full_path)
 
                         # Çok uzun değilse kabul et
@@ -744,7 +830,7 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
     Via-Node (Ara Nokta) yaklaşımı ile alternatif rotalar bulur.
 
     Endüstri standardı: Google Maps / OSRM tarzı.
-    Ana rota geometrik olarak uzak büyük kavşakları bulur,
+    Ana rotadan geometrik olarak uzak büyük kavşakları bulur,
     rotayı bu kavşaklardan geçmeye zorlar (A → C → B).
 
     Algoritma:
@@ -758,20 +844,6 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
         num_via_routes = ROUTE_CONFIG.get("VIA_NODE_DEFAULT_COUNT", 2)
     if max_distance_ratio is None:
         max_distance_ratio = ROUTE_CONFIG.get("VIA_NODE_MAX_DISTANCE_RATIO", 1.5)
-    """
-    Via-Node (Ara Nokta) yaklaşımı ile alternatif rotalar bulur.
-
-    Endüstri standardı: Google Maps / OSRM tarzı.
-    Ana rotadan geometrik olarak uzak büyük kavşakları bulur,
-    rotayı bu kavşaklardan geçmeye zorlar (A → C → B).
-
-    Algoritma:
-    1. Ana rota koordinatlarının bounding box'ını genişlet
-    2. Bounding box içindeki yüksek degree (kavşak) node'ları bul
-    3. Ana rotadan en uzak olanları via-node olarak seç
-    4. A → via → B rotası oluştur
-    5. Çok uzun rotaları reddet (max_distance_ratio)
-    """
     via_routes = []
 
     if not main_route_nodes or len(main_route_nodes) < 2:
@@ -857,8 +929,8 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
         if len(via_routes) >= num_via_routes:
             break
         try:
-            path_a = nx.shortest_path(G, origin_node, node, weight="length")
-            path_b = nx.shortest_path(G, node, dest_node, weight="length")
+            path_a = nx.shortest_path(G, origin_node, node, weight=_routing_weight_key())
+            path_b = nx.shortest_path(G, node, dest_node, weight=_routing_weight_key())
             full_path = path_a + path_b[1:]
 
             stats = calculate_route_stats(G, full_path)
@@ -892,7 +964,10 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
             print(f"[RouteEngine] ✓ Via-Node #{len(via_routes)}: "
                   f"{stats['total_distance_km']:.2f} km (degree={degree}, uzaklık={dist:.0f}m)")
 
-        except (nx.NetworkXNoPath, Exception):
+        except nx.NetworkXNoPath:
+            continue
+        except (KeyError, TypeError, ValueError) as exc:
+            _route_debug_log(f"[RouteEngine DEBUG] Via-node candidate skip: {exc}")
             continue
 
     return via_routes
@@ -944,7 +1019,7 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
         # ADIM 1: En kısa rotayı bul (Rota 1)
         # ============================================================
         try:
-            shortest_nodes = nx.shortest_path(G, origin_node, dest_node, weight="length")
+            shortest_nodes = nx.shortest_path(G, origin_node, dest_node, weight=_routing_weight_key())
             shortest_stats = calculate_route_stats(G, shortest_nodes)
             shortest_km = shortest_stats["total_distance_km"]
             print(f"[RouteEngine] ✓ Rota 1 (en kısa): {shortest_km:.2f} km")
@@ -1098,7 +1173,7 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
     except MemoryError:
         print(f"[RouteEngine] MemoryError: Yetersiz hafiza")
         try:
-            shortest_nodes = nx.shortest_path(G, origin_node, dest_node, weight="length")
+            shortest_nodes = nx.shortest_path(G, origin_node, dest_node, weight=_routing_weight_key())
             shortest_stats = calculate_route_stats(G, shortest_nodes)
             return [{
                 "type": "route_1", "name": "Rota 1", "icon": "📍",
@@ -1162,11 +1237,20 @@ def build_alternative_routes(G, ordered_points: list, route_index: int = 0) -> l
         else:
             segment = shortest_path(G, origin, dest)
 
+        if not segment:
+            print(f"[RouteEngine] Segment {i+1} tamamlanamadi; tam rota iptal edildi")
+            return []
+
         if segment:
+            candidate_nodes = list(full_route_nodes)
             if i == 0:
-                full_route_nodes.extend(segment)
+                candidate_nodes.extend(segment)
             else:
-                full_route_nodes.extend(segment[1:])
+                candidate_nodes.extend(segment[1:])
+            if not _is_valid_path(G, candidate_nodes):
+                print(f"[RouteEngine] Segment {i+1} gecersiz kenar iceriyor; tam rota iptal edildi")
+                return []
+            full_route_nodes = candidate_nodes
 
     return full_route_nodes
 
@@ -1191,6 +1275,9 @@ def build_all_alternative_routes_batch(G, ordered_points: list) -> list:
         print(f"[RouteEngine] [BATCH] Segment {i+1}: {ordered_points[i]} -> {ordered_points[i+1]}")
         alts = find_alternative_routes(G, origin, dest, num_routes=3)
         print(f"[RouteEngine] [BATCH] Segment {i+1} icin {len(alts)} alternatif bulundu")
+        if not alts:
+            print(f"[RouteEngine] [BATCH] Segment {i+1} tamamlanamadi; alternatif rota iptal edildi")
+            return []
         segment_alternatives.append(alts)
 
     # 3 tam rota oluştur (her biri için aynı index'teki segmenti seç)
@@ -1219,6 +1306,11 @@ def build_all_alternative_routes_batch(G, ordered_points: list) -> list:
                 segment = shortest_path(G, origin, dest)
                 chosen_idx = "fallback"
 
+            if not segment:
+                print(f"[RouteEngine] [BATCH] Segment {seg_idx+1} bos; Rota {route_idx+1} iptal edildi")
+                full_nodes = []
+                break
+
             if segment:
                 if seg_idx == 0:
                     full_nodes.extend(segment)
@@ -1227,6 +1319,9 @@ def build_all_alternative_routes_batch(G, ordered_points: list) -> list:
                 print(f"[RouteEngine] [BATCH] Segment {seg_idx+1} icin secilen rota: {chosen_idx}, uzunluk={len(segment)}")
 
         if full_nodes:
+            if not _is_valid_path(G, full_nodes):
+                print(f"[RouteEngine] [BATCH] Rota {route_idx+1} gecersiz kenar iceriyor; iptal edildi")
+                continue
             stats = calculate_route_stats(G, full_nodes)
             route_num = route_idx + 1
             print(f"[RouteEngine] [BATCH] Rota {route_num}: {stats['total_distance_km']} km, {stats['estimated_walk_minutes']} dk")

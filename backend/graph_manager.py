@@ -1,8 +1,8 @@
 """
-graph_manager.py - OSMnx ile harita verisi yÃ¶netimi
+graph_manager.py - OSMnx ile harita verisi yönetimi
 
 Harita verilerini OpenStreetMap'ten indirir, .graphml olarak cache'ler,
-ve POI (Points of Interest) aramalarÄ±nÄ± gerÃ§ekleÅŸtirir.
+ve POI (Points of Interest) aramalarını gerçekleştirir.
 """
 
 import os
@@ -243,7 +243,7 @@ def _build_tags_cache_suffix(tags: dict) -> str:
 
 
 def _cache_path(place_name: str) -> str:
-    """Verilen yer adÄ± iÃ§in cache dosya yolunu dÃ¶ner."""
+    """Verilen yer adı için cache dosya yolunu döner."""
     safe_name = place_name.replace(",", "").replace(" ", "_").lower()
     return os.path.join(DATA_DIR, f"{safe_name}.graphml")
 
@@ -301,9 +301,9 @@ def _filter_outdoor_walk_graph(G):
 
 def get_graph(place_name: str = "Kadikoy, Istanbul, Turkey"):
     """
-    Belirtilen bÃ¶lgenin yÃ¼rÃ¼yÃ¼ÅŸ grafiÄŸini dÃ¶ner.
-    Ä°lk Ã§aÄŸrÄ±da internetten indirir ve .graphml olarak cache'ler.
-    Sonraki Ã§aÄŸrÄ±larda dosyadan okur (Ã§ok daha hÄ±zlÄ±).
+    Belirtilen bölgenin yürüyüş grafiğini döner.
+    İlk çağrıda internetten indirir ve .graphml olarak cache'ler.
+    Sonraki çağrılarda dosyadan okur (çok daha hızlı).
     """
     cache_file = _cache_path(place_name)
 
@@ -321,28 +321,28 @@ def get_graph(place_name: str = "Kadikoy, Istanbul, Turkey"):
 
 def get_graph_for_points(points: list):
     """
-    SeÃ§ilen noktalarÄ±n merkezinden, tÃ¼m noktalarÄ± kapsayacak
-    yarÄ±Ã§apla graf indirir. graph_from_point kullanÄ±r (bbox'tan Ã§ok daha hÄ±zlÄ±).
+    Seçilen noktaların merkezinden, tüm noktaları kapsayacak
+    yarıçapla graf indirir. graph_from_point kullanır (bbox'tan çok daha hızlı).
     
     Args:
         points: [(lat, lon), ...] koordinat listesi
     
     Returns:
-        networkx.MultiDiGraph: YÃ¼rÃ¼yÃ¼ÅŸ grafiÄŸi
+        networkx.MultiDiGraph: Yürüyüş grafiği
     """
     import math
     
     lats = [p[0] for p in points]
     lons = [p[1] for p in points]
     
-    # Merkez noktayÄ± hesapla
+    # Merkez noktayı hesapla
     center_lat = sum(lats) / len(lats)
     center_lon = sum(lons) / len(lons)
     
     # En uzak noktaya olan mesafeyi hesapla (metre cinsinden)
     max_dist = 0
     for lat, lon in points:
-        # Haversine yaklaÅŸÄ±mÄ± (basit)
+        # Haversine yaklaşımı (basit)
         dlat = math.radians(lat - center_lat)
         dlon = math.radians(lon - center_lon)
         a = math.sin(dlat/2)**2 + math.cos(math.radians(center_lat)) * math.cos(math.radians(lat)) * math.sin(dlon/2)**2
@@ -355,10 +355,10 @@ def get_graph_for_points(points: list):
     padding = ROUTE_CONFIG.get("GRAPH_RADIUS_PADDING_M", 300)
     max_radius = ROUTE_CONFIG.get("GRAPH_RADIUS_MAX_M", 3500)
 
-    # Minimum yarÄ±Ã§ap + padding uygula. Maksimum deÄŸeri config yÃ¶netir.
+    # Minimum yarıçap + padding uygula. Maksimum değeri config yönetir.
     radius = min(max_radius, max(min_radius, max_dist + padding))
     
-    # Cache key: merkez + yarÄ±Ã§ap
+    # Cache key: merkez + yarıçap
     cache_key = f"point_{center_lat:.4f}_{center_lon:.4f}_{int(radius)}"
     cache_file = os.path.join(DATA_DIR, f"{cache_key}.graphml")
     
@@ -366,7 +366,7 @@ def get_graph_for_points(points: list):
         print(f"[GraphManager] Cache'den okunuyor: {cache_file}")
         G = ox.load_graphml(cache_file)
     else:
-        print(f"[GraphManager] Graf indiriliyor: merkez=({center_lat:.4f}, {center_lon:.4f}), yarÄ±Ã§ap={int(radius)}m")
+        print(f"[GraphManager] Graf indiriliyor: merkez=({center_lat:.4f}, {center_lon:.4f}), yarıçap={int(radius)}m")
         G = ox.graph_from_point((center_lat, center_lon), dist=radius, network_type="walk")
         ox.save_graphml(G, cache_file)
         print(f"[GraphManager] Cache'e kaydedildi: {cache_file}")
@@ -376,25 +376,25 @@ def get_graph_for_points(points: list):
 
 def find_nearest_node(G, lat: float, lon: float) -> int:
     """
-    Verilen koordinata (lat, lon) en yakÄ±n graf dÃ¼ÄŸÃ¼mÃ¼nÃ¼ bulur.
+    Verilen koordinata (lat, lon) en yakın graf düğümünü bulur.
     
-    nearest_edges kullanarak en yakÄ±n yol kenarÄ±nÄ± bulur, sonra
-    o kenarÄ±n uÃ§ noktalarÄ±ndan kullanÄ±cÄ±ya en yakÄ±n olanÄ± seÃ§er.
-    Bu sayede ana caddeye deÄŸil, gerÃ§ekten en yakÄ±n sokaÄŸa snap edilir.
+    nearest_edges kullanarak en yakın yol kenarını bulur, sonra
+    o kenarın uç noktalarından kullanıcıya en yakın olanı seçer.
+    Bu sayede ana caddeye değil, gerçekten en yakın sokağa snap edilir.
     
     Args:
-        G: NetworkX grafiÄŸi
+        G: NetworkX grafiği
         lat: Enlem
         lon: Boylam
     
     Returns:
-        int: En yakÄ±n dÃ¼ÄŸÃ¼m ID'si
+        int: En yakın düğüm ID'si
     """
     try:
-        # En yakÄ±n yol kenarÄ±nÄ± bul (u, v, key)
+        # En yakın yol kenarını bul (u, v, key)
         u, v, _ = ox.nearest_edges(G, X=lon, Y=lat)
         
-        # KenarÄ±n iki uÃ§ noktasÄ±ndan kullanÄ±cÄ±ya en yakÄ±n olanÄ± seÃ§
+        # Kenarın iki uç noktasından kullanıcıya en yakın olanı seç
         u_data = G.nodes[u]
         v_data = G.nodes[v]
 
@@ -404,19 +404,19 @@ def find_nearest_node(G, lat: float, lon: float) -> int:
         return u if dist_u <= dist_v else v
     except Exception as e:
         # Fallback: nearest_nodes kullan
-        print(f"[GraphManager] Manuel nearest node hatasÄ±, fallback kullanÄ±lÄ±yor: {e}")
+        print(f"[GraphManager] Manuel nearest node hatası, fallback kullanılıyor: {e}")
         return ox.nearest_nodes(G, X=lon, Y=lat)
 
 
 def _rows_to_poi_list(gdf, category_label: str) -> list:
-    """OSMnx dataframe satÄ±rlarÄ±nÄ± API POI listesine dÃ¶nÃ¼ÅŸtÃ¼rÃ¼r."""
+    """OSMnx dataframe satırlarını API POI listesine dönüştürür."""
     pois = []
     for _, row in gdf.iterrows():
         try:
             centroid = row.geometry.centroid
-            name = row.get("name", "Ä°simsiz")
+            name = row.get("name", "İsimsiz")
             if name is None or (hasattr(name, "__len__") and len(str(name)) == 0):
-                name = "Ä°simsiz"
+                name = "İsimsiz"
 
             website = row.get("website", "") or ""
             wikipedia = row.get("wikipedia", "") or ""
@@ -441,20 +441,20 @@ def _rows_to_poi_list(gdf, category_label: str) -> list:
                 "image": str(image) if image else "",
             })
         except Exception as e:
-            print(f"[POI] POI verisi hatasÄ± (atlanÄ±yor): {e}")
+            print(f"[POI] POI verisi hatası (atlanıyor): {e}")
             continue
     return pois
 
 
 def _resolve_search_center(place_name: str):
-    """Yer adÄ±nÄ± merkez koordinata Ã§evirir (geo-bound zorunluluÄŸu)."""
+    """Yer adını merkez koordinata çevirir (geo-bound zorunluluğu)."""
     if not geocode or not place_name:
         return None
 
     try:
         result = geocode(place_name)
     except Exception as e:
-        print(f"[POI] Geocode hatasÄ±: {e}")
+        print(f"[POI] Geocode hatası: {e}")
         return None
 
     if not isinstance(result, dict) or result.get("status") != "success":
@@ -854,8 +854,8 @@ def search_pois(
     )
 def search_poi_by_name_fuzzy(query_name: str, place_name: str = None) -> list:
     """
-    Yerel POI veritabanÄ±nda 'query_name' (Ã–rn: "Fener Stadyumu") deÄŸerini
-    yaklaÅŸÄ±k (fuzzy) olarak arar. Bulunursa dÃ¶ndÃ¼rÃ¼r.
+    Yerel POI veritabanında 'query_name' (Örn: "Fener Stadyumu") değerini
+    yaklaşık (fuzzy) olarak arar. Bulunursa döndürür.
     """
     import sqlite3
     import json
@@ -887,12 +887,12 @@ def search_poi_by_name_fuzzy(query_name: str, place_name: str = None) -> list:
                     results.append((1.0, poi))
                     continue
                     
-                # Fuzzy matching (benzerlik oranÄ±)
+                # Fuzzy matching (benzerlik oranı)
                 ratio = difflib.SequenceMatcher(None, query_name_lower, name).ratio()
-                if ratio > 0.65:  # %65 benzerlik sÄ±nÄ±rÄ±
+                if ratio > 0.65:  # %65 benzerlik sınırı
                     results.append((ratio, poi))
                     
-        # BenzerliÄŸe gÃ¶re sÄ±rala
+        # Benzerliğe göre sırala
         results.sort(key=lambda x: x[0], reverse=True)
         
         unique_pois = []
@@ -904,21 +904,21 @@ def search_poi_by_name_fuzzy(query_name: str, place_name: str = None) -> list:
                 unique_pois.append(poi)
                 
         if unique_pois:
-            print(f"[POI] Fuzzy match baÅŸarÄ±lÄ±. '{query_name}' iÃ§in {len(unique_pois)} sonuÃ§.")
+            print(f"[POI] Fuzzy match başarılı. '{query_name}' için {len(unique_pois)} sonuç.")
             return unique_pois
     except Exception as e:
-        print(f"[POI] Fuzzy arama hatasÄ±: {e}")
+        print(f"[POI] Fuzzy arama hatası: {e}")
         
-    print(f"[POI] Fuzzy match bulunamadÄ±: '{query_name}'.")
+    print(f"[POI] Fuzzy match bulunamadı: '{query_name}'.")
     return []
 
 
 # =============================================================================
-# GRAPH PRELOADING - PopÃ¼ler bÃ¶lgeler iÃ§in hÄ±zlÄ± eriÅŸim
+# GRAPH PRELOADING - Popüler bölgeler için hızlı erişim
 # =============================================================================
 
-# PopÃ¼ler bÃ¶lgeler (TÃ¼rkiye'nin en Ã§ok kullanÄ±lan bÃ¶lgeleri)
-# Uygulama baÅŸladÄ±ÄŸÄ±nda bu bÃ¶lgelerin grafileri Ã¶n yÃ¼klenir
+# Popüler bölgeler (Türkiye'nin en çok kullanılan bölgeleri)
+# Uygulama başladığında bu bölgelerin grafileri ön yüklenir
 POPULAR_REGIONS = [
     "Kadikoy, Istanbul, Turkey",
     "Besiktas, Istanbul, Turkey",
@@ -934,51 +934,51 @@ _preloaded_graphs = {}
 
 def preload_popular_regions():
     """
-    PopÃ¼ler bÃ¶lgelerin grafilerini Ã¶n yÃ¼kler.
-    Uygulama baÅŸlangÄ±cÄ±nda Ã§aÄŸrÄ±lmalÄ±dÄ±r.
-    Ä°lk rota hesaplamalarÄ±nÄ± %80 daha hÄ±zlÄ± yapar.
+    Popüler bölgelerin grafilerini ön yükler.
+    Uygulama başlangıcında çağrılmalıdır.
+    İlk rota hesaplamalarını %80 daha hızlı yapar.
     """
     import threading
 
     def _preload_region(place_name):
         try:
-            print(f"[GraphPreload] Ã–n yÃ¼kleniyor: {place_name}")
+            print(f"[GraphPreload] Ön yükleniyor: {place_name}")
             G = get_graph(place_name)
             _preloaded_graphs[place_name] = G
 
-            # LRU cache'e de ekle (preload Ã¶nceliÄŸi yÃ¼ksek)
+            # LRU cache'e de ekle (preload önceliği yüksek)
             from cache_manager import get_graph_cache
             cache = get_graph_cache()
             cache.put(place_name, G, preloaded=True)
 
-            print(f"[GraphPreload] YÃ¼klendi: {place_name}")
+            print(f"[GraphPreload] Yüklendi: {place_name}")
         except Exception as e:
             print(f"[GraphPreload] Hata {place_name}: {e}")
 
-    # Paralel yÃ¼klemeyi baÅŸlat
+    # Paralel yüklemeyi başlat
     threads = []
     for region in POPULAR_REGIONS:
         t = threading.Thread(target=_preload_region, args=(region,))
         t.start()
         threads.append(t)
 
-    # TÃ¼m thread'lerin tamamlanmasÄ±nÄ± bekle
+    # Tüm thread'lerin tamamlanmasını bekle
     for t in threads:
         t.join()
 
-    print(f"[GraphPreload] {len(_preloaded_graphs)} bÃ¶lge Ã¶n yÃ¼klendi")
+    print(f"[GraphPreload] {len(_preloaded_graphs)} bölge ön yüklendi")
 
 
 def is_preloaded(place_name: str) -> bool:
     """
-    Belirtilen bÃ¶lgenin grafiklerinin Ã¶nceden yÃ¼klenip yÃ¼klenmediÄŸini kontrol eder.
+    Belirtilen bölgenin grafiklerinin önceden yüklenip yüklenmediğini kontrol eder.
     """
     return place_name in _preloaded_graphs
 
 
 def get_preloaded_graph(place_name: str):
     """
-    Ã–nceden yÃ¼klenmiÅŸ grafÄ± dÃ¶ner. Varsa cache'ten alÄ±r, yoksa None dÃ¶ner.
+    Önceden yüklenmiş grafı döner. Varsa cache'ten alır, yoksa None döner.
     """
     return _preloaded_graphs.get(place_name)
 

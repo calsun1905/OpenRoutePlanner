@@ -27,25 +27,5 @@ def get_overlap_threshold(distance_km: float) -> float:
 # length to avoid treating a smaller subset as full overlap.
 
 def count_edge_overlap(edges1, edges2):
-    """Normalized edge overlap (compatibility)
-
-    Returns intersection / max(len(set1), len(set2)) to ensure subset
-    routes are treated as partial overlap rather than full.
-    """
-    if not edges1 or not edges2:
-        return 0.0
-
-    def normalize_edge(edge):
-        if len(edge) >= 2:
-            u, v = edge[0], edge[1]
-            return (min(u, v), max(u, v))
-        return edge
-
-    set1 = {normalize_edge(e) for e in edges1}
-    set2 = {normalize_edge(e) for e in edges2}
-
-    if not set1 or not set2:
-        return 0.0
-
-    intersection = len(set1 & set2)
-    return intersection / max(len(set1), len(set2))
+    """Compatibility wrapper for the production overlap implementation."""
+    return _impl.count_edge_overlap(edges1, edges2)

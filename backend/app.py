@@ -1,8 +1,8 @@
-﻿"""
+"""
 app.py - Flask API Sunucusu
 
-Frontend ile Backend arasÃ„Â±ndaki kÃƒÂ¶prÃƒÂ¼.
-Rota optimizasyonu ve POI arama endpoint'leri saÃ„Å¸lar.
+Frontend ile Backend arasÃındaki kÃƒöprÃƒü.
+Rota optimizasyonu ve POI arama endpoint'leri saÃşlar.
 """
 import os
 import sys
@@ -18,7 +18,7 @@ from typing import Any
 
 
 def _env_flag(name: str, default: bool) -> bool:
-    """ENV'den bool deÃ„Å¸er okur."""
+    """ENV'den bool deÃşer okur."""
     raw = os.getenv(name)
     if raw is None:
         return default
@@ -26,7 +26,7 @@ def _env_flag(name: str, default: bool) -> bool:
 
 
 def _env_float(name: str, default: float) -> float:
-    """ENV'den float deÃ„Å¸er okur."""
+    """ENV'den float deÃşer okur."""
     raw = os.getenv(name)
     if raw is None:
         return default
@@ -385,7 +385,7 @@ def _chat_context_from_session(session_id: str, context_limit: int = 40) -> list
 
 def _configure_live_console_output() -> None:
     """
-    Console stream buffering'i azaltÃ„Â±r ve print'i anlÃ„Â±k flush edecek Ã…Å¸ekilde ayarlar.
+    Console stream buffering'i azaltÃır ve print'i anlÃık flush edecek Ã…şekilde ayarlar.
     """
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
@@ -552,40 +552,40 @@ try:
         health_check as weather_health_check
     )
     WEATHER_SERVICE_AVAILABLE = True
-    print("[app.py] Hava durumu servisi yÃƒÂ¼klendi")
+    print("[app.py] Hava durumu servisi yuklendi")
 except ImportError as e:
     WEATHER_SERVICE_AVAILABLE = False
-    print(f"[app.py] Hava durumu servisi bulunamadÃ„Â±: {str(e)} [WARN]")
+    print(f"[app.py] Hava durumu servisi bulunamadi: {str(e)} [WARN]")
 
-# BERT NLP Engine (opsiyonel - kurulu deÃ„Å¸ilse regex fallback kullanÃ„Â±lÃ„Â±r)
+# BERT NLP Engine (opsiyonel - kurulu degilse regex fallback kullanilir)
 try:
     from bert_nlp_engine import get_bert_nlp_engine, is_bert_available
     BERT_NLP_AVAILABLE = is_bert_available()
     _BERT_NLP_ERROR = None
     if BERT_NLP_AVAILABLE:
-        print("[app.py] BERT NLP Engine yÃƒÂ¼klendi")
+        print("[app.py] BERT NLP Engine yuklendi")
     else:
-        print("[app.py] BERT NLP Engine bulunamadÃ„Â±, regex fallback aktif [WARN]")
+        print("[app.py] BERT NLP Engine bulunamadi, regex fallback aktif [WARN]")
 except ImportError as e:
     BERT_NLP_AVAILABLE = False
     _BERT_NLP_ERROR = str(e)
-    print("[app.py] BERT NLP Engine modÃƒÂ¼lÃƒÂ¼ bulunamadÃ„Â±, regex fallback aktif [WARN]")
+    print("[app.py] BERT NLP Engine modulu bulunamadi, regex fallback aktif [WARN]")
 
-# Frontend klasÃƒÂ¶rÃƒÂ¼nÃƒÂ¼n yolu
+# Frontend klasÃƒörÃƒünÃƒün yolu
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 CORS(app)  # Frontend'den gelen isteklere izin ver
 Compress(app)  # gzip compression aktif et - %60-70 bandwidth tasarrufu
 
-# BERT ÃƒÂ¶n-yÃƒÂ¼kleme (opsiyonel). ENV: ORP_BERT_PRELOAD_ON_STARTUP=1
+# BERT Ãƒön-yÃƒükleme (opsiyonel). ENV: ORP_BERT_PRELOAD_ON_STARTUP=1
 _PRELOAD_BERT_ON_STARTUP = _env_flag("ORP_BERT_PRELOAD_ON_STARTUP", True)
 
 def _preload_bert_async(force: bool = False) -> None:
-    """Arka planda BERT NLP engine'i yÃƒÂ¼kler (lazy warm-up).
+    """Arka planda BERT NLP engine'i yukler (lazy warm-up).
 
     Args:
-        force: True ise ORP_BERT_PRELOAD_ON_STARTUP kontrolÃƒÂ¼ atlanÃ„Â±r ve yÃƒÂ¼kleme baÃ…Å¸latÃ„Â±lÃ„Â±r.
+        force: True ise ORP_BERT_PRELOAD_ON_STARTUP kontrolu atlanir ve yukleme baslatilir.
     """
     if not force and not _PRELOAD_BERT_ON_STARTUP:
         return
@@ -594,28 +594,28 @@ def _preload_bert_async(force: bool = False) -> None:
 
     def _target():
         try:
-            print("[app.py] BaÃ…Å¸latÃ„Â±lÃ„Â±yor: BERT warmup (background)...")
-            # import burada yapÃ„Â±lÃ„Â±r; hata yakalanÃ„Â±rsa uygulama ÃƒÂ§alÃ„Â±Ã…Å¸maya devam eder
+            print("[app.py] Baslatiliyor: BERT warmup (background)...")
+            # import burada yapilir; hata olursa uygulama calismaya devam eder
             from bert_nlp_engine import get_bert_nlp_engine
             get_bert_nlp_engine()
-            print("[app.py] BERT warmup tamamlandÃ„Â±")
+            print("[app.py] BERT warmup tamamlandi")
         except Exception as exc:
-            print(f"[app.py] BERT warmup hatasÃ„Â±: {exc}")
+            print(f"[app.py] BERT warmup hatasi: {exc}")
 
     t = threading.Thread(target=_target, daemon=True)
     t.start()
 
-# EÃ„Å¸er ORP_BERT_PRELOAD_ON_STARTUP set ise arka planda baÃ…Å¸lat
+# Eger ORP_BERT_PRELOAD_ON_STARTUP set ise arka planda baslat
 _preload_bert_async()
 
-# Global deÃ„Å¸iÃ…Å¸kenler: LRU cache manager
+# Global degiskenler: LRU cache manager
 _graph_cache_manager = get_graph_cache()
 _poi_cache_manager = get_poi_cache()
 _runtime_initialized = False
 _graph_preload_initialized = False
 _last_bert_metrics_log_ts = 0.0
 
-# BERT donanÃ„Â±m metrik loglarÃ„Â±:
+# BERT donanÃım metrik loglarÃı:
 # ORP_BERT_LOG_METRICS=1/0
 # ORP_BERT_METRICS_INTERVAL_SEC=float (default 0.5s)
 _BERT_METRICS_LOG_ENABLED = _env_flag("ORP_BERT_LOG_METRICS", True)
@@ -635,7 +635,7 @@ def _poi_version_token() -> str:
 
 
 def _should_log_bert_metrics(force: bool = False) -> bool:
-    """BERT metrik loglarÃ„Â±nÃ„Â±n hÃ„Â±zÃ„Â±nÃ„Â± sÃ„Â±nÃ„Â±rlar."""
+    """BERT metrik loglarÃınÃın hÃızÃınÃı sÃınÃırlar."""
     global _last_bert_metrics_log_ts
     if not _BERT_METRICS_LOG_ENABLED:
         return False
@@ -648,7 +648,7 @@ def _should_log_bert_metrics(force: bool = False) -> bool:
 
 def _log_bert_runtime_metrics(stage: str, bert_engine_instance=None, force: bool = False) -> None:
     """
-    BERT runtime donanÃ„Â±m kullanÃ„Â±mÃ„Â±nÃ„Â± loglar.
+    BERT runtime donanÃım kullanÃımÃınÃı loglar.
     """
     if not _should_log_bert_metrics(force=force):
         return
@@ -771,22 +771,22 @@ def initialize_graph_preload() -> None:
 
 def _get_cached_graph(place_name: str):
     """
-    Graf objesini LRU cache'te alÃ„Â±r (uygulama iÃƒÂ§i).
-    Ãƒâ€“nce preload kontrolÃƒÂ¼ yapar, sonra LRU cache'e bakar, en son disk'ten okur.
+    Graf objesini LRU cache'te alÃır (uygulama iÃƒçi).
+    Ãƒ "nce preload kontrolÃƒü yapar, sonra LRU cache'e bakar, en son disk'ten okur.
     """
-    # Ãƒâ€“nce LRU cache'ten kontrol et
+    # Ãƒ "nce LRU cache'ten kontrol et
     graph = _graph_cache_manager.get(place_name)
     if graph is not None:
         return graph
 
-    # Disk'ten yÃƒÂ¼kle ve cache'e ekle
+    # Disk'ten yÃƒükle ve cache'e ekle
     graph = get_graph(place_name)
     _graph_cache_manager.put(place_name, graph)
     return graph
 
 
 def _redact_pii_text(value: str) -> str:
-    """Loglarda temel PII redaction uygular (telefon/e-posta/sayÃ„Â±sal kimlik)."""
+    """Loglarda temel PII redaction uygular (telefon/e-posta/sayÃısal kimlik)."""
     text = str(value or "")
     text = re.sub(r"[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}", "[redacted-email]", text)
     text = re.sub(r"\b(?:\+?90\s*)?(?:\d[\s-]?){10,}\b", "[redacted-phone]", text)
@@ -847,15 +847,15 @@ def _attach_trace_headers(response):
 
 
 def _disable_bert_runtime(exc: Exception) -> None:
-    """Runtime'da BERT kullanÃ„Â±lamaz hale geldiÃ„Å¸inde fallback moduna geÃƒÂ§."""
+    """Runtime'da BERT kullanÃılamaz hale geldiÃşinde fallback moduna geÃƒç."""
     global BERT_NLP_AVAILABLE, _BERT_NLP_ERROR
     BERT_NLP_AVAILABLE = False
     _BERT_NLP_ERROR = str(exc)
-    print(f"[NLP WARN] BERT devre dÃ„Â±Ã…Å¸Ã„Â± bÃ„Â±rakÃ„Â±ldÃ„Â±: {_BERT_NLP_ERROR}")
+    print(f"[NLP WARN] BERT devre dÃıÃ…şÃı bÃırakÃıldÃı: {_BERT_NLP_ERROR}")
 
 
 def _build_regex_fallback_result(query: str) -> dict:
-    """Regex parser sonucunu BERT endpoint sÃƒÂ¶zleÃ…Å¸mesine uyarlar."""
+    """Regex parser sonucunu BERT endpoint sÃƒözleÃ…şmesine uyarlar."""
     result = regex_parse_query(query)
     result["detected_places"] = result.get("detected_places", [])
     result["parse_time"] = float(result.get("parse_time", 0.0) or 0.0)
@@ -867,13 +867,13 @@ def _build_regex_fallback_result(query: str) -> dict:
 @app.route("/api/get-route", methods=["POST"])
 def api_get_route():
     """
-    Koordinat listesi alÃ„Â±r, optimize edilmiÃ…Å¸ rota dÃƒÂ¶ner.
+    Koordinat listesi alÃır, optimize edilmiÃ…ş rota dÃƒöner.
     
     Request Body:
         {
             "points": [[lat, lon], [lat, lon], ...],
-            "place": "Kadikoy, Istanbul, Turkey"  (opsiyonel, varsayÃ„Â±lan KadÃ„Â±kÃƒÂ¶y),
-            "route_type": "route_1" | "route_2" | "route_3"  (opsiyonel, varsayÃ„Â±lan route_1)
+            "place": "Kadikoy, Istanbul, Turkey"  (opsiyonel, varsayÃılan KadÃıkÃƒöy),
+            "route_type": "route_1" | "route_2" | "route_3"  (opsiyonel, varsayÃılan route_1)
         }
     
     Response:
@@ -889,10 +889,10 @@ def api_get_route():
         data = request.get_json(silent=True)
 
         if not data or "points" not in data:
-            return jsonify({"error": "GeÃƒÂ§ersiz istek: 'points' alanÃ„Â± gerekli."}), 400
+            return jsonify({"error": "GeÃƒçersiz istek: 'points' alanÃı gerekli."}), 400
 
         points = data["points"]
-        optimize = data.get("optimize", False)  # VarsayÃ„Â±lan: sÃ„Â±ralÃ„Â± baÃ„Å¸la
+        optimize = data.get("optimize", False)  # VarsayÃılan: sÃıralÃı baÃşla
         route_type = data.get("route_type", "route_1")  # route_1, route_2, route_3
 
         print(f"[API] Get-route: {len(points)} nokta, optimize={optimize}, route_type={route_type}")
@@ -908,14 +908,14 @@ def api_get_route():
 
         for i, p in enumerate(points):
             if not isinstance(p, list) or len(p) != 2:
-                return jsonify({"error": f"Nokta {i} geÃƒÂ§ersiz format. [lat, lon] olmalÃ„Â±."}), 400
+                return jsonify({"error": f"Nokta {i} geÃƒçersiz format. [lat, lon] olmalÃı."}), 400
             try:
                 float(p[0])
                 float(p[1])
             except (ValueError, TypeError):
-                return jsonify({"error": f"Nokta {i} geÃƒÂ§ersiz koordinat."}), 400
+                return jsonify({"error": f"Nokta {i} geÃƒçersiz koordinat."}), 400
 
-        # 1) SeÃƒÂ§ilen noktalarÃ„Â± kapsayan grafÃ„Â± al (otomatik bÃƒÂ¶lge algÃ„Â±lama)
+        # 1) SeÃƒçilen noktalarÃı kapsayan grafÃı al (otomatik bÃƒölge algÃılama)
         outside_point = _first_outside_point(points)
         if outside_point is not None:
             idx, lat, lon = outside_point
@@ -925,32 +925,32 @@ def api_get_route():
             )
 
         point_tuples = [(p[0], p[1]) for p in points]
-        # print(f"[API] Noktalar iÃƒÂ§in graf alÃ„Â±nÃ„Â±yor: {len(points)} nokta"))
+        # print(f"[API] Noktalar iÃƒçin graf alÃınÃıyor: {len(points)} nokta"))
         G = get_graph_for_points(point_tuples)
 
-        # 2) SÃ„Â±ralama: TSP optimizasyonu veya kullanÃ„Â±cÃ„Â± sÃ„Â±rasÃ„Â±
+        # 2) SÃıralama: TSP optimizasyonu veya kullanÃıcÃı sÃırasÃı
         if optimize and len(point_tuples) > 2:
-            # print(f"[API] TSP ÃƒÂ§ÃƒÂ¶zÃƒÂ¼lÃƒÂ¼yor: {len(points)} nokta"))
+            # print(f"[API] TSP ÃƒçÃƒözÃƒülÃƒüyor: {len(points)} nokta"))
             optimized_order = solve_tsp(G, point_tuples)
         else:
-            # print(f"[API] SÃ„Â±ralÃ„Â± rota: {len(points)} nokta"))
+            # print(f"[API] SÃıralÃı rota: {len(points)} nokta"))
             optimized_order = list(range(len(point_tuples)))
 
-        # 3) SÃ„Â±ralanmÃ„Â±Ã…Å¸ noktalar
+        # 3) SÃıralanmÃıÃ…ş noktalar
         ordered_points = [point_tuples[i] for i in optimized_order]
 
-        # 4) Tam rotayÃ„Â± oluÃ…Å¸tur (alternatif rota tipi ile)
+        # 4) Tam rotayÃı oluÃ…ştur (alternatif rota tipi ile)
         # route_type "route_1"|"route_2"|"route_3" string -> route_index 0|1|2 int (build_alternative_routes int bekliyor)
         route_index = {"route_1": 0, "route_2": 1, "route_3": 2}.get(route_type, 0)
         route_nodes = build_alternative_routes(G, ordered_points, route_index)
 
         if not route_nodes:
-            return jsonify({"error": "Rota hesaplanamadÃ„Â±. Noktalar harita alanÃ„Â± dÃ„Â±Ã…Å¸Ã„Â±nda olabilir."}), 400
+            return jsonify({"error": "Rota hesaplanamadÃı. Noktalar harita alanÃı dÃıÃ…şÃında olabilir."}), 400
 
-        # 5) Koordinatlara ÃƒÂ§evir
+        # 5) Koordinatlara Ãƒçevir
         route_coords = nodes_to_coords(G, route_nodes)
 
-        # 6) Ã„Â°statistikler
+        # 6) Ãİstatistikler
         stats = calculate_route_stats(G, route_nodes)
 
         # 7) Google Maps linki
@@ -970,13 +970,13 @@ def api_get_route():
 
     except Exception as e:
         print(f"[API] Hata: {e}")
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/get-route-steps", methods=["POST"])
 def api_get_route_steps():
     """
-    Verilen noktalar iÃƒÂ§in adÃ„Â±m adÃ„Â±m yÃƒÂ¶nlendirme (basitleÃ…Å¸tirilmiÃ…Å¸).
+    Verilen noktalar iÃƒçin adÃım adÃım yÃƒönlendirme (basitleÃ…ştirilmiÃ…ş).
 
     Request Body:
         { "points": [[lat, lon], ...], "optimize": true/false, "route_type": "route_1" }
@@ -987,7 +987,7 @@ def api_get_route_steps():
     try:
         data = request.get_json(silent=True)
         if not data or 'points' not in data:
-            return jsonify({"error": "'points' alanÃ„Â± gerekli."}), 400
+            return jsonify({"error": "'points' alanÃı gerekli."}), 400
 
         points = data['points']
         optimize = bool(data.get('optimize', False))
@@ -1021,9 +1021,9 @@ def api_get_route_steps():
         route_nodes = build_alternative_routes(G, ordered_points, route_index)
 
         if not route_nodes:
-            return jsonify({"error": "Rota hesaplanamadÃ„Â±."}), 400
+            return jsonify({"error": "Rota hesaplanamadÃı."}), 400
 
-        # Basit step extractor: kenar ÃƒÂ¼zerindeki 'name' veya 'ref' attribute'una gÃƒÂ¶re adÃ„Â±m oluÃ…Å¸tur
+        # Basit step extractor: kenar Ãƒüzerindeki 'name' veya 'ref' attribute'una gÃƒöre adÃım oluÃ…ştur
         def build_turn_by_turn_steps(G, nodes):
             steps = []
             if not nodes or len(nodes) < 2:
@@ -1059,7 +1059,7 @@ def api_get_route_steps():
                 else:
                     # flush
                     minutes = round((current_dist/1000) / float(ROUTE_CONFIG.get('WALK_SPEED_KMH', 5.0)) * 60)
-                    instr = f"{int(round(current_dist))} metre boyunca {current_name} ÃƒÂ¼zerinde ilerleyin."
+                    instr = f"{int(round(current_dist))} metre boyunca {current_name} Ãƒüzerinde ilerleyin."
                     steps.append({"instruction": instr, "distance_m": int(round(current_dist)), "duration_min": minutes})
                     current_name = name
                     current_dist = length
@@ -1067,7 +1067,7 @@ def api_get_route_steps():
             # flush last
             if current_name is not None:
                 minutes = round((current_dist/1000) / float(ROUTE_CONFIG.get('WALK_SPEED_KMH', 5.0)) * 60)
-                instr = f"{int(round(current_dist))} metre boyunca {current_name} ÃƒÂ¼zerinde ilerleyin."
+                instr = f"{int(round(current_dist))} metre boyunca {current_name} Ãƒüzerinde ilerleyin."
                 steps.append({"instruction": instr, "distance_m": int(round(current_dist)), "duration_min": minutes})
 
             return steps
@@ -1077,19 +1077,19 @@ def api_get_route_steps():
 
     except Exception as e:
         print(f"[API] get-route-steps hata: {e}")
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 
 @app.route("/api/get-alternative-routes", methods=["POST"])
 def api_get_alternative_routes():
     """
-    AynÃ„Â± noktalar iÃƒÂ§in 3 farklÃ„Â± alternatif rota dÃƒÂ¶ner.
+    AynÃı noktalar iÃƒçin 3 farklÃı alternatif rota dÃƒöner.
 
     Basit sistem:
     - 3 rota: "Rota 1", "Rota 2", "Rota 3"
-    - Hepsi kÃ„Â±sa rotaya yakÃ„Â±n mesafede
-    - Geometrik olarak farklÃ„Â± sokaklardan geÃƒÂ§er
+    - Hepsi kÃısa rotaya yakÃın mesafede
+    - Geometrik olarak farklÃı sokaklardan geÃƒçer
 
     Request Body:
         {
@@ -1128,7 +1128,7 @@ def api_get_alternative_routes():
         data = request.get_json(silent=True)
 
         if not data or "points" not in data:
-            return jsonify({"error": "GeÃƒÂ§ersiz istek: 'points' alanÃ„Â± gerekli."}), 400
+            return jsonify({"error": "GeÃƒçersiz istek: 'points' alanÃı gerekli."}), 400
 
         points = data["points"]
         optimize = data.get("optimize", False)
@@ -1163,11 +1163,11 @@ def api_get_alternative_routes():
 
         ordered_points = [point_tuples[i] for i in optimized_order]
 
-        # PERFORMANS: Segment alternatifleri tek seferde hesaplanÃ„Â±r (3x yerine 1x)
+        # PERFORMANS: Segment alternatifleri tek seferde hesaplanÃır (3x yerine 1x)
         try:
             batch_results = build_all_alternative_routes_batch(G, ordered_points)
         except Exception as e:
-            print(f"[API] Alternatif rota batch hatasÃ„Â±: {e}")
+            print(f"[API] Alternatif rota batch hatasÃı: {e}")
             batch_results = []
 
         alternatives = []
@@ -1185,9 +1185,9 @@ def api_get_alternative_routes():
             })
 
         if not alternatives:
-            return jsonify({"error": "HiÃƒÂ§bir alternatif rota hesaplanamadÃ„Â±."}), 400
+            return jsonify({"error": "HiÃƒçbir alternatif rota hesaplanamadÃı."}), 400
 
-        # AynÃ„Â± rotalarÃ„Â± filtrele: Birebir aynÃ„Â± koordinat listesi = tek rota
+        # AynÃı rotalarÃı filtrele: Birebir aynÃı koordinat listesi = tek rota
         def _coords_equal(a, b):
             if len(a) != len(b):
                 return False
@@ -1206,13 +1206,13 @@ def api_get_alternative_routes():
 
     except Exception as e:
         print(f"[API] Hata: {e}")
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/search-pois", methods=["POST"])
 def api_search_pois():
     """
-    Belirtilen bÃƒÂ¶lgede POI arar.
+    Belirtilen bÃƒölgede POI arar.
     
     Request Body:
         {
@@ -1232,7 +1232,7 @@ def api_search_pois():
         data = request.get_json(silent=True)
 
         if not data or "category" not in data:
-            return jsonify({"error": "'category' alanÃ„Â± gerekli."}), 400
+            return jsonify({"error": "'category' alanÃı gerekli."}), 400
 
         place = data.get("place", "Kadikoy, Istanbul, Turkey")
         raw_category = data["category"]
@@ -1253,17 +1253,17 @@ def api_search_pois():
         else:
             force_refresh = bool(force_refresh_raw)
 
-        # GÃƒÂ¼venlik aÃ„Å¸Ã„Â±: il/ilÃƒÂ§e seviyesinde idari yer adlarÃ„Â±nda
-        # fallback yerine doÃ„Å¸rudan place-boundary sorgusu zorunlu olsun.
+        # GÃƒüvenlik aÃşÃı: il/ilÃƒçe seviyesinde idari yer adlarÃında
+        # fallback yerine doÃşrudan place-boundary sorgusu zorunlu olsun.
         if search_mode == "auto" and isinstance(place, str):
             place_parts = [p.strip() for p in place.split(",") if p.strip()]
             place_tail = place_parts[-1].lower() if place_parts else ""
             is_city_level = (
                 len(place_parts) == 1
-                or (len(place_parts) == 2 and place_tail in {"turkey", "turkiye", "tÃƒÂ¼rkiye"})
+                or (len(place_parts) == 2 and place_tail in {"turkey", "turkiye", "tÃƒürkiye"})
             )
             is_district_level = (
-                len(place_parts) == 3 and place_tail in {"turkey", "turkiye", "tÃƒÂ¼rkiye"}
+                len(place_parts) == 3 and place_tail in {"turkey", "turkiye", "tÃƒürkiye"}
             )
             if is_city_level or is_district_level:
                 search_mode = "place_boundary_only"
@@ -1302,7 +1302,7 @@ def api_search_pois():
 
         from osm_poi_dictionary import POI_MAPPING
 
-        # Validasyon: ASCII serbest, TÃƒÂ¼rkÃƒÂ§e sÃƒÂ¶zlÃƒÂ¼kten canonicalize edilen ifadeler de serbest.
+        # Validasyon: ASCII serbest, TÃƒürkÃƒçe sÃƒözlÃƒükten canonicalize edilen ifadeler de serbest.
         if isinstance(resolved_category, str) and resolved_category.lower() not in POI_MAPPING and not resolved_category.isascii():
             pass
 
@@ -1345,22 +1345,22 @@ def api_search_pois():
         })
 
     except Exception as e:
-        # print(f"[API] POI arama hatasÃ„Â±: {e}"))
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        # print(f"[API] POI arama hatasÃı: {e}"))
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
-    """Sunucu saÃ„Å¸lÃ„Â±k kontrolÃƒÂ¼."""
-    return jsonify({"status": "ok", "message": "OpenTrip API ÃƒÂ§alÃ„Â±Ã…Å¸Ã„Â±yor!"})
+    """Sunucu saÃşlÃık kontrolÃƒü."""
+    return jsonify({"status": "ok", "message": "OpenTrip API ÃƒçalÃıÃ…şÃıyor!"})
 
 
 @app.route("/api/geocode/suggest", methods=["GET"])
 def api_geocode_suggest():
     """
-    Yazarken ÃƒÂ¶neri iÃƒÂ§in: KÃ„Â±smi yer ismi -> coklu sonuc doner (autocomplete).
+    Yazarken Ãƒöneri iÃƒçin: KÃısmi yer ismi -> coklu sonuc doner (autocomplete).
 
-    Query: ?q=KadÃ„Â±kÃƒÂ¶y&limit=6
+    Query: ?q=KadÃıkÃƒöy&limit=6
     """
     try:
         q = request.args.get("q", "").strip()
@@ -1368,7 +1368,7 @@ def api_geocode_suggest():
         result = geocode_suggest(q, limit=limit)
         return jsonify(result)
     except Exception as e:
-        print(f"[API] Geocode suggest hatasÃ„Â±: {e}")
+        print(f"[API] Geocode suggest hatasÃı: {e}")
         return jsonify({"status": "success", "suggestions": []})
 
 
@@ -1385,7 +1385,7 @@ def api_geocode_forward_get():
         result = geocode(address)
         return jsonify(result)
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/geocode/reverse", methods=["GET"])
@@ -1399,17 +1399,17 @@ def api_geocode_reverse_get():
         result = reverse_geocode(float(lat), float(lon))
         return jsonify(result)
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/geocode", methods=["POST"])
 def api_geocode():
     """
-    Yer ismini koordinata ÃƒÂ§evirir.
+    Yer ismini koordinata Ãƒçevirir.
 
     Request Body:
         {
-            "place": "KadÃ„Â±kÃƒÂ¶y ParkÃ„Â±, Ã„Â°stanbul"
+            "place": "KadÃıkÃƒöy ParkÃı, Ãİstanbul"
         }
 
     Response:
@@ -1417,7 +1417,7 @@ def api_geocode():
             "status": "success",
             "lat": 40.990,
             "lon": 29.029,
-            "display_name": "KadÃ„Â±kÃƒÂ¶y ParkÃ„Â±, Ã„Â°stanbul, TÃƒÂ¼rkiye",
+            "display_name": "KadÃıkÃƒöy ParkÃı, Ãİstanbul, TÃƒürkiye",
             "cached": false
         }
     """
@@ -1425,7 +1425,7 @@ def api_geocode():
         data = request.get_json(silent=True)
 
         if not data or "place" not in data:
-            return jsonify({"error": "'place' alanÃ„Â± gerekli."}), 400
+            return jsonify({"error": "'place' alanÃı gerekli."}), 400
 
         place_name = data["place"]
 
@@ -1441,14 +1441,14 @@ def api_geocode():
         return jsonify(result)
 
     except Exception as e:
-        print(f"[API] Geocode hatasÃ„Â±: {e}")
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        print(f"[API] Geocode hatasÃı: {e}")
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/reverse-geocode", methods=["POST"])
 def api_reverse_geocode():
     """
-    KoordinatÃ„Â± yer ismine ÃƒÂ§evirir.
+    KoordinatÃı yer ismine Ãƒçevirir.
 
     Request Body:
         {
@@ -1459,7 +1459,7 @@ def api_reverse_geocode():
     Response:
         {
             "status": "success",
-            "display_name": "KadÃ„Â±kÃƒÂ¶y, Ã„Â°stanbul, TÃƒÂ¼rkiye",
+            "display_name": "KadÃıkÃƒöy, Ãİstanbul, TÃƒürkiye",
             "address": "{...}",
             "cached": false
         }
@@ -1468,7 +1468,7 @@ def api_reverse_geocode():
         data = request.get_json(silent=True)
 
         if not data or "lat" not in data or "lon" not in data:
-            return jsonify({"error": "'lat' ve 'lon' alanlarÃ„Â± gerekli."}), 400
+            return jsonify({"error": "'lat' ve 'lon' alanlarÃı gerekli."}), 400
 
         lat = data["lat"]
         lon = data["lon"]
@@ -1480,18 +1480,18 @@ def api_reverse_geocode():
         return jsonify(result)
 
     except Exception as e:
-        print(f"[API] Reverse geocode hatasÃ„Â±: {e}")
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        print(f"[API] Reverse geocode hatasÃı: {e}")
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/geocode/batch", methods=["POST"])
 def api_geocode_batch():
     """
-    Toplu geocoding iÃ…Å¸lemi.
+    Toplu geocoding iÃ…şlemi.
 
     Request Body:
         {
-            "places": ["KadÃ„Â±kÃƒÂ¶y", "BeÃ…Å¸iktaÃ…Å¸", "Taksim"]
+            "places": ["KadÃıkÃƒöy", "BeÃ…şiktaÃ…ş", "Taksim"]
         }
 
     Response:
@@ -1507,74 +1507,78 @@ def api_geocode_batch():
         data = request.get_json(silent=True)
 
         if not data or "places" not in data:
-            return jsonify({"error": "'places' alanÃ„Â± gerekli (liste)."}), 400
+            return jsonify({"error": "'places' alanÃı gerekli (liste)."}), 400
 
         places = data["places"]
 
         if not isinstance(places, list):
-            return jsonify({"error": "'places' bir liste olmalÃ„Â±."}), 400
+            return jsonify({"error": "'places' bir liste olmalÃı."}), 400
 
         if len(places) > 10:
-            return jsonify({"error": "En fazla 10 yer adÃ„Â± aynÃ„Â± anda iÃ…Å¸lenebilir."}), 400
+            return jsonify({"error": "En fazla 10 yer adÃı aynÃı anda iÃ…şlenebilir."}), 400
 
         results = geocode_batch(places)
         return jsonify({"results": results})
 
     except Exception as e:
-        print(f"[API] Batch geocode hatasÃ„Â±: {e}")
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        print(f"[API] Batch geocode hatasÃı: {e}")
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/")
 def serve_frontend():
     """Ana sayfa - Frontend'i sun."""
     response = send_from_directory(FRONTEND_DIR, "index.html")
-    # HTML dosyasÃ„Â± iÃƒÂ§in cache header (kÃ„Â±sa sÃƒÂ¼re)
-    response.headers["Cache-Control"] = "public, max-age=300"  # 5 dakika
+    # Dev ortaminda eski UI'nin cache'ten gelmesini onle
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     return response
 
 
 @app.route("/<path:filepath>")
 def serve_static_files(filepath):
     """
-    Statik dosyalarÃ„Â± sun (CSS, JS, gÃƒÂ¶rseller vb.).
-    Cache headers ile daha hÃ„Â±zlÃ„Â± yÃƒÂ¼klenme.
+    Statik dosyalarÃı sun (CSS, JS, gÃƒörseller vb.).
+    Cache headers ile daha hÃızlÃı yÃƒüklenme.
     """
     response = send_from_directory(FRONTEND_DIR, filepath)
 
-    # Dosya uzantÃ„Â±sÃ„Â±na gÃƒÂ¶re cache sÃƒÂ¼resi belirle
+    # Dev ortaminda stale CSS/JS cache'ini engelle
     if filepath.endswith((".css", ".js")):
-        # CSS/JS dosyalarÃ„Â± 1 saat cache
-        response.headers["Cache-Control"] = "public, max-age=3600"
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     elif filepath.endswith((".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp")):
-        # GÃƒÂ¶rsel dosyalar 1 gÃƒÂ¼n cache
+        # GÃƒörsel dosyalar 1 gÃƒün cache
         response.headers["Cache-Control"] = "public, max-age=86400"
     else:
-        # DiÃ„Å¸er dosyalar 5 dakika cache
-        response.headers["Cache-Control"] = "public, max-age=300"
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
 
     return response
 
 
 # =============================================================================
-# ROTA KAYDETME VE YÃƒÅ“KLEME API'LERÃ„Â°
+# ROTA KAYDETME VE YÃƒÅKLEME API'LERÃİ
 # =============================================================================
 
 @app.route("/api/routes/save", methods=["POST"])
 def api_save_route():
     """
-    RotayÃ„Â± kaydeder.
+    RotayÃı kaydeder.
     
     Request Body:
         {
-            "name": "KadÃ„Â±kÃƒÂ¶y Turu",
-            "description": "KadÃ„Â±kÃƒÂ¶y'de gezilecek yerler",
+            "name": "KadÃıkÃƒöy Turu",
+            "description": "KadÃıkÃƒöy'de gezilecek yerler",
             "points": [[lat, lon], ...],
             "route_coords": [[lat, lon], ...],
             "distance_km": 4.5,
             "duration_minutes": 55,
             "route_type": "shortest",
-            "tags": ["tarihi", "kÃƒÂ¼ltÃƒÂ¼rel"]
+            "tags": ["tarihi", "kÃƒültÃƒürel"]
         }
     
     Response:
@@ -1588,15 +1592,15 @@ def api_save_route():
         data = request.get_json(silent=True)
 
         if not data:
-            return jsonify({"error": "GeÃƒÂ§ersiz veya eksik JSON gÃƒÂ¶vdesi."}), 400
+            return jsonify({"error": "GeÃƒçersiz veya eksik JSON gÃƒövdesi."}), 400
         
         # Zorunlu alanlar
         required_fields = ["name", "points", "route_coords", "distance_km", "duration_minutes"]
         for field in required_fields:
             if field not in data:
-                return jsonify({"error": f"'{field}' alanÃ„Â± gerekli."}), 400
+                return jsonify({"error": f"'{field}' alanÃı gerekli."}), 400
         
-        # RotayÃ„Â± kaydet
+        # RotayÃı kaydet
         route = save_route(
             name=data["name"],
             points=data["points"],
@@ -1611,24 +1615,24 @@ def api_save_route():
         return jsonify({
             "status": "success",
             "route": route,
-            "message": f"'{route['name']}' rotasÃ„Â± kaydedildi!"
+            "message": f"'{route['name']}' rotasÃı kaydedildi!"
         })
     
     except Exception as e:
-        print(f"[API] Rota kaydetme hatasÃ„Â±: {e}")
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        print(f"[API] Rota kaydetme hatasÃı: {e}")
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/routes", methods=["GET"])
 def api_get_routes():
     """
-    TÃƒÂ¼m kaydedilmiÃ…Å¸ rotalarÃ„Â± getirir (Pagination destekli).
+    TÃƒüm kaydedilmiÃ…ş rotalarÃı getirir (Pagination destekli).
 
     Query Parameters:
         sort_by: created_at, name, distance_km, times_used, favorite
-        limit: Maksimum rota sayÃ„Â±sÃ„Â± (varsayÃ„Â±lan 20)
-        offset: BaÃ…Å¸langÃ„Â±ÃƒÂ§ index'i (varsayÃ„Â±lan 0)
-        page: Sayfa numarasÃ„Â± (limit ile hesaplanÃ„Â±r, offset alternatifi)
+        limit: Maksimum rota sayÃısÃı (varsayÃılan 20)
+        offset: BaÃ…şlangÃıÃƒç index'i (varsayÃılan 0)
+        page: Sayfa numarasÃı (limit ile hesaplanÃır, offset alternatifi)
 
     Response:
         {
@@ -1647,14 +1651,14 @@ def api_get_routes():
         offset = request.args.get("offset", 0, type=int)
         page = request.args.get("page", 1, type=int)
 
-        # Page parametresini offset'e ÃƒÂ§evir
+        # Page parametresini offset'e Ãƒçevir
         if page > 1:
             offset = (page - 1) * limit
 
-        # Toplam sayÃ„Â±yÃ„Â± al
+        # Toplam sayÃıyÃı al
         total = get_routes_count()
 
-        # RotalarÃ„Â± getir
+        # RotalarÃı getir
         routes = get_all_routes(sort_by=sort_by, limit=limit, offset=offset)
 
         # Sayfa bilgisi
@@ -1672,14 +1676,14 @@ def api_get_routes():
         })
     
     except Exception as e:
-        # print(f"[API] Rota listeleme hatasÃ„Â±: {e}"))
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        # print(f"[API] Rota listeleme hatasÃı: {e}"))
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/routes/<route_id>", methods=["GET"])
 def api_get_route_by_id(route_id):
     """
-    Belirli bir rotayÃ„Â± getirir.
+    Belirli bir rotayÃı getirir.
     
     Response:
         {
@@ -1690,24 +1694,24 @@ def api_get_route_by_id(route_id):
         route = get_route(route_id)
         
         if not route:
-            return jsonify({"error": "Rota bulunamadÃ„Â±"}), 404
+            return jsonify({"error": "Rota bulunamadÃı"}), 404
         
         return jsonify({"route": route})
     
     except Exception as e:
-        # print(f"[API] Rota getirme hatasÃ„Â±: {e}"))
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        # print(f"[API] Rota getirme hatasÃı: {e}"))
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/routes/<route_id>", methods=["PUT"])
 def api_update_route(route_id):
     """
-    RotayÃ„Â± gÃƒÂ¼nceller.
+    RotayÃı gÃƒünceller.
     
     Request Body:
         {
-            "name": "Yeni Ã„Â°sim",
-            "description": "Yeni aÃƒÂ§Ã„Â±klama",
+            "name": "Yeni Ãİsim",
+            "description": "Yeni aÃƒçÃıklama",
             "tags": ["yeni", "etiketler"]
         }
     
@@ -1721,28 +1725,28 @@ def api_update_route(route_id):
         data = request.get_json(silent=True)
 
         if not data:
-            return jsonify({"error": "GeÃƒÂ§ersiz veya eksik JSON gÃƒÂ¶vdesi."}), 400
+            return jsonify({"error": "GeÃƒçersiz veya eksik JSON gÃƒövdesi."}), 400
         
         route = update_route(route_id, data)
         
         if not route:
-            return jsonify({"error": "Rota bulunamadÃ„Â±"}), 404
+            return jsonify({"error": "Rota bulunamadÃı"}), 404
         
         return jsonify({
             "status": "success",
             "route": route,
-            "message": "Rota gÃƒÂ¼ncellendi"
+            "message": "Rota gÃƒüncellendi"
         })
     
     except Exception as e:
-        print(f"[API] Rota gÃƒÂ¼ncelleme hatasÃ„Â±: {e}")
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        print(f"[API] Rota gÃƒüncelleme hatasÃı: {e}")
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/routes/<route_id>", methods=["DELETE"])
 def api_delete_route(route_id):
     """
-    RotayÃ„Â± siler.
+    RotayÃı siler.
     
     Response:
         {
@@ -1754,7 +1758,7 @@ def api_delete_route(route_id):
         success = delete_route(route_id)
         
         if not success:
-            return jsonify({"error": "Rota bulunamadÃ„Â±"}), 404
+            return jsonify({"error": "Rota bulunamadÃı"}), 404
         
         return jsonify({
             "status": "success",
@@ -1762,14 +1766,14 @@ def api_delete_route(route_id):
         })
     
     except Exception as e:
-        # print(f"[API] Rota silme hatasÃ„Â±: {e}"))
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        # print(f"[API] Rota silme hatasÃı: {e}"))
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/routes/<route_id>/favorite", methods=["POST"])
 def api_toggle_favorite(route_id):
     """
-    RotayÃ„Â± favorilere ekler/ÃƒÂ§Ã„Â±karÃ„Â±r.
+    RotayÃı favorilere ekler/ÃƒçÃıkarÃır.
     
     Response:
         {
@@ -1782,7 +1786,7 @@ def api_toggle_favorite(route_id):
         route = toggle_favorite(route_id)
         
         if not route:
-            return jsonify({"error": "Rota bulunamadÃ„Â±"}), 404
+            return jsonify({"error": "Rota bulunamadÃı"}), 404
         
         return jsonify({
             "status": "success",
@@ -1791,8 +1795,8 @@ def api_toggle_favorite(route_id):
         })
     
     except Exception as e:
-        # print(f"[API] Favori iÃ…Å¸lemi hatasÃ„Â±: {e}"))
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        # print(f"[API] Favori iÃ…şlemi hatasÃı: {e}"))
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/routes/search", methods=["GET"])
@@ -1823,8 +1827,8 @@ def api_search_routes():
         })
     
     except Exception as e:
-        print(f"[API] Rota arama hatasÃ„Â±: {e}")
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        print(f"[API] Rota arama hatasÃı: {e}")
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/routes/statistics", methods=["GET"])
@@ -1846,30 +1850,30 @@ def api_route_statistics():
         return jsonify(stats)
     
     except Exception as e:
-        # print(f"[API] Ã„Â°statistik hatasÃ„Â±: {e}"))
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        # print(f"[API] Ãİstatistik hatasÃı: {e}"))
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 # =============================================================================
-# ZAMAN PLANLAMA API'LERÃ„Â°
+# ZAMAN PLANLAMA API'LERÃİ
 # =============================================================================
 
 @app.route("/api/timeline/create", methods=["POST"])
 def api_create_timeline():
     """
-    Rota iÃƒÂ§in zaman ÃƒÂ§izelgesi oluÃ…Å¸turur.
+    Rota iÃƒçin zaman Ãƒçizelgesi oluÃ…şturur.
     
     Request Body:
         {
             "points": [
-                {"name": "KadÃ„Â±kÃƒÂ¶y", "lat": 40.99, "lon": 29.03},
+                {"name": "KadÃıkÃƒöy", "lat": 40.99, "lon": 29.03},
                 {"name": "Moda", "lat": 40.98, "lon": 29.04}
             ],
             "segment_distances": [1.2, 0.8],  # km cinsinden
             "start_time": "09:00",
-            "visit_duration": 30,  # dakika (varsayÃ„Â±lan)
+            "visit_duration": 30,  # dakika (varsayÃılan)
             "transport_mode": "walking",
-            "custom_durations": {0: 45, 1: 60}  # ÃƒÆ’Ã¢â‚¬â€œzel sÃƒÂ¼reler (opsiyonel)
+            "custom_durations": {0: 45, 1: 60}  # ÃƒÆ’aa‚¬ œzel sÃƒüreler (opsiyonel)
         }
     
     Response:
@@ -1885,7 +1889,7 @@ def api_create_timeline():
         
         # Zorunlu alanlar
         if not data or "points" not in data:
-            return jsonify({"error": "'points' alanÃ„Â± gerekli"}), 400
+            return jsonify({"error": "'points' alanÃı gerekli"}), 400
         
         points = data["points"]
         segment_distances = data.get("segment_distances", [])
@@ -1895,7 +1899,7 @@ def api_create_timeline():
         custom_durations = data.get("custom_durations", {})
         include_weather = bool(data.get("include_weather", False) and WEATHER_SERVICE_AVAILABLE)
         
-        # String key'leri int'e ÃƒÂ§evir
+        # String key'leri int'e Ãƒçevir
         if custom_durations:
             custom_durations = {int(k): v for k, v in custom_durations.items()}
         
@@ -1918,14 +1922,14 @@ def api_create_timeline():
         return jsonify(timeline)
 
     except Exception as e:
-        # print(f"[API] Timeline oluÃ…Å¸turma hatasÃ„Â±: {e}"))
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        # print(f"[API] Timeline oluÃ…şturma hatasÃı: {e}"))
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/timeline/check-conflicts", methods=["POST"])
 def api_check_conflicts():
     """
-    Zaman ÃƒÂ§izelgesinde ÃƒÂ§akÃ„Â±Ã…Å¸malarÃ„Â± kontrol eder.
+    Zaman Ãƒçizelgesinde ÃƒçakÃıÃ…şmalarÃı kontrol eder.
     
     Request Body:
         {
@@ -1941,7 +1945,7 @@ def api_check_conflicts():
             "warnings": [
                 {
                     "point_index": 2,
-                    "warning": "Bu saat kapalÃ„Â± olabilir",
+                    "warning": "Bu saat kapalÃı olabilir",
                     "arrival_time": "20:00"
                 }
             ]
@@ -1951,12 +1955,12 @@ def api_check_conflicts():
         data = request.get_json(silent=True)
         
         if not data or "schedule" not in data:
-            return jsonify({"error": "'schedule' alanÃ„Â± gerekli"}), 400
+            return jsonify({"error": "'schedule' alanÃı gerekli"}), 400
         
         schedule = data["schedule"]
         opening_hours = data.get("opening_hours", {})
         
-        # String key'leri int'e ÃƒÂ§evir
+        # String key'leri int'e Ãƒçevir
         if opening_hours:
             opening_hours = {int(k): v for k, v in opening_hours.items()}
         
@@ -1965,14 +1969,14 @@ def api_check_conflicts():
         return jsonify({"warnings": warnings})
     
     except Exception as e:
-        print(f"[API] Ãƒâ€¡akÃ„Â±Ã…Å¸ma kontrolÃƒÂ¼ hatasÃ„Â±: {e}")
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        print(f"[API] Ãƒ ¡akÃıÃ…şma kontrolÃƒü hatasÃı: {e}")
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/timeline/optimize", methods=["POST"])
 def api_optimize_timeline():
     """
-    Zaman ÃƒÂ§izelgesini optimize eder ve ÃƒÂ¶neriler sunar.
+    Zaman Ãƒçizelgesini optimize eder ve Ãƒöneriler sunar.
     
     Request Body:
         {
@@ -1986,8 +1990,8 @@ def api_optimize_timeline():
             "suggestions": [
                 {
                     "type": "duration_exceeded",
-                    "message": "Toplam sÃƒÂ¼re 1s 30dk fazla",
-                    "suggestion": "Ziyaret sÃƒÂ¼relerini azaltÃ„Â±n"
+                    "message": "Toplam sÃƒüre 1s 30dk fazla",
+                    "suggestion": "Ziyaret sÃƒürelerini azaltÃın"
                 }
             ]
         }
@@ -1996,7 +2000,7 @@ def api_optimize_timeline():
         data = request.get_json(silent=True)
         
         if not data or "schedule" not in data:
-            return jsonify({"error": "'schedule' alanÃ„Â± gerekli"}), 400
+            return jsonify({"error": "'schedule' alanÃı gerekli"}), 400
         
         schedule = data["schedule"]
         max_duration = data.get("max_duration_minutes")
@@ -2007,19 +2011,19 @@ def api_optimize_timeline():
         return jsonify(result)
     
     except Exception as e:
-        # print(f"[API] Optimizasyon hatasÃ„Â±: {e}"))
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        # print(f"[API] Optimizasyon hatasÃı: {e}"))
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 # =============================================================================
-# KULLANICI LOKASYON API'LERÃ„Â°
+# KULLANICI LOKASYON API'LERÃİ
 # =============================================================================
 
 @app.route("/api/locations", methods=["GET"])
 def api_get_locations():
     """
-    KaydedilmiÃ…Å¸ tÃƒÂ¼m lokasyonlarÃ„Â± getirir.
-    Pagination desteÃ„Å¸i eklenmiÃ…Å¸tir (limit, offset, page).
+    KaydedilmiÃ…ş tÃƒüm lokasyonlarÃı getirir.
+    Pagination desteÃşi eklenmiÃ…ştir (limit, offset, page).
     """
     try:
         sort_by = request.args.get("sort_by", "created_at")
@@ -2034,7 +2038,7 @@ def api_get_locations():
         total = get_locations_count()
         locations = get_all_locations(sort_by=sort_by, limit=limit, offset=offset)
 
-        # Toplam sayfa sayÃ„Â±sÃ„Â±nÃ„Â± hesapla
+        # Toplam sayfa sayÃısÃınÃı hesapla
         pages = (total + limit - 1) // limit if total > 0 else 1
         current_page = (offset // limit) + 1
 
@@ -2048,7 +2052,7 @@ def api_get_locations():
             "offset": offset
         })
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/locations", methods=["POST"])
@@ -2060,12 +2064,12 @@ def api_save_location():
         data = request.get_json(silent=True)
 
         if not data:
-            return jsonify({"error": "GeÃƒÂ§ersiz veya eksik JSON gÃƒÂ¶vdesi."}), 400
+            return jsonify({"error": "GeÃƒçersiz veya eksik JSON gÃƒövdesi."}), 400
         
         required_fields = ["name", "lat", "lon"]
         for field in required_fields:
             if field not in data:
-                return jsonify({"error": f"'{field}' alanÃ„Â± gerekli."}), 400
+                return jsonify({"error": f"'{field}' alanÃı gerekli."}), 400
                 
         location = save_location(
             name=data["name"],
@@ -2081,7 +2085,7 @@ def api_save_location():
             "message": f"'{location['name']}' konumu kaydedildi!"
         })
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/locations/<location_id>", methods=["DELETE"])
@@ -2093,51 +2097,51 @@ def api_delete_location(location_id):
         success = delete_location(location_id)
         
         if not success:
-            return jsonify({"error": "Lokasyon bulunamadÃ„Â±"}), 404
+            return jsonify({"error": "Lokasyon bulunamadÃı"}), 404
             
         return jsonify({
             "status": "success",
             "message": "Lokasyon silindi"
         })
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/locations/<location_id>", methods=["PUT"])
 def api_update_location(location_id):
     """
-    Lokasyonu gÃƒÂ¼nceller.
+    Lokasyonu gÃƒünceller.
     """
     try:
         data = request.get_json(silent=True)
 
         if not data:
-            return jsonify({"error": "GeÃƒÂ§ersiz veya eksik JSON gÃƒÂ¶vdesi."}), 400
+            return jsonify({"error": "GeÃƒçersiz veya eksik JSON gÃƒövdesi."}), 400
 
         location = update_location(location_id, data)
         
         if not location:
-            return jsonify({"error": "Lokasyon bulunamadÃ„Â±"}), 404
+            return jsonify({"error": "Lokasyon bulunamadÃı"}), 404
             
         return jsonify({
             "status": "success",
             "location": location,
-            "message": "Lokasyon gÃƒÂ¼ncellendi"
+            "message": "Lokasyon gÃƒüncellendi"
         })
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/locations/<location_id>/favorite", methods=["POST"])
 def api_toggle_location_favorite(location_id):
     """
-    Lokasyonun favori durumunu deÃ„Å¸iÃ…Å¸tirir.
+    Lokasyonun favori durumunu deÃşiÃ…ştirir.
     """
     try:
         location = toggle_location_favorite(location_id)
         
         if not location:
-            return jsonify({"error": "Lokasyon bulunamadÃ„Â±"}), 404
+            return jsonify({"error": "Lokasyon bulunamadÃı"}), 404
             
         return jsonify({
             "status": "success",
@@ -2146,7 +2150,7 @@ def api_toggle_location_favorite(location_id):
             "message": "Favorilere eklendi *" if location.get("favorite") else "Favorilerden cikarildi"
         })
     except Exception as e:
-        return jsonify({"error": f"Sunucu hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Sunucu hatasÃı: {str(e)}"}), 500
 
 
 # =============================================================================
@@ -2156,24 +2160,24 @@ def api_toggle_location_favorite(location_id):
 @app.route("/api/nlp/parse", methods=["POST"])
 def api_nlp_parse():
     """
-    DoÃ„Å¸al dil sorgusunu analiz eder ve yapÃ„Â±landÃ„Â±rÃ„Â±lmÃ„Â±Ã…Å¸ veri dÃƒÂ¶ner.
+    DoÃşal dil sorgusunu analiz eder ve yapÃılandÃırÃılmÃıÃ…ş veri dÃƒöner.
 
     Request Body:
         {
-            "query": "KadÃ„Â±kÃƒÂ¶y'den BeÃ…Å¸iktaÃ…Å¸'a rota ÃƒÂ§iz"
+            "query": "KadÃıkÃƒöy'den BeÃ…şiktaÃ…ş'a rota Ãƒçiz"
         }
 
     Response:
         {
             "type": "route",           # route | poi | multi | single | unknown
             "confidence": 0.85,
-            "origin": "KadÃ„Â±kÃƒÂ¶y",
-            "destination": "BeÃ…Å¸iktaÃ…Å¸",
-            "locations": null,         # multi iÃƒÂ§in
-            "location": null,          # poi iÃƒÂ§in
+            "origin": "KadÃıkÃƒöy",
+            "destination": "BeÃ…şiktaÃ…ş",
+            "locations": null,         # multi iÃƒçin
+            "location": null,          # poi iÃƒçin
             "detected_places": [
-                {"place": "KadÃ„Â±kÃƒÂ¶y", "similarity": 0.92},
-                {"place": "BeÃ…Å¸iktaÃ…Å¸", "similarity": 0.88}
+                {"place": "KadÃıkÃƒöy", "similarity": 0.92},
+                {"place": "BeÃ…şiktaÃ…ş", "similarity": 0.88}
             ],
             "parse_time": 0.15,
             "error": null
@@ -2183,25 +2187,25 @@ def api_nlp_parse():
     try:
         trace_prefix = _request_trace_prefix()
         print(f"\n{'='*60}")
-        print(f"{trace_prefix} [NLP API] Parse ÃƒÂ§aÃ„Å¸rÃ„Â±sÃ„Â± alÃ„Â±ndÃ„Â±")
+        print(f"{trace_prefix} [NLP API] Parse ÃƒçaÃşrÃısÃı alÃındÃı")
         global BERT_NLP_AVAILABLE
         data = request.get_json(silent=True)
 
         if not data or "query" not in data:
             print(f"[NLP API] ? Eksik parametreler")
-            return jsonify({"error": "'query' alanÃ„Â± gerekli"}), 400
+            return jsonify({"error": "'query' alanÃı gerekli"}), 400
 
         query_value = data["query"]
         if not isinstance(query_value, str):
-            print(f"[NLP API] ? Query metin olmalÃ„Â±")
-            return jsonify({"error": "'query' alanÃ„Â± metin olmalÃ„Â±"}), 400
+            print(f"[NLP API] ? Query metin olmalÃı")
+            return jsonify({"error": "'query' alanÃı metin olmalÃı"}), 400
 
         query = query_value.strip()
         debug_trace_requested = bool(data.get("debug", False)) or _BERT_PARSE_TRACE_LOG_ENABLED
 
         if not query or len(query) < 2:
-            print(f"[NLP API] ? Sorgu ÃƒÂ§ok kÃ„Â±sa")
-            return jsonify({"error": "Sorgu ÃƒÂ§ok kÃ„Â±sa"}), 400
+            print(f"[NLP API] ? Sorgu Ãƒçok kÃısa")
+            return jsonify({"error": "Sorgu Ãƒçok kÃısa"}), 400
 
         print(f"{trace_prefix} [NLP API] ?? Sorgu: '{_redact_pii_text(query)}'")
         print(f"{trace_prefix} [NLP API] ?? BERT_NLP_AVAILABLE: {BERT_NLP_AVAILABLE}")
@@ -2210,7 +2214,7 @@ def api_nlp_parse():
             print(f"[NLP API] ? BERT motoru ZORUNLU! Regex fallback KALDIRILDI.")
             return jsonify({"error": "BERT motoru gereklidir. Transformers ve PyTorch kurun."}), 503
 
-        print(f"[NLP API] ?? BERT motoru kullanÃ„Â±lÃ„Â±yor...")
+        print(f"[NLP API] ?? BERT motoru kullanÃılÃıyor...")
         try:
             nlp_engine = get_bert_nlp_engine()
             _log_bert_runtime_metrics(
@@ -2229,10 +2233,10 @@ def api_nlp_parse():
                 stage="parse:after",
                 bert_engine_instance=getattr(nlp_engine, "bert", None)
             )
-            print(f"{trace_prefix} [NLP API] ? BERT parse baÃ…Å¸arÃ„Â±lÃ„Â±")
+            print(f"{trace_prefix} [NLP API] ? BERT parse baÃ…şarÃılÃı")
         except Exception as bert_exc:
-            print(f"{trace_prefix} [NLP API] ? BERT hatasÃ„Â±: {bert_exc}")
-            return jsonify({"error": f"BERT motoru hatasÃ„Â±: {str(bert_exc)}"}), 500
+            print(f"{trace_prefix} [NLP API] ? BERT hatasÃı: {bert_exc}")
+            return jsonify({"error": f"BERT motoru hatasÃı: {str(bert_exc)}"}), 500
 
         scope_checks = []
         for place in _extract_nlp_places_for_scope_check(result):
@@ -2249,12 +2253,12 @@ def api_nlp_parse():
         }
 
         confidence = float(result.get("confidence", 0.0) or 0.0)
-        print(f"{trace_prefix} [NLP API] ?? SonuÃƒÂ§:")
+        print(f"{trace_prefix} [NLP API] ?? SonuÃƒç:")
         print(f"{trace_prefix} [NLP API]    - Tip: {result.get('type', 'unknown')}")
         print(f"{trace_prefix} [NLP API]    - Confidence: {confidence:.2f}")
         print(f"{trace_prefix} [NLP API]    - Engine: {result.get('engine', 'unknown')}")
         if result.get('origin'):
-            print(f"{trace_prefix} [NLP API]    - Rota: {result['origin']} Ã¢â‚¬Âº {result.get('destination', '?')}")
+            print(f"{trace_prefix} [NLP API]    - Rota: {result['origin']} aa‚¬Âº {result.get('destination', '?')}")
         if result.get('detected_places'):
             print(f"{trace_prefix} [NLP API]    - Tespit edilen yerler: {[p['place'] for p in result['detected_places']]}")
         if debug_trace_requested:
@@ -2263,7 +2267,7 @@ def api_nlp_parse():
         safe_result = dict(result)
         if "raw_query" in safe_result:
             safe_result["raw_query"] = _redact_pii_text(safe_result.get("raw_query"))
-        print(f"{trace_prefix} [NLP API] ?? DÃƒÂ¶nen response: {safe_result}")
+        print(f"{trace_prefix} [NLP API] ?? DÃƒönen response: {safe_result}")
         print(f"{'='*60}\n")
         try:
             audit_id = log_nlp_parse_audit(
@@ -2292,7 +2296,7 @@ def api_nlp_parse():
             )
         except Exception:
             pass
-        return jsonify({"error": f"NLP hatasÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"NLP hatasÃı: {str(e)}"}), 500
 
 
 @app.route("/api/nlp/status", methods=["GET"])
@@ -2334,101 +2338,101 @@ def api_nlp_audit_recent():
 @app.route("/api/nlp/similarity", methods=["POST"])
 def api_nlp_similarity():
     """
-    Ã„Â°ki metin arasÃ„Â±ndaki semantic similarity'yi hesaplar.
+    Ãİki metin arasÃındaki semantic similarity'yi hesaplar.
 
     Request Body:
         {
-            "text1": "KadÃ„Â±kÃƒÂ¶y",
-            "text2": "KadikÃƒÂ¶y"
+            "text1": "KadÃıkÃƒöy",
+            "text2": "KadikÃƒöy"
         }
 
     Response:
         {
             "similarity": 0.92,
-            "text1": "KadÃ„Â±kÃƒÂ¶y",
-            "text2": "KadikÃƒÂ¶y"
+            "text1": "KadÃıkÃƒöy",
+            "text2": "KadikÃƒöy"
         }
     """
     try:
         print(f"\n{'='*60}")
-        print(f"[NLP API] Similarity ÃƒÂ§aÃ„Å¸rÃ„Â±sÃ„Â± alÃ„Â±ndÃ„Â±")
+        print(f"[NLP API] Similarity ÃƒçaÃşrÃısÃı alÃındÃı")
         if not BERT_NLP_AVAILABLE:
-            print(f"[NLP API] ? BERT engine aktif deÃ„Å¸il!")
-            return jsonify({"error": "BERT engine aktif deÃ„Å¸il"}), 503
+            print(f"[NLP API] ? BERT engine aktif deÃşil!")
+            return jsonify({"error": "BERT engine aktif deÃşil"}), 503
 
         data = request.get_json(silent=True)
         print(f"[NLP API] ?? Gelen request: {data}")
 
         if not data or "text1" not in data or "text2" not in data:
             print(f"[NLP API] ? Eksik parametreler")
-            return jsonify({"error": "'text1' ve 'text2' alanlarÃ„Â± gerekli"}), 400
+            return jsonify({"error": "'text1' ve 'text2' alanlarÃı gerekli"}), 400
 
         text1 = data["text1"].strip()
         text2 = data["text2"].strip()
         print(f"[NLP API] ?? Text1: '{text1}' | Text2: '{text2}'")
 
         if not text1 or not text2:
-            print(f"[NLP API] ? BoÃ…Å¸ metin")
-            return jsonify({"error": "Metinler boÃ…Å¸ olamaz"}), 400
+            print(f"[NLP API] ? BoÃ…ş metin")
+            return jsonify({"error": "Metinler boÃ…ş olamaz"}), 400
 
-        print(f"[NLP API] ?? BERT engine yÃƒÂ¼kleniyor...")
+        print(f"[NLP API] ?? BERT engine yÃƒükleniyor...")
         from bert_engine import get_bert_engine
         engine = get_bert_engine()
         _log_bert_runtime_metrics(stage="similarity:before", bert_engine_instance=engine)
-        print(f"[NLP API] ? BERT engine hazÃ„Â±r")
+        print(f"[NLP API] ? BERT engine hazÃır")
 
-        print(f"[NLP API] ?? Benzerlik hesaplanÃ„Â±yor...")
+        print(f"[NLP API] ?? Benzerlik hesaplanÃıyor...")
         similarity = engine.similarity(text1, text2)
         _log_bert_runtime_metrics(stage="similarity:after", bert_engine_instance=engine)
-        print(f"[NLP API] ? SonuÃƒÂ§: {similarity:.4f}")
+        print(f"[NLP API] ? SonuÃƒç: {similarity:.4f}")
 
         result = {
             "similarity": float(similarity),
             "text1": text1,
             "text2": text2
         }
-        print(f"[NLP API] ?? DÃƒÂ¶nen response: {result}")
+        print(f"[NLP API] ?? DÃƒönen response: {result}")
         print(f"{'='*60}\n")
 
         return jsonify(result)
 
     except Exception as e:
         print(f"[NLP ERROR] Similarity: {str(e)}")
-        return jsonify({"error": f"Benzerlik hesaplanamadÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"Benzerlik hesaplanamadÃı: {str(e)}"}), 500
 
 
 @app.route("/api/nlp/best-match", methods=["POST"])
 def api_nlp_best_match():
     """
-    Sorguya en yakÃ„Â±n adayÃ„Â± bulur (typo tolerant).
+    Sorguya en yakÃın adayÃı bulur (typo tolerant).
 
     Request Body:
         {
             "query": "kadikoy",
-            "candidates": ["KadÃ„Â±kÃƒÂ¶y", "BeÃ…Å¸iktaÃ…Å¸", "Taksim"],
+            "candidates": ["KadÃıkÃƒöy", "BeÃ…şiktaÃ…ş", "Taksim"],
             "threshold": 0.75
         }
 
     Response:
         {
-            "match": "KadÃ„Â±kÃƒÂ¶y",
+            "match": "KadÃıkÃƒöy",
             "similarity": 0.92,
             "index": 0
         }
     """
     try:
         print(f"\n{'='*60}")
-        print(f"[NLP API] Best Match ÃƒÂ§aÃ„Å¸rÃ„Â±sÃ„Â± alÃ„Â±ndÃ„Â±")
+        print(f"[NLP API] Best Match ÃƒçaÃşrÃısÃı alÃındÃı")
         if not BERT_NLP_AVAILABLE:
-            print(f"[NLP API] ? BERT engine aktif deÃ„Å¸il!")
-            return jsonify({"error": "BERT engine aktif deÃ„Å¸il"}), 503
+            print(f"[NLP API] ? BERT engine aktif deÃşil!")
+            return jsonify({"error": "BERT engine aktif deÃşil"}), 503
 
         data = request.get_json(silent=True)
         print(f"[NLP API] ?? Gelen request: query='{data.get('query')}', {len(data.get('candidates', []))} aday")
 
         if not data or "query" not in data or "candidates" not in data:
             print(f"[NLP API] ? Eksik parametreler")
-            return jsonify({"error": "'query' ve 'candidates' alanlarÃ„Â± gerekli"}), 400
+            return jsonify({"error": "'query' ve 'candidates' alanlarÃı gerekli"}), 400
 
         query = data["query"].strip()
         candidates = data["candidates"]
@@ -2437,33 +2441,33 @@ def api_nlp_best_match():
         print(f"[NLP API] ?? Adaylar: {candidates}")
 
         if not query:
-            print(f"[NLP API] ? BoÃ…Å¸ sorgu")
-            return jsonify({"error": "Sorgu boÃ…Å¸ olamaz"}), 400
+            print(f"[NLP API] ? BoÃ…ş sorgu")
+            return jsonify({"error": "Sorgu boÃ…ş olamaz"}), 400
 
         if not isinstance(candidates, list) or len(candidates) == 0:
-            print(f"[NLP API] ? GeÃƒÂ§ersiz adaylar")
-            return jsonify({"error": "'candidates' bir liste olmalÃ„Â±"}), 400
+            print(f"[NLP API] ? GeÃƒçersiz adaylar")
+            return jsonify({"error": "'candidates' bir liste olmalÃı"}), 400
 
-        print(f"[NLP API] ?? BERT engine yÃƒÂ¼kleniyor...")
+        print(f"[NLP API] ?? BERT engine yÃƒükleniyor...")
         from bert_engine import get_bert_engine
         engine = get_bert_engine()
         _log_bert_runtime_metrics(stage="best-match:before", bert_engine_instance=engine)
-        print(f"[NLP API] ? BERT engine hazÃ„Â±r")
+        print(f"[NLP API] ? BERT engine hazÃır")
 
-        print(f"[NLP API] ?? En iyi eÃ…Å¸leÃ…Å¸me aranÃ„Â±yor...")
+        print(f"[NLP API] ?? En iyi eÃ…şleÃ…şme aranÃıyor...")
         result = engine.find_best_match(query, candidates, threshold=threshold)
         _log_bert_runtime_metrics(stage="best-match:after", bert_engine_instance=engine)
 
         if result:
-            print(f"[NLP API] ? EÃ…Å¸leÃ…Å¸me bulundu: {result['match']} (benzerlik: {result['similarity']:.4f})")
-            print(f"[NLP API] ?? DÃƒÂ¶nen response: {result}")
+            print(f"[NLP API] ? EÃ…şleÃ…şme bulundu: {result['match']} (benzerlik: {result['similarity']:.4f})")
+            print(f"[NLP API] ?? DÃƒönen response: {result}")
         else:
-            print(f"[NLP API] ? EÃ…Å¸leÃ…Å¸me bulunamadÃ„Â±")
+            print(f"[NLP API] ? EÃ…şleÃ…şme bulunamadÃı")
             result = {
                 "match": None,
                 "similarity": 0.0,
                 "index": -1,
-                "message": f"EÃ…Å¸leÃ…Å¸me bulunamadÃ„Â± (threshold: {threshold})"
+                "message": f"EÃ…şleÃ…şme bulunamadÃı (threshold: {threshold})"
             }
         print(f"{'='*60}\n")
 
@@ -2471,7 +2475,7 @@ def api_nlp_best_match():
 
     except Exception as e:
         print(f"[NLP ERROR] Best match: {str(e)}")
-        return jsonify({"error": f"EÃ…Å¸leÃ…Å¸me bulunamadÃ„Â±: {str(e)}"}), 500
+        return jsonify({"error": f"EÃ…şleÃ…şme bulunamadÃı: {str(e)}"}), 500
 
 
 # =============================================================================
@@ -2481,7 +2485,7 @@ def api_nlp_best_match():
 @app.route("/api/weather", methods=["GET"])
 def api_get_weather():
     """
-    Belirli bir konum iÃƒÂ§in gÃƒÂ¼ncel hava durumunu getirir.
+    Belirli bir konum iÃƒçin gÃƒüncel hava durumunu getirir.
 
     Query Parameters:
         lat (float, required): Enlem (-90 ile 90 arasi)
@@ -2537,7 +2541,7 @@ def api_get_weather():
 @app.route("/api/weather/forecast", methods=["GET"])
 def api_get_weather_forecast():
     """
-    Belirli bir konum iÃƒÂ§in saatlik hava tahmini getirir.
+    Belirli bir konum iÃƒçin saatlik hava tahmini getirir.
 
     Query Parameters:
         lat (float, required): Enlem
@@ -2640,14 +2644,14 @@ def api_check_route_weather():
         if not points or len(points) == 0:
             return jsonify({"error": "En az bir nokta gerekli"}), 400
 
-        print(f"[Weather] Route check: {len(points)} noktalar, forecast={'evet' if start_time and 'T' in str(start_time) else 'hayÃ„Â±r'}")
+        print(f"[Weather] Route check: {len(points)} noktalar, forecast={'evet' if start_time and 'T' in str(start_time) else 'hayÃır'}")
 
         result = check_route_weather(points, start_time, segment_distances, transport_mode)
 
         if result.get("success"):
             return jsonify(result)
         else:
-            return jsonify({"error": "Rota hava kontrolÃƒÂ¼ basarisiz"}), 500
+            return jsonify({"error": "Rota hava kontrolÃƒü basarisiz"}), 500
 
     except Exception as e:
         print(f"[Weather ERROR] {str(e)}")
@@ -2657,7 +2661,7 @@ def api_check_route_weather():
 @app.route("/api/weather/status", methods=["GET"])
 def api_weather_status():
     """
-    Hava durumu servisi durumunu dondurÃƒÂ¼r.
+    Hava durumu servisi durumunu dondurÃƒür.
 
     Response:
         {
@@ -2688,7 +2692,7 @@ def api_weather_status():
 @app.route("/api/weather/health", methods=["GET"])
 def api_weather_health():
     """
-    Hava durumu servisi saglik kontrolÃƒÂ¼.
+    Hava durumu servisi saglik kontrolÃƒü.
 
     Response:
         {"healthy": true}
