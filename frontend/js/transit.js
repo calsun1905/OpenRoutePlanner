@@ -414,7 +414,8 @@
         const shownRouteLabels = new Set();
         const drawableSegments = option.segments.map((seg, idx) => {
             const displayCoords = getSegmentCoordsForDrawing(seg, transitOnlyView);
-            return { seg, idx, displayCoords };
+            const isEndpointWalk = idx === 0 || idx === (option.segments.length - 1);
+            return { seg, idx, displayCoords, isEndpointWalk };
         }).filter(({ seg, displayCoords }) => {
             if (!Array.isArray(displayCoords) || displayCoords.length < 2) return false;
             if (transitOnlyView && seg.mode === "walk") {

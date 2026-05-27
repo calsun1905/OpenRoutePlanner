@@ -50,7 +50,8 @@ AVG_BUS_SPEED_KMH = 18
 AVG_METRO_SPEED_KMH = 34
 
 # Maksimum yurume mesafesi duraga (metre)
-MAX_WALK_TO_STOP_M = 800
+MAX_WALK_TO_STOP_M = float(ROUTE_CONFIG.get("MULTIMODAL_MAX_WALK_TO_STOP_M", 800))
+MAX_RAIL_TRANSFER_WALK_M = float(ROUTE_CONFIG.get("MULTIMODAL_MAX_RAIL_TRANSFER_WALK_M", 1500))
 
 # Arama yaricaplari (dar -> genis)
 SEARCH_RADII = [600, 1000, 1500]
@@ -61,8 +62,34 @@ _OSRM_ROUTE_CACHE: Dict[Tuple, List[List[float]]] = {}
 _OSRM_MULTI_CACHE: Dict[Tuple, List[List[float]]] = {}
 _OSRM_CACHE_MAX_ITEMS = 800
 _COMPARE_ROUTE_CACHE: Dict[Tuple, Dict] = {}
-_COMPARE_CACHE_MAX_ITEMS = 220
-_ENABLE_COMPARE_CACHE = False
+_COMPARE_CACHE_MAX_ITEMS = int(ROUTE_CONFIG.get("MULTIMODAL_COMPARE_CACHE_MAX_ITEMS", 220))
+_ENABLE_COMPARE_CACHE = bool(ROUTE_CONFIG.get("MULTIMODAL_COMPARE_CACHE_ENABLED", False))
+_COMPARE_CACHE_HITS = 0
+_COMPARE_CACHE_MISSES = 0
+
+
+def _effective_walk_to_stop_limit_m(direct_walk_m: float) -> float:
+    """
+    Ilk/son duraga yurume limitini mesafeye gore dinamiklestirir.
+    Kisa rotalarda default limit korunur; uzun rotalarda limit biraz esner.
+    """
+    base = float(ROUTE_CONFIG.get("MULTIMODAL_MAX_WALK_TO_STOP_M", MAX_WALK_TO_STOP_M))
+    medium = float(ROUTE_CONFIG.get("MULTIMODAL_MAX_WALK_TO_STOP_MEDIUM_M", 1000))
+    long_ = float(ROUTE_CONFIG.get("MULTIMODAL_MAX_WALK_TO_STOP_LONG_M", 1200))
+    medium_trigger = float(ROUTE_CONFIG.get("MULTIMODAL_WALK_EXPAND_MEDIUM_TRIGGER_M", 20000))
+    long_trigger = float(ROUTE_CONFIG.get("MULTIMODAL_WALK_EXPAND_LONG_TRIGGER_M", 50000))
+
+    try:
+        walk_m = float(direct_walk_m)
+    except (TypeError, ValueError):
+        walk_m = 0.0
+
+    limit = base
+    if walk_m >= long_trigger:
+        limit = max(limit, long_)
+    elif walk_m >= medium_trigger:
+        limit = max(limit, medium)
+    return float(limit)
 
 
 def _cache_get(cache: Dict[Tuple, List[List[float]]], key: Tuple) -> Optional[List[List[float]]]:
@@ -86,11 +113,14 @@ def _cache_put(cache: Dict[Tuple, List[List[float]]], key: Tuple, value: List[Li
 
 
 def _compare_cache_get(key: Tuple) -> Optional[Dict]:
+    global _COMPARE_CACHE_HITS, _COMPARE_CACHE_MISSES
     if not _ENABLE_COMPARE_CACHE:
         return None
     data = _COMPARE_ROUTE_CACHE.get(key)
     if data is None:
+        _COMPARE_CACHE_MISSES += 1
         return None
+    _COMPARE_CACHE_HITS += 1
     return copy.deepcopy(data)
 
 
@@ -104,6 +134,19 @@ def _compare_cache_put(key: Tuple, value: Dict) -> None:
         except Exception:
             _COMPARE_ROUTE_CACHE.clear()
     _COMPARE_ROUTE_CACHE[key] = copy.deepcopy(value)
+
+
+def get_compare_cache_stats() -> Dict[str, object]:
+    total = _COMPARE_CACHE_HITS + _COMPARE_CACHE_MISSES
+    hit_rate = (_COMPARE_CACHE_HITS / total) if total > 0 else 0.0
+    return {
+        "enabled": bool(_ENABLE_COMPARE_CACHE),
+        "size": len(_COMPARE_ROUTE_CACHE),
+        "max_items": int(_COMPARE_CACHE_MAX_ITEMS),
+        "hits": int(_COMPARE_CACHE_HITS),
+        "misses": int(_COMPARE_CACHE_MISSES),
+        "hit_rate": f"{hit_rate:.1%}",
+    }
 
 
 # ============================================================================
@@ -818,6 +861,77 @@ def _get_routes_at_stop(stop_code: int) -> List[str]:
     return routes
 
 
+def _normalize_transit_stop_name(name: str) -> str:
+    """Durak isimlerini kod/farkli karakter varyasyonlarina karsi normalize eder."""
+    if not name:
+        return ""
+    text = str(name).lower().strip()
+    text = (
+        text.replace("ı", "i")
+        .replace("ö", "o")
+        .replace("ü", "u")
+        .replace("ş", "s")
+        .replace("ç", "c")
+        .replace("ğ", "g")
+    )
+    text = re.sub(r"[^a-z0-9]+", "", text)
+    return text
+
+
+def _expand_route_stop_code_aliases(cursor, route_code: str, stop_code: int) -> set[int]:
+    """
+    Ayni fiziksel duragin hat-yon bazli farkli kodlarini toplar.
+    Ornek: CEVIZLIBAG icin 900191/900192 gibi.
+    """
+    try:
+        stop_code_int = int(stop_code)
+    except Exception:
+        return set()
+
+    cursor.execute(
+        """
+        SELECT rs.stop_code, s.name
+        FROM route_stops rs
+        LEFT JOIN stops s ON s.code = rs.stop_code
+        WHERE rs.route_code = ?
+        """,
+        (route_code,),
+    )
+    rows = cursor.fetchall()
+    if not rows:
+        return {stop_code_int}
+
+    target_norm = ""
+    for row in rows:
+        try:
+            code = int(row["stop_code"])
+        except Exception:
+            continue
+        if code == stop_code_int:
+            target_norm = _normalize_transit_stop_name(row["name"])
+            break
+
+    if not target_norm:
+        cursor.execute("SELECT name FROM stops WHERE code = ?", (stop_code_int,))
+        hit = cursor.fetchone()
+        if hit:
+            target_norm = _normalize_transit_stop_name(hit["name"])
+
+    aliases: set[int] = {stop_code_int}
+    if not target_norm:
+        return aliases
+
+    for row in rows:
+        try:
+            code = int(row["stop_code"])
+        except Exception:
+            continue
+        if _normalize_transit_stop_name(row["name"]) == target_norm:
+            aliases.add(code)
+
+    return aliases
+
+
 def _get_route_stop_coords(route_code: str, from_stop_code: int, to_stop_code: int) -> List[List[float]]:
     """
     Bir hat uzerindeki binis duragindan inis duragina kadar
@@ -832,6 +946,14 @@ def _get_route_stop_coords(route_code: str, from_stop_code: int, to_stop_code: i
     conn = _get_db_connection()
     cursor = conn.cursor()
 
+    from_aliases = _expand_route_stop_code_aliases(cursor, route_code, from_stop_code)
+    to_aliases = _expand_route_stop_code_aliases(cursor, route_code, to_stop_code)
+    code_pool = sorted(from_aliases | to_aliases)
+    if len(code_pool) < 2:
+        conn.close()
+        return []
+    placeholders = ",".join(["?"] * len(code_pool))
+
     # Ayni route/direction icinde bir stop birden fazla kez gecebilir.
     # Bu nedenle tek bir "son gorulen stop_order" yerine tum aday ciftleri degerlendir.
     candidates_forward: List[Tuple[int, str, int, int, bool]] = []
@@ -839,25 +961,27 @@ def _get_route_stop_coords(route_code: str, from_stop_code: int, to_stop_code: i
 
     for direction in ["D", "G"]:
         cursor.execute(
-            """
+            f"""
             SELECT stop_code, stop_order
             FROM route_stops
-            WHERE route_code = ? AND direction = ? AND stop_code IN (?, ?)
+            WHERE route_code = ? AND direction = ? AND stop_code IN ({placeholders})
             ORDER BY stop_order
             """,
-            (route_code, direction, from_stop_code, to_stop_code),
+            (route_code, direction, *code_pool),
         )
         rows = cursor.fetchall()
         if len(rows) < 2:
             continue
 
-        from_orders = [int(r["stop_order"]) for r in rows if int(r["stop_code"]) == int(from_stop_code)]
-        to_orders = [int(r["stop_order"]) for r in rows if int(r["stop_code"]) == int(to_stop_code)]
+        from_orders = [int(r["stop_order"]) for r in rows if int(r["stop_code"]) in from_aliases]
+        to_orders = [int(r["stop_order"]) for r in rows if int(r["stop_code"]) in to_aliases]
         if not from_orders or not to_orders:
             continue
 
         for from_order in from_orders:
             for to_order in to_orders:
+                if from_order == to_order:
+                    continue
                 if from_order <= to_order:
                     candidates_forward.append((to_order - from_order, direction, from_order, to_order, False))
                 else:
@@ -979,6 +1103,12 @@ def _find_metro_transfer_pairs(
         if not nm or nm not in b_name_map:
             continue
         b_st = b_name_map[nm]
+        dist = _haversine_distance(a_st["lat"], a_st["lon"], b_st["lat"], b_st["lon"])
+        # Ayni isimli fakat farkli bolgedeki istasyonlar yalanci aktarma uretebilir
+        # (ornegin farkli hatlarda "Yenimahalle"). Isim eslesmesinde de
+        # fiziksel yakinligi zorunlu kil.
+        if dist > (max_distance_m * 1.8):
+            continue
         key = (a_st["id"], b_st["id"])
         if key in seen_ids:
             continue
@@ -1171,19 +1301,48 @@ def _build_metro_options(
                         if not walk_to_seg or not walk_from_seg:
                             continue
 
+                        transfer_direct_m = _haversine_distance(
+                            float(transfer_a["lat"]),
+                            float(transfer_a["lon"]),
+                            float(transfer_b["lat"]),
+                            float(transfer_b["lon"]),
+                        )
+                        if transfer_direct_m > (MAX_RAIL_TRANSFER_WALK_M * 1.6):
+                            continue
+                        transfer_walk_seg = _build_walk_leg(
+                            float(transfer_a["lat"]),
+                            float(transfer_a["lon"]),
+                            float(transfer_b["lat"]),
+                            float(transfer_b["lon"]),
+                            max_distance_m=MAX_RAIL_TRANSFER_WALK_M,
+                            allow_fallback_if_short=True,
+                            fallback_max_m=min(MAX_RAIL_TRANSFER_WALK_M, 1000.0),
+                            max_ratio=8.0,
+                        )
+                        if not transfer_walk_seg:
+                            continue
+
                         coords1 = [[s["lat"], s["lon"]] for s in leg1]
                         coords2 = [[s["lat"], s["lon"]] for s in leg2]
                         dist1 = _path_distance_m(coords1)
                         dist2 = _path_distance_m(coords2)
                         walk_to = float(walk_to_seg["duration_min"])
                         walk_from = float(walk_from_seg["duration_min"])
+                        transfer_walk_min = float(transfer_walk_seg["duration_min"])
+                        transfer_walk_m = float(transfer_walk_seg["distance_m"])
                         wait1 = 4.0
                         wait2 = 4.0
                         rail1 = _metro_travel_time_minutes(dist1 / 1000)
                         rail2 = _metro_travel_time_minutes(dist2 / 1000)
-                        total_time = walk_to + wait1 + rail1 + wait2 + rail2 + walk_from
+                        total_time = walk_to + wait1 + rail1 + transfer_walk_min + wait2 + rail2 + walk_from
 
-                        total_distance = float(walk_to_seg["distance_m"]) + dist1 + dist2 + float(walk_from_seg["distance_m"])
+                        total_distance = (
+                            float(walk_to_seg["distance_m"])
+                            + dist1
+                            + transfer_walk_m
+                            + dist2
+                            + float(walk_from_seg["distance_m"])
+                        )
                         if total_time > max(direct_walk_min * 3.1, 110):
                             continue
                         if total_distance > max(direct_walk_m * 6.2, 28000):
@@ -1196,7 +1355,9 @@ def _build_metro_options(
 
                         name_a = line_a.get("name", f"L{line_a_id}")
                         name_b = line_b.get("name", f"L{line_b_id}")
-                        transfer_desc = transfer_a.get("description") or transfer_a.get("name") or "Transfer"
+                        transfer_desc_a = transfer_a.get("description") or transfer_a.get("name") or "Transfer"
+                        transfer_desc_b = transfer_b.get("description") or transfer_b.get("name") or "Transfer"
+                        transfer_desc = transfer_desc_a if transfer_desc_a == transfer_desc_b else f"{transfer_desc_a} -> {transfer_desc_b}"
                         options.append({
                             "type": "transit",
                             "transit_mode": "metro",
@@ -1205,7 +1366,9 @@ def _build_metro_options(
                             "description": f"{o['description']} -> {transfer_desc} -> {d['description']}",
                             "total_time_min": round(total_time, 1),
                             "total_distance_m": round(total_distance),
-                            "total_walk_m": round(float(walk_to_seg["distance_m"]) + float(walk_from_seg["distance_m"])),
+                            "total_walk_m": round(
+                                float(walk_to_seg["distance_m"]) + transfer_walk_m + float(walk_from_seg["distance_m"])
+                            ),
                             "route_code": f"{name_a}->{name_b}",
                             "route_name": f"{name_a} + {name_b}",
                             "transfer_count": 1,
@@ -1222,7 +1385,7 @@ def _build_metro_options(
                                     "description": f"{name_a} hatti",
                                     "route_code": name_a,
                                     "from_stop": o["description"],
-                                    "to_stop": transfer_desc,
+                                    "to_stop": transfer_desc_a,
                                     "distance_m": round(dist1),
                                     "duration_min": rail1,
                                     "wait_min": wait1,
@@ -1230,10 +1393,17 @@ def _build_metro_options(
                                     "stop_coords": coords1,
                                 },
                                 {
+                                    "mode": "walk",
+                                    "description": f"Aktarma yuruyusu: {transfer_desc_a} -> {transfer_desc_b}",
+                                    "distance_m": round(transfer_walk_m),
+                                    "duration_min": transfer_walk_min,
+                                    "coords": transfer_walk_seg["coords"],
+                                },
+                                {
                                     "mode": "rail",
                                     "description": f"{name_b} hatti",
                                     "route_code": name_b,
-                                    "from_stop": transfer_desc,
+                                    "from_stop": transfer_desc_b,
                                     "to_stop": d["description"],
                                     "distance_m": round(dist2),
                                     "duration_min": rail2,
@@ -2689,12 +2859,13 @@ def _build_bus_metro_mixed_options(
     started = _time.time()
     budget_sec = 2.5
     target_pool = max(8, max_results * 6)
+    max_walk_to_stop_m = _effective_walk_to_stop_limit_m(direct_walk_m)
 
     origin_stops: List[Dict] = []
     for radius in [700, 1100, 1600]:
         origin_stops = get_stops_in_area(origin_lat, origin_lon, radius)
         origin_stops = sorted(origin_stops, key=lambda s: float(s.get("distance_m", 10**9)))
-        origin_stops = [s for s in origin_stops if float(s.get("distance_m", 10**9)) <= MAX_WALK_TO_STOP_M][:8]
+        origin_stops = [s for s in origin_stops if float(s.get("distance_m", 10**9)) <= max_walk_to_stop_m][:8]
         if origin_stops:
             break
     if not origin_stops:
@@ -2920,13 +3091,14 @@ def _build_metro_bus_mixed_options(
     started = _time.time()
     budget_sec = 35.0
     target_pool = max(10, max_results * 8)
+    max_walk_to_stop_m = _effective_walk_to_stop_limit_m(direct_walk_m)
 
     # Hedefe yakin inis duraklari
     dest_stops: List[Dict] = []
     for radius in [700, 1100, 1600]:
         dest_stops = get_stops_in_area(dest_lat, dest_lon, radius)
         dest_stops = sorted(dest_stops, key=lambda s: float(s.get("distance_m", 10**9)))
-        dest_stops = [s for s in dest_stops if float(s.get("distance_m", 10**9)) <= MAX_WALK_TO_STOP_M][:10]
+        dest_stops = [s for s in dest_stops if float(s.get("distance_m", 10**9)) <= max_walk_to_stop_m][:10]
         if dest_stops:
             break
     if not dest_stops:
@@ -3262,10 +3434,13 @@ def find_transit_routes(
     5. En iyi secenekleri dondur
     """
 
+    max_transit_options = max(1, int(ROUTE_CONFIG.get("MULTIMODAL_MAX_TRANSIT_OPTIONS", max_results)))
+
     # Direkt yurume mesafesi (OSRM foot bazli)
     direct_walk_m, direct_walk_min, walking_road_coords = _direct_walk_metrics(
         origin_lat, origin_lon, dest_lat, dest_lon
     )
+    max_walk_to_stop_m = _effective_walk_to_stop_limit_m(direct_walk_m)
     allowed_user_modes = _normalize_allowed_modes(allowed_modes)
     walking_option = {
         "type": "walking",
@@ -3320,11 +3495,11 @@ def find_transit_routes(
 
         # Her baslangic duragi icin
         for o_stop in origin_stops[:stop_pair_scan_limit]:
-            if o_stop["distance_m"] > MAX_WALK_TO_STOP_M:
+            if o_stop["distance_m"] > max_walk_to_stop_m:
                 continue
 
             for d_stop in dest_stops[:stop_pair_scan_limit]:
-                if d_stop["distance_m"] > MAX_WALK_TO_STOP_M:
+                if d_stop["distance_m"] > max_walk_to_stop_m:
                     continue
 
                 # Ortak hat bul
@@ -3355,13 +3530,12 @@ def find_transit_routes(
                         o_stop["code"],
                         d_stop["code"],
                     )
-                    if len(direct_leg_stop_coords) >= 2:
-                        bus_distance_m = _path_distance_m(direct_leg_stop_coords)
-                    else:
-                        bus_distance_m = _haversine_distance(
-                            o_stop["lat"], o_stop["lon"],
-                            d_stop["lat"], d_stop["lon"]
-                        )
+                    # Yon/sira dogrulanamayan direkt bacaklari ele:
+                    # fallback kus-ucusu hesapla devam etmek haritada yaniltici
+                    # A->B->A benzeri artefaktlar uretebiliyor.
+                    if len(direct_leg_stop_coords) < 2:
+                        continue
+                    bus_distance_m = _path_distance_m(direct_leg_stop_coords)
                     bus_time = _bus_travel_time_minutes(bus_distance_m / 1000)
                     walk_from_stop = float(walk_from_seg["duration_min"])
 
@@ -3622,10 +3796,7 @@ def find_transit_routes(
                 opt["dest_stop"]["code"],
             )
             if not bus_stop_coords:
-                bus_stop_coords = [
-                    [opt["origin_stop"]["lat"], opt["origin_stop"]["lon"]],
-                    [opt["dest_stop"]["lat"], opt["dest_stop"]["lon"]],
-                ]
+                continue
             bus_road_coords = _get_bus_road_coords(bus_stop_coords)
 
             result.append({
@@ -3746,7 +3917,7 @@ def find_transit_routes(
         if _has_implausible_segment_jump(opt):
             continue
         transit.append(opt)
-    merged = _diversify_transit_options(transit, max_options=8)
+    merged = _diversify_transit_options(transit, max_options=max_transit_options)
     result = [walking] + merged
     return result
 
@@ -3762,6 +3933,9 @@ def compare_routes(
     Yuruyus ve toplu tasima seceneklerini karsilastirir.
     Direkt baglanti bulunamazsa yakin hatlari bilgi olarak dondurur.
     """
+    compare_start = _time.perf_counter()
+    telemetry: Dict[str, object] = {"stage_ms": {}}
+    stage_ms = telemetry["stage_ms"]
     allowed_modes_norm = sorted(_normalize_allowed_modes(allowed_modes))
     cache_key = (
         round(float(origin_lat), 6),
@@ -3772,20 +3946,30 @@ def compare_routes(
     )
     cached = _compare_cache_get(cache_key)
     if cached is not None:
+        cached_telemetry = cached.get("telemetry")
+        if not isinstance(cached_telemetry, dict):
+            cached_telemetry = {}
+        cached_telemetry["compare_cache_hit"] = True
+        cached["telemetry"] = cached_telemetry
         return cached
 
+    t0 = _time.perf_counter()
     options = find_transit_routes(
         origin_lat, origin_lon, dest_lat, dest_lon,
         allowed_modes=allowed_modes_norm,
     )
+    stage_ms["find_transit_routes_ms"] = round((_time.perf_counter() - t0) * 1000, 2)
 
+    t0 = _time.perf_counter()
     walking = options[0]
     transit = sorted(
         [o for o in options if o["type"] == "transit"],
         key=lambda x: float(x.get("total_time_min", 10**9))
     )
+    stage_ms["rank_options_ms"] = round((_time.perf_counter() - t0) * 1000, 2)
 
     # Oneri
+    t0 = _time.perf_counter()
     recommended = "walking"
     reason = "Yuruyus en hizli secenek"
 
@@ -3797,10 +3981,19 @@ def compare_routes(
             reason = f"Toplu tasima {saved} dk daha hizli"
         else:
             reason = "Yuruyus daha hizli veya benzer surede"
+    stage_ms["recommendation_ms"] = round((_time.perf_counter() - t0) * 1000, 2)
 
     # Yakin hatlari bilgi olarak ekle (direkt baglanti olmasa bile)
+    t0 = _time.perf_counter()
     nearby_origin = _get_nearby_routes(origin_lat, origin_lon, 500)
     nearby_dest = _get_nearby_routes(dest_lat, dest_lon, 500)
+    stage_ms["nearby_routes_ms"] = round((_time.perf_counter() - t0) * 1000, 2)
+    stage_ms["total_ms"] = round((_time.perf_counter() - compare_start) * 1000, 2)
+    telemetry["compare_cache_hit"] = False
+    telemetry["option_counts"] = {
+        "total_options": len(options),
+        "transit_options": len(transit),
+    }
 
     output = {
         "options": options,
@@ -3813,6 +4006,7 @@ def compare_routes(
             "origin": [{"route_code": r["route_code"], "stop_name": r["stop_name"], "distance_m": r["distance_m"]} for r in nearby_origin[:5]],
             "destination": [{"route_code": r["route_code"], "stop_name": r["stop_name"], "distance_m": r["distance_m"]} for r in nearby_dest[:5]],
         },
+        "telemetry": telemetry,
     }
     _compare_cache_put(cache_key, output)
     return output
