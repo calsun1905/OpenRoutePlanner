@@ -99,6 +99,9 @@ ROUTE_CONFIG = {
     "VIA_NODE_SELF_OVERLAP_LIMIT": 0.70,
     "VIA_NODE_MAX_DISTANCE_RATIO": 1.5,
     "VIA_NODE_ROUTE_SAMPLE_COUNT": 20,
+    "VIA_NODE_ROUTE_SAMPLE_MIN": 8,
+    "VIA_NODE_ROUTE_SAMPLE_MAX": 80,
+    "VIA_NODE_SAMPLE_PER_KM": 6.0,
 
     # =========================================================================
     # GÖVDE-ONLY PENALTY — v3.0
@@ -165,17 +168,42 @@ ROUTE_CONFIG = {
     "SNAP_CROSS_SHORE_PENALTY_M": 2000.0,
     # API kabul limiti: bundan daha kotu snap varsa daha genis grafikle tekrar dene.
     "ROUTE_SNAP_MAX_DISTANCE_M": 900.0,
+    "ALT_ROUTE_DEDUP_EPSILON_MIN_DEG": 1e-6,
+    "ALT_ROUTE_DEDUP_EPSILON_MAX_DEG": 2.5e-5,
 
     # =========================================================================
     # POINT GRAPH CACHE — disk temizliği
     # =========================================================================
 
     "GRAPH_POINT_CACHE_MAX_FILES": 20,
+    "POINT_GRAPH_MEMORY_CACHE_MAXSIZE": 24,
+    "POINT_GRAPH_MEMORY_CACHE_TTL_SEC": 900,
+    "ROUTE_RESPONSE_CACHE_ENABLED": True,
+    "ROUTE_RESPONSE_CACHE_MAX_ITEMS": 500,
+    "ROUTE_RESPONSE_CACHE_TTL_SEC": 180,
+    "ROUTE_RESPONSE_CACHE_CONFIG_VERSION": "v1",
+    "CACHE_POLICY_MIN_SAMPLES": 20,
+    "CACHE_POLICY_MIN_HIT_RATE": 0.20,
+    "CACHE_POLICY_UTILIZATION_WARN": 0.90,
+    "NLP_MAX_CANDIDATE_SPANS": 24,
+    "NLP_QUEUE_TIMEOUT_SEC": 20,
+    "MULTIMODAL_QUEUE_TIMEOUT_SEC": 25,
 
     # =========================================================================
     # MULTIMODAL — SU GEÇİŞİ KORUMASI
     # =========================================================================
 
     "MULTIMODAL_ENFORCE_WATER_CROSSING_GUARDS": True,
+    "MULTIMODAL_ALLOWED_MODES_MAX": 4,
+    "MULTIMODAL_MAX_TRANSIT_OPTIONS": 8,
+    "MULTIMODAL_COMPARE_MAX_CONCURRENCY": 2,
+    "MULTIMODAL_COMPARE_CACHE_ENABLED": False,
+    "MULTIMODAL_COMPARE_CACHE_MAX_ITEMS": 220,
+    "MULTIMODAL_MAX_WALK_TO_STOP_M": 800,
+    "MULTIMODAL_MAX_WALK_TO_STOP_MEDIUM_M": 1000,
+    "MULTIMODAL_MAX_WALK_TO_STOP_LONG_M": 1200,
+    "MULTIMODAL_WALK_EXPAND_MEDIUM_TRIGGER_M": 20000,
+    "MULTIMODAL_WALK_EXPAND_LONG_TRIGGER_M": 50000,
+    "MULTIMODAL_MAX_RAIL_TRANSFER_WALK_M": 1500,
 
 }

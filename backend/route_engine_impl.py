@@ -57,6 +57,22 @@ def _route_debug_log(message: str):
         print(message)
 
 
+class UnreachableWaypointsError(ValueError):
+    """Raised when at least one waypoint pair is not mutually reachable."""
+
+    def __init__(self, unreachable_pairs: list[tuple[int, int]]):
+        self.unreachable_pairs = sorted({tuple(sorted(pair)) for pair in unreachable_pairs})
+        super().__init__(f"Unreachable waypoint pairs: {self.unreachable_pairs}")
+
+    def to_payload(self) -> dict:
+        return {
+            "error_code": "UNREACHABLE_WAYPOINTS",
+            "details": {
+                "unreachable_pairs": [[i, j] for i, j in self.unreachable_pairs],
+            },
+        }
+
+
 def shortest_path(G, origin_node: int, dest_node: int) -> list:
     """
     İki düğüm arası en kısa yolu Dijkstra algoritması ile bulur.
@@ -190,6 +206,7 @@ def solve_tsp(G, points: list) -> list:
     # TSP için tam bir alt grafik (complete subgraph) gerekli
     # Her düğüm çifti arası en kısa yol uzunluğunu hesapla
     dist_matrix = {}
+    directed_reachable = {}
     no_path_count = 0
     no_path_pairs = []
     routing_weight = _routing_weight_key()
@@ -200,17 +217,32 @@ def solve_tsp(G, points: list) -> list:
             try:
                 length = nx.shortest_path_length(G, nodes[i], nodes[j], weight=routing_weight)
                 dist_matrix[(nodes[i], nodes[j])] = length
+                directed_reachable[(i, j)] = True
             except nx.NetworkXNoPath:
                 dist_matrix[(nodes[i], nodes[j])] = 999999.0
+                directed_reachable[(i, j)] = False
                 no_path_count += 1
                 no_path_pairs.append((nodes[i], nodes[j]))
                 _route_debug_log(f"[TSP DEBUG] NetworkXNoPath: node {nodes[i]} -> {nodes[j]} (999999.0)")
     
     if no_path_count > 0:
-        print(f"[TSP WARN] {no_path_count} cift icin yol bulunamadi (inf atandi)")
+        print(f"[TSP WARN] {no_path_count} yonlu cift icin yol bulunamadi (buyuk sonlu ceza atandi)")
         _route_debug_log(
-            f"[TSP DEBUG] Eksik baglanti ciftleri: {no_path_pairs[:5]}{'...' if len(no_path_pairs) > 5 else ''}"
+            f"[TSP DEBUG] Eksik yonlu baglanti ciftleri: {no_path_pairs[:5]}{'...' if len(no_path_pairs) > 5 else ''}"
         )
+
+    # TSP optimizasyonu icin iki yonlu erisim gereklidir.
+    unreachable_pairs = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            if nodes[i] == nodes[j]:
+                continue
+            if directed_reachable.get((i, j)) or directed_reachable.get((j, i)):
+                continue
+            unreachable_pairs.append((i, j))
+
+    if unreachable_pairs:
+        raise UnreachableWaypointsError(unreachable_pairs)
     
     # TSP alt grafını oluştur
     tsp_graph = nx.Graph()
@@ -366,13 +398,11 @@ def count_edge_overlap(edges1, edges2):
     if not edges1 or not edges2:
         return 0.0  # Boş set = örtüşme yok
 
-    # Edge'leri normalize et: key'i ignore et, sadece (u, v) çiftini kullan
-    # MultiDiGraph'ta aynı sokak (u, v, 0) ve (v, u, 0) farklı olabilir
-    # Bu yüzden yön-independent normalize et
+    # YON-DUYARLI normalize: (u, v) ile (v, u) farklidir.
     def normalize_edge(edge):
         if len(edge) >= 2:
             u, v = edge[0], edge[1]
-            return (min(u, v), max(u, v))  # Yönsuz çift
+            return (u, v)
         return edge
 
     set1 = {normalize_edge(e) for e in edges1}
@@ -383,20 +413,13 @@ def count_edge_overlap(edges1, edges2):
 
     intersection = len(set1 & set2)
     
-    # DEBUG LOG: Yönlü vs yönsuz overlap karşılaştırması
-    directional_set1 = {(e[0], e[1]) for e in edges1 if len(e) >= 2}
-    directional_set2 = {(e[0], e[1]) for e in edges2 if len(e) >= 2}
-    directional_intersection = len(directional_set1 & directional_set2)
     
     _route_debug_log(f"[OVERLAP DEBUG] edges1={len(edges1)}, edges2={len(edges2)}")
-    _route_debug_log(f"[OVERLAP DEBUG] Yönsuz overlap: {intersection}/{len(set2)} = {intersection/len(set2):.2%}")
-    _route_debug_log(f"[OVERLAP DEBUG] Yönlü overlap: {directional_intersection}/{len(directional_set2)} = {directional_intersection/len(directional_set2):.2%}")
+    _route_debug_log(f"[OVERLAP DEBUG] Yonlu overlap: {intersection}/{len(set2)} = {intersection/len(set2):.2%}")
     
-    if intersection != directional_intersection:
-        _route_debug_log(f"[OVERLAP DEBUG] Yonlu/yonsuz overlap farki: {abs(intersection - directional_intersection)} edge")
     
     # Asimetrik: "Yeni rotanın (set2) ne kadarı eski rotayla örtüşüyor?"
-    return intersection / len(set2) if len(set2) > 0 else 0.0
+    return intersection / len(set2)
 
 
 def dynamic_overlap_threshold(distance_km: float) -> float:
@@ -828,6 +851,25 @@ def get_body_edges(edges, skip_ratio=0.10):
     return edges[skip:-skip]
 
 
+def calculate_via_route_sample_count(main_km: float, coord_count: int) -> int:
+    """
+    Via-node hesaplamasi icin rota sample sayisini dinamik belirler.
+    """
+    min_samples = int(ROUTE_CONFIG.get("VIA_NODE_ROUTE_SAMPLE_MIN", 8))
+    max_samples = int(ROUTE_CONFIG.get("VIA_NODE_ROUTE_SAMPLE_MAX", 80))
+    per_km = float(ROUTE_CONFIG.get("VIA_NODE_SAMPLE_PER_KM", 6.0))
+    fallback_samples = int(ROUTE_CONFIG.get("VIA_NODE_ROUTE_SAMPLE_COUNT", 20))
+
+    if coord_count <= 0:
+        return max(1, fallback_samples)
+
+    dynamic_target = int(round(max(main_km, 0.1) * per_km))
+    target = max(min_samples, dynamic_target)
+    target = min(max_samples, target)
+    target = min(target, coord_count)
+    return max(1, target)
+
+
 def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
                          num_via_routes=None, max_distance_ratio=None):
     """
@@ -859,6 +901,9 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
         data = G.nodes[n]
         if 'y' in data and 'x' in data:
             main_coords.append((data['y'], data['x']))
+    if len(main_coords) < 2:
+        _route_debug_log("[RouteEngine DEBUG] Via-Node: ana rota koordinatlari yetersiz")
+        return via_routes
 
     main_stats = calculate_route_stats(G, main_route_nodes)
     main_km = main_stats["total_distance_km"]
@@ -900,8 +945,8 @@ def find_via_node_routes(G, origin_node, dest_node, main_route_nodes,
         print(f"[RouteEngine] Via-Node: Bounding box'ta kavşak bulunamadı")
         return via_routes
 
-    # Rotanın her ~VIA_NODE_ROUTE_SAMPLE_COUNT. noktasını sample'la (performans için)
-    sample_count = ROUTE_CONFIG.get("VIA_NODE_ROUTE_SAMPLE_COUNT", 20)
+    # Rotanin nokta yogunluguna gore dinamik sample al (performans + kalite dengesi).
+    sample_count = calculate_via_route_sample_count(main_km=main_km, coord_count=len(main_coords))
     sampled_coords = main_coords[::max(1, len(main_coords) // sample_count)]
 
     def min_distance_to_route(lat, lon):
@@ -1192,11 +1237,9 @@ def find_alternative_routes(G, origin_node: int, dest_node: int, num_routes: int
             print(f"[RouteEngine] Fallback rota hesaplama hatası: {e}")
             return []
 
-    except Exception as e:
-        print(f"[RouteEngine] KRITIK HATA: {e}")
-        import traceback
-        traceback.print_exc()
-        return get_fallback_routes(G, origin_node, dest_node)
+    except (KeyError, TypeError, ValueError) as e:
+        print(f"[RouteEngine] Veri hatasi: {e}")
+        return []
 
     # Minimum alternatif garantisi
     if len(alternatives) < num_routes and alternatives:
