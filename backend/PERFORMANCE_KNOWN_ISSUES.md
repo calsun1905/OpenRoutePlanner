@@ -60,3 +60,12 @@ This document tracks unresolved performance risks observed during current routin
 - Status: Open (tracked)
 - Priority: High
 - Owner: Routing/NLP performance pass in next cycle
+
+## 5) Implemented MVP Mitigations (2026-05-27)
+
+- BERT eager warmup on startup is now disabled by default (`ORP_BERT_PRELOAD_ON_STARTUP` default `False`).
+- NLP parse endpoint now has bounded concurrency guard (`ORP_NLP_PARSE_MAX_CONCURRENCY`) and returns controlled busy response when saturated.
+- `/api/multimodal/compare` now emits stage-level API timing telemetry and applies a simple allowed-modes fan-out cap.
+- `/api/multimodal/compare` now has bounded concurrency guard (`ORP_MULTIMODAL_COMPARE_MAX_CONCURRENCY`) and returns `MULTIMODAL_BUSY` when saturated.
+- Multimodal engine now emits internal stage telemetry and uses config-driven transit fan-out cap (`MULTIMODAL_MAX_TRANSIT_OPTIONS`).
+- Cache observability endpoint added: `GET /api/cache/stats` (graph/poi/multimodal compare cache metrics).

@@ -1,6 +1,6 @@
 # OpenRoutePlanner - Live Project Index
 
-Last updated: 2026-03-10
+Last updated: 2026-05-27
 
 This index reflects the current codebase state in `OpenRoutePlanner` and is intended as a working map for future feature add/remove/refactor tasks.
 
@@ -67,12 +67,14 @@ This index reflects the current codebase state in `OpenRoutePlanner` and is inte
 ### Route + POI
 
 - `POST /api/get-route`
+- `POST /api/get-route-steps`
 - `POST /api/get-alternative-routes`
 - `POST /api/search-pois`
 
 ### Health + Geocode
 
 - `GET /api/health`
+- `GET /api/cache/stats`
 - `GET /api/geocode/suggest`
 - `POST /api/geocode`
 - `POST /api/reverse-geocode`
@@ -123,6 +125,10 @@ This index reflects the current codebase state in `OpenRoutePlanner` and is inte
 - `GET /api/weather/status`
 - `GET /api/weather/health`
 - `POST /api/weather/clear-cache`
+
+### Multimodal
+
+- `POST /api/multimodal/compare`
 
 ## 5) BERT-Focused Deep Index
 
@@ -203,7 +209,10 @@ This index reflects the current codebase state in `OpenRoutePlanner` and is inte
 
 ### Important note
 
-- Weather endpoints exist in backend, but main frontend (`frontend/js/app.js`) currently has no direct weather fetch calls. UI integration is pending if weather should be visible in primary UX.
+- Weather endpoints are integrated in frontend (`frontend/js/app.js`) via:
+  - widget fetch (`/api/weather`),
+  - route weather check (`/api/weather/check-route`),
+  - forecast simulator (`/api/weather/forecast`).
 
 ## 7) Frontend Index
 
@@ -228,7 +237,7 @@ This index reflects the current codebase state in `OpenRoutePlanner` and is inte
 ### Current frontend integration snapshot
 
 - NLP integrated in main UI.
-- Weather not wired into main UI (backend-only endpoint surface).
+- Weather integrated in main UI (widget + route banner + simulator).
 
 ## 8) Data and Persistence Map
 
@@ -237,24 +246,26 @@ This index reflects the current codebase state in `OpenRoutePlanner` and is inte
 - Geocode/district caches: `backend/cache/geocodes.db`, `backend/cache/districts_turkey.db`
 - Weather cache: in-memory process cache (not persisted to disk by default)
 
-## 9) Test and Quality Snapshot (2026-03-10)
+## 9) Test and Quality Snapshot (2026-05-27)
 
 Command run:
 
-`.\.venv\Scripts\python.exe -m pytest -q`
+`.\venv_test\Scripts\python.exe -m pytest -q`
 
 Result:
 
-- 25 tests collected
-- 18 passed
-- 7 failed
+- 96 tests collected
+- 96 passed
+- 0 failed
 
-Observed drift points:
+Current status:
 
-- `tests/test_api/test_routes.py` uses Flask test client with unsupported `query=` argument.
-- Tests still target old geocode shape (`/api/geocode/forward`, `/api/geocode/reverse`) while app uses `POST /api/geocode` and `POST /api/reverse-geocode`.
-- `tests/test_core/test_route_engine.py` imports `get_overlap_threshold` which does not exist in current `route_engine.py` (current function: `dynamic_overlap_threshold`).
-- One overlap expectation does not match current asymmetric overlap logic (`count_edge_overlap` behavior changed).
+- Frontend transit UI contract tests are passing.
+- Route-engine regression tests include:
+  - direction-sensitive overlap,
+  - unreachable waypoint contract behavior,
+  - dynamic via-node sampling bounds,
+  - MultiDiGraph edge-key penalty handling.
 
 ## 10) Change Entry Points (for next tasks)
 
