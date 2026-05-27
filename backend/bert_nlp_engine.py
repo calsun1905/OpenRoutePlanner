@@ -370,6 +370,17 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _env_int(name: str, default: int) -> int:
+    """ENV'den int değer okur."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw.strip())
+    except (TypeError, ValueError):
+        return default
+
+
 _TR_FOLD_TABLE = str.maketrans(
     {
         "ç": "c",
@@ -826,6 +837,7 @@ class PlaceDatabase:
         self._place_name_to_index = {}  # {name: index}
         self._normalized_place_lookup = {}  # {normalized_key: canonical_name}
         self._embeddings = None  # np.ndarray matrix
+        self._embedding_matrix_dirty = True
         
         # OSM usage from env ORP_USE_OSM (default False if not set)
         osm_from_env = os.getenv("ORP_USE_OSM", "").lower()
@@ -839,8 +851,8 @@ class PlaceDatabase:
         
         self._prefer_osm_first = prefer_osm_first
         self._osm_timeout_sec = max(0.5, _env_float("ORP_BERT_OSM_TIMEOUT_SEC", 3.0))
-        self._osm_prefetch_budget_sec = max(0.0, _env_float("ORP_BERT_OSM_PREFETCH_BUDGET_SEC", 2.5))
-        self._osm_prefetch_max_queries = max(1, int(_env_float("ORP_BERT_OSM_PREFETCH_MAX_QUERIES", 3)))
+        self._osm_prefetch_budget_sec = max(0.0, _env_float("ORP_BERT_OSM_PREFETCH_BUDGET_SEC", 1.0))
+        self._osm_prefetch_max_queries = max(1, _env_int("ORP_BERT_OSM_PREFETCH_MAX_QUERIES", 3))
         # {normalized_query: {"added_count": int, "expires_at": float}}
         self._osm_query_cache = {}
 
@@ -945,21 +957,45 @@ class PlaceDatabase:
             place_name: Yer ismi
             embedding: BERT embedding (None ise hesaplanır)
         """
-        if place_name not in self._places:
-            if embedding is None:
-                # Embedding daha sonra hesaplanacak (lazy loading)
-                self._places[place_name] = None
-            else:
-                self._places[place_name] = embedding
-            self._place_names.append(place_name)
-            self._place_name_to_index[place_name] = len(self._place_names) - 1
-            normalized_key = normalize_place_key(place_name)
-            if normalized_key and normalized_key not in self._normalized_place_lookup:
-                self._normalized_place_lookup[normalized_key] = place_name
-            folded_key = normalized_key.translate(_TR_FOLD_TABLE) if normalized_key else ""
-            if folded_key and folded_key not in self._normalized_place_lookup:
-                self._normalized_place_lookup[folded_key] = place_name
-            self._embeddings = None  # Reset matrix
+        if place_name in self._places:
+            return
+
+        emb_array = None
+        if embedding is not None:
+            emb_array = np.array(embedding)
+
+        self._places[place_name] = emb_array
+        self._place_names.append(place_name)
+        self._place_name_to_index[place_name] = len(self._place_names) - 1
+        normalized_key = normalize_place_key(place_name)
+        if normalized_key and normalized_key not in self._normalized_place_lookup:
+            self._normalized_place_lookup[normalized_key] = place_name
+        folded_key = normalized_key.translate(_TR_FOLD_TABLE) if normalized_key else ""
+        if folded_key and folded_key not in self._normalized_place_lookup:
+            self._normalized_place_lookup[folded_key] = place_name
+
+        if emb_array is None:
+            self._embedding_matrix_dirty = True
+            return
+
+        if self._embeddings is None:
+            self._embedding_matrix_dirty = True
+            return
+
+        if self._embedding_matrix_dirty:
+            return
+
+        if self._embeddings.ndim != 2:
+            self._embedding_matrix_dirty = True
+            return
+
+        emb_row = np.array(emb_array).reshape(1, -1)
+        if emb_row.shape[1] != self._embeddings.shape[1]:
+            self._embedding_matrix_dirty = True
+            return
+
+        self._embeddings = np.vstack([self._embeddings, emb_row])
+        self._embedding_matrix_dirty = False
 
     def get_embedding_matrix(self, bert_engine) -> np.ndarray:
         """
@@ -967,7 +1003,12 @@ class PlaceDatabase:
 
         Lazy: İlk çağırmada hesaplar ve cache'ler.
         """
-        if self._embeddings is not None:
+        if self._embeddings is not None and not self._embedding_matrix_dirty:
+            return self._embeddings
+
+        if not self._place_names:
+            self._embeddings = np.array([])
+            self._embedding_matrix_dirty = False
             return self._embeddings
 
         # Tüm yer isimleri için embedding hesapla
@@ -978,6 +1019,7 @@ class PlaceDatabase:
         for name, emb in zip(self._place_names, embeddings):
             self._places[name] = emb
 
+        self._embedding_matrix_dirty = False
         return self._embeddings
 
     def resolve_lookup(self, query: str) -> Optional[str]:
@@ -1060,7 +1102,7 @@ class PlaceDatabase:
         refreshed_match = None
         if self._use_osm and (best_match is None or best_match["similarity"] < 0.50):
             print(f"[OSM API] '{query}' aranıyor...")
-            added = self.cache_osm_results(query)
+            added = self.cache_osm_results(query, bert_engine=bert_engine)
 
             if added > 0:
                 print(f"[OSM API] {added} yeni yer eklendi!")
@@ -1138,9 +1180,15 @@ class PlaceDatabase:
         Returns:
             Eklenen yer sayısı
         """
-        return self.cache_osm_results(query)
+        return self.cache_osm_results(query, bert_engine=None)
 
-    def cache_osm_results(self, query: str, limit: int = 5, deadline_ts: Optional[float] = None) -> int:
+    def cache_osm_results(
+        self,
+        query: str,
+        limit: int = 5,
+        deadline_ts: Optional[float] = None,
+        bert_engine=None,
+    ) -> int:
         """
         OSM'den yer arar, sonuçları memory + local_places cache'e yazar.
         deadline_ts verildiyse bu zamanı aşan çağrılar atlanır.
@@ -1184,6 +1232,8 @@ class PlaceDatabase:
             if response.status_code == 200:
                 request_succeeded = True
                 data = response.json()
+                new_place_names: List[str] = []
+                seen_new_places = set()
 
                 for item in data:
                     display_name = item.get("display_name", item.get("name", "")).strip()
@@ -1196,9 +1246,9 @@ class PlaceDatabase:
                     if lat is None or lon is None:
                         continue
 
-                    if short_name not in self._places:
-                        self.add_place(short_name)
-                        added_count += 1
+                    if short_name not in self._places and short_name not in seen_new_places:
+                        seen_new_places.add(short_name)
+                        new_place_names.append(short_name)
 
                     save_dynamic_place(
                         name=short_name,
@@ -1207,6 +1257,20 @@ class PlaceDatabase:
                         lon=float(lon),
                         search_terms=f"{tr_lower(short_name)} {tr_lower(display_name)}",
                     )
+
+                if new_place_names:
+                    if bert_engine is not None:
+                        try:
+                            new_embeddings = bert_engine.encode_batch(new_place_names)
+                            for place_name, embedding in zip(new_place_names, new_embeddings):
+                                self.add_place(place_name, embedding=np.array(embedding))
+                        except Exception:
+                            for place_name in new_place_names:
+                                self.add_place(place_name)
+                    else:
+                        for place_name in new_place_names:
+                            self.add_place(place_name)
+                    added_count += len(new_place_names)
 
                 time.sleep(self.OSM_RATE_LIMIT)
             else:
@@ -1227,7 +1291,7 @@ class PlaceDatabase:
 
         return added_count
 
-    def _build_osm_prefetch_queries(self, query: str, max_queries: int = 6) -> List[str]:
+    def _build_osm_prefetch_queries(self, query: str, max_queries: int = 3) -> List[str]:
         """
         Kullanıcı sorgusundan OSM için daha anlamlı aday arama parçaları üretir.
         """
@@ -1242,7 +1306,7 @@ class PlaceDatabase:
 
         return phrases[:max_queries]
 
-    def prefetch_osm_candidates(self, query: str, bert_engine=None, max_queries: int = 6) -> int:
+    def prefetch_osm_candidates(self, query: str, bert_engine=None, max_queries: int = 3) -> int:
         """
         Tek parse akışında kontrollü sayıda OSM sorgusu yaparak aday havuzunu büyütür.
         """
@@ -1259,9 +1323,14 @@ class PlaceDatabase:
         for candidate_query in self._build_osm_prefetch_queries(query, max_queries=effective_max_queries):
             if time.monotonic() >= deadline_ts:
                 break
-            added_total += self.cache_osm_results(candidate_query, limit=5, deadline_ts=deadline_ts)
+            added_total += self.cache_osm_results(
+                candidate_query,
+                limit=5,
+                deadline_ts=deadline_ts,
+                bert_engine=bert_engine,
+            )
 
-        if added_total > 0 and bert_engine is not None:
+        if added_total > 0 and bert_engine is not None and self._embedding_matrix_dirty:
             self.get_embedding_matrix(bert_engine)
 
         return added_total
@@ -1301,6 +1370,59 @@ class PlaceDatabase:
         results.sort(key=lambda x: x["similarity"], reverse=True)
 
         return results[:max_results]
+
+
+# =============================================================================
+# INTENT RESCUE HELPER
+# =============================================================================
+
+def should_rescue_poi_intent(
+    *,
+    query_type: str,
+    has_poi_cue: bool,
+    poi_question_cue: bool,
+    route_intent_cue: bool,
+    direction_hints: bool,
+    role_hints: set,
+    unique_place_count: int,
+) -> bool:
+    """
+    Lokasyon yakalansa bile kaybolan POI niyetini geri kazanmak icin son adim guard'i.
+    """
+    if query_type == "poi":
+        return False
+    if not has_poi_cue and not poi_question_cue:
+        return False
+    if route_intent_cue and direction_hints and unique_place_count >= 2:
+        return False
+
+    has_loc_role = "loc" in role_hints
+
+    if has_poi_cue and not direction_hints and unique_place_count <= 1 and has_loc_role:
+        return True
+    if poi_question_cue and not direction_hints and unique_place_count <= 1 and not route_intent_cue:
+        return True
+    return False
+
+
+def should_prefetch_osm_for_query(query: str, candidate_spans: List[Dict[str, Any]]) -> bool:
+    """
+    OSM prefetch'i sadece lokasyon/POI sinyali gucluyken ac.
+    """
+    normalized = normalize_query_text(query or "")
+    if not normalized:
+        return False
+
+    has_loc_role = any((span.get("role_hint") in {"from", "to", "loc"}) for span in (candidate_spans or []))
+    has_multi_span = len(candidate_spans or []) >= 2
+    has_route_cue = bool(re.search(r"\b(rota|yol|guzergah|güzergah|git|giderim|ulasim|ulaşım)\b", normalized))
+    has_poi_cue = bool(
+        re.search(
+            r"\b(kafe|cafe|restoran|restaurant|eczane|hastane|müze|muze|park|avm|otel|cami|durak)\b",
+            normalized,
+        )
+    )
+    return bool(has_loc_role or has_multi_span or has_route_cue or has_poi_cue)
 
 
 # =============================================================================
@@ -1345,6 +1467,13 @@ class BertNLPEngine:
             seed_local_places=seed_local_places,
             seed_static_places=seed_static_places,
             seed_user_locations=seed_user_locations,
+        )
+        self._max_candidate_spans = max(
+            4,
+            _env_int(
+                "NLP_MAX_CANDIDATE_SPANS",
+                _env_int("ORP_NLP_MAX_CANDIDATE_SPANS", 24),
+            ),
         )
 
         # Yer isimleri için embedding matrix'i HESAPLA
@@ -1519,12 +1648,26 @@ class BertNLPEngine:
         best_matches = {}
         candidate_spans = extract_candidate_spans(query, max_ngram=3)
         span_trace_rows = [] if trace is not None else None
+        if len(candidate_spans) > self._max_candidate_spans:
+            # Uzun sorgularda GPU yukunu sinirlamak icin aday span sayisini cap'le.
+            candidate_spans = sorted(
+                candidate_spans,
+                key=lambda item: (-int(item.get("token_count", 1)), int(item.get("start", 0))),
+            )[: self._max_candidate_spans]
+            candidate_spans.sort(key=lambda item: (int(item.get("start", 0)), -int(item.get("token_count", 1))))
 
-        # OSM-first: Önce sorgudan canlı adaylar çekip aday havuzunu besle.
-        self.places.prefetch_osm_candidates(query, bert_engine=self.bert, max_queries=6)
+        # OSM-first: Lokasyon/POI sinyali gucluyse aday havuzunu kontrollu genislet.
+        if should_prefetch_osm_for_query(query, candidate_spans):
+            self.places.prefetch_osm_candidates(
+                query,
+                bert_engine=self.bert,
+                max_queries=self.places._osm_prefetch_max_queries,
+            )
 
-        for span in candidate_spans:
-            span_embedding = self.bert.encode(span["normalized"])
+        span_texts = [span["normalized"] for span in candidate_spans]
+        span_embeddings = self.bert.encode_batch(span_texts) if span_texts else []
+
+        for span, span_embedding in zip(candidate_spans, span_embeddings):
             threshold = 0.78 if span["token_count"] == 1 else 0.70
             match = self.places.find_best_match(
                 query=span["normalized"],
@@ -1864,6 +2007,21 @@ class BertNLPEngine:
             type_confidence = min(float(type_confidence), 0.45)
             intent_matrix_meta["final_type"] = "unknown"
             intent_matrix_meta["reason"] = "weak-poi-signal=>unknown"
+
+        # Lokasyon yakalansa da POI niyeti kaybolduysa son adimda geri kazan.
+        if should_rescue_poi_intent(
+            query_type=query_type,
+            has_poi_cue=has_poi_cue,
+            poi_question_cue=poi_question_cue,
+            route_intent_cue=route_intent_cue,
+            direction_hints=direction_hints,
+            role_hints=role_hints,
+            unique_place_count=len(unique_place_names),
+        ):
+            query_type = "poi"
+            type_confidence = max(float(type_confidence), 0.72)
+            intent_matrix_meta["final_type"] = "poi"
+            intent_matrix_meta["reason"] = "poi-intent-rescue=>poi"
 
         if trace_data is not None:
             trace_data["query"] = query

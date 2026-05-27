@@ -7,12 +7,35 @@ Memory leak önler, performansı iyileştirir.
 
 import threading
 import time
+import copy
+import os
 from collections import OrderedDict
-from typing import Any, Optional, Dict, Tuple
+from typing import Any, Optional, Dict, Tuple, List
 import hashlib
 import json
 
 from route_config import ROUTE_CONFIG
+
+
+def _env_flag_any(names: List[str], default: bool) -> bool:
+    for name in names:
+        raw = os.getenv(name)
+        if raw is None:
+            continue
+        return raw.strip().lower() in {"1", "true", "yes", "on"}
+    return default
+
+
+def _env_int_any(names: List[str], default: int) -> int:
+    for name in names:
+        raw = os.getenv(name)
+        if raw is None:
+            continue
+        try:
+            return int(raw.strip())
+        except (TypeError, ValueError):
+            continue
+    return default
 
 
 class LRUCache:
@@ -74,12 +97,10 @@ class LRUCache:
                 # Yeni anahtar - boyut kontrolü
                 if len(self.cache) >= self.maxsize:
                     # En eski öğeyi sil (ilk öğe)
-                    self.cache.popitem(last=False)
+                    oldest_key, _ = self.cache.popitem(last=False)
                     if self.ttl is not None:
-                        # Timestamp'ı da sil (eğer varsa)
-                        oldest = next(iter(self.cache))
-                        if oldest in self.timestamps:
-                            del self.timestamps[oldest]
+                        # Timestamp'i da sil
+                        self.timestamps.pop(oldest_key, None)
 
             # Değeri ekle
             self.cache[key] = value
@@ -247,9 +268,116 @@ class POICache:
         return self.cache.stats()
 
 
+class RouteResponseCache:
+    """
+    /api/get-route ve benzeri endpoint cevaplari icin ortak TTL+LRU cache.
+    """
+
+    def __init__(self):
+        cfg_enabled = bool(ROUTE_CONFIG.get("ROUTE_RESPONSE_CACHE_ENABLED", True))
+        cfg_max_items = int(ROUTE_CONFIG.get("ROUTE_RESPONSE_CACHE_MAX_ITEMS", 500))
+        cfg_ttl = int(ROUTE_CONFIG.get("ROUTE_RESPONSE_CACHE_TTL_SEC", 180))
+
+        self.enabled = _env_flag_any(
+            ["ROUTE_RESPONSE_CACHE_ENABLED", "ORP_ROUTE_RESPONSE_CACHE_ENABLED"],
+            cfg_enabled,
+        )
+        self.max_items = max(
+            10,
+            _env_int_any(
+                ["ROUTE_RESPONSE_CACHE_MAX_ITEMS", "ORP_ROUTE_RESPONSE_CACHE_MAX_ITEMS"],
+                cfg_max_items,
+            ),
+        )
+        self.ttl_sec = max(
+            1,
+            _env_int_any(
+                ["ROUTE_RESPONSE_CACHE_TTL_SEC", "ORP_ROUTE_RESPONSE_CACHE_TTL_SEC"],
+                cfg_ttl,
+            ),
+        )
+        self.cache = LRUCache(maxsize=self.max_items, ttl=self.ttl_sec)
+
+    def get(self, key: str) -> Optional[Any]:
+        if not self.enabled:
+            return None
+        value = self.cache.get(key)
+        if value is None:
+            return None
+        return copy.deepcopy(value)
+
+    def put(self, key: str, value: Any) -> None:
+        if not self.enabled:
+            return
+        self.cache.put(key, copy.deepcopy(value))
+
+    def clear(self) -> None:
+        self.cache.clear()
+
+    def stats(self) -> Dict[str, Any]:
+        base = self.cache.stats()
+        return {
+            "enabled": bool(self.enabled),
+            "size": int(base.get("size", 0)),
+            "max_items": int(self.max_items),
+            "maxsize": int(self.max_items),
+            "hits": int(base.get("hits", 0)),
+            "misses": int(base.get("misses", 0)),
+            "hit_rate": base.get("hit_rate", "0.0%"),
+            "ttl_sec": int(self.ttl_sec),
+        }
+
+
+class PointGraphMemoryCache:
+    """
+    graph_manager.get_graph_for_points icin disk ustu RAM katmani.
+    """
+
+    def __init__(self):
+        cfg_maxsize = int(ROUTE_CONFIG.get("POINT_GRAPH_MEMORY_CACHE_MAXSIZE", 24))
+        cfg_ttl = int(ROUTE_CONFIG.get("POINT_GRAPH_MEMORY_CACHE_TTL_SEC", 900))
+        self.maxsize = max(
+            1,
+            _env_int_any(
+                ["POINT_GRAPH_MEMORY_CACHE_MAXSIZE", "ORP_POINT_GRAPH_MEMORY_CACHE_MAXSIZE"],
+                cfg_maxsize,
+            ),
+        )
+        self.ttl_sec = max(
+            1,
+            _env_int_any(
+                ["POINT_GRAPH_MEMORY_CACHE_TTL_SEC", "ORP_POINT_GRAPH_MEMORY_CACHE_TTL_SEC"],
+                cfg_ttl,
+            ),
+        )
+        self.cache = LRUCache(maxsize=self.maxsize, ttl=self.ttl_sec)
+
+    def get(self, key: str) -> Optional[Any]:
+        return self.cache.get(key)
+
+    def put(self, key: str, value: Any) -> None:
+        self.cache.put(key, value)
+
+    def clear(self) -> None:
+        self.cache.clear()
+
+    def stats(self) -> Dict[str, Any]:
+        base = self.cache.stats()
+        return {
+            "size": int(base.get("size", 0)),
+            "maxsize": int(self.maxsize),
+            "hits": int(base.get("hits", 0)),
+            "misses": int(base.get("misses", 0)),
+            "hit_rate": base.get("hit_rate", "0.0%"),
+            "ttl_sec": int(self.ttl_sec),
+        }
+
+
 # Global singleton instances
 _graph_cache: Optional[GraphCache] = None
 _poi_cache: Optional[POICache] = None
+_route_response_cache: Optional[RouteResponseCache] = None
+_point_graph_memory_cache: Optional[PointGraphMemoryCache] = None
 _cache_lock = threading.Lock()
 
 
@@ -273,9 +401,86 @@ def get_poi_cache() -> POICache:
     return _poi_cache
 
 
+def get_route_response_cache() -> RouteResponseCache:
+    """Global route response cache singleton."""
+    global _route_response_cache
+    if _route_response_cache is None:
+        with _cache_lock:
+            if _route_response_cache is None:
+                _route_response_cache = RouteResponseCache()
+    return _route_response_cache
+
+
+def get_point_graph_memory_cache() -> PointGraphMemoryCache:
+    """Global point-graph memory cache singleton."""
+    global _point_graph_memory_cache
+    if _point_graph_memory_cache is None:
+        with _cache_lock:
+            if _point_graph_memory_cache is None:
+                _point_graph_memory_cache = PointGraphMemoryCache()
+    return _point_graph_memory_cache
+
+
 def get_all_cache_stats() -> Dict[str, Any]:
     """Tüm cache istatistiklerini döner."""
     return {
         "graph": get_graph_cache().stats(),
-        "poi": get_poi_cache().stats()
+        "poi": get_poi_cache().stats(),
+        "route_response_cache": get_route_response_cache().stats(),
+        "point_graph_memory_cache": get_point_graph_memory_cache().stats(),
+    }
+
+
+def evaluate_cache_policy(stats: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Cache istatistiklerinden basit policy/saglik degerlendirmesi uretir.
+    """
+    min_samples = int(ROUTE_CONFIG.get("CACHE_POLICY_MIN_SAMPLES", 20))
+    min_hit_rate = float(ROUTE_CONFIG.get("CACHE_POLICY_MIN_HIT_RATE", 0.20))
+    util_warn = float(ROUTE_CONFIG.get("CACHE_POLICY_UTILIZATION_WARN", 0.90))
+
+    warnings: List[str] = []
+
+    def _evaluate_bucket(name: str, bucket: Dict[str, Any]) -> None:
+        if not isinstance(bucket, dict):
+            return
+        size = int(bucket.get("size", 0) or 0)
+        maxsize = int(bucket.get("maxsize", bucket.get("max_items", 0)) or 0)
+        hits = int(bucket.get("hits", 0) or 0)
+        misses = int(bucket.get("misses", 0) or 0)
+        total = hits + misses
+        hit_rate = (hits / total) if total > 0 else 0.0
+
+        if maxsize > 0:
+            utilization = size / maxsize
+            if utilization >= util_warn:
+                warnings.append(
+                    f"{name} cache utilization high ({size}/{maxsize}, {utilization:.0%})"
+                )
+
+        if total >= min_samples and hit_rate < min_hit_rate:
+            warnings.append(
+                f"{name} cache hit rate low ({hit_rate:.0%}, samples={total})"
+            )
+
+    graph_stats = (stats.get("graph") or {}).get("memory_cache", {})
+    poi_stats = stats.get("poi") or {}
+    multimodal_stats = stats.get("multimodal_compare") or {}
+    route_response_stats = stats.get("route_response_cache") or {}
+    point_graph_stats = stats.get("point_graph_memory_cache") or {}
+
+    _evaluate_bucket("graph.memory", graph_stats if isinstance(graph_stats, dict) else {})
+    _evaluate_bucket("poi", poi_stats if isinstance(poi_stats, dict) else {})
+    _evaluate_bucket("multimodal.compare", multimodal_stats if isinstance(multimodal_stats, dict) else {})
+    _evaluate_bucket("route.response", route_response_stats if isinstance(route_response_stats, dict) else {})
+    _evaluate_bucket("graph.point_memory", point_graph_stats if isinstance(point_graph_stats, dict) else {})
+
+    return {
+        "status": "warn" if warnings else "ok",
+        "warnings": warnings,
+        "thresholds": {
+            "min_samples": min_samples,
+            "min_hit_rate": min_hit_rate,
+            "utilization_warn": util_warn,
+        },
     }

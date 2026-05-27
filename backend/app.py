@@ -12,7 +12,8 @@ import hashlib
 import builtins
 import uuid
 import re
-from datetime import datetime
+import threading
+from datetime import datetime, timezone
 from functools import partial
 from typing import Any
 from route_config import ROUTE_CONFIG
@@ -166,6 +167,58 @@ def _route_index_from_type(route_type: str) -> int:
     return {"route_1": 0, "route_2": 1, "route_3": 2}.get(route_type, 0)
 
 
+def _round_point_pairs(points: list[Any], digits: int = 6) -> list[list[float]]:
+    rounded: list[list[float]] = []
+    for raw in points or []:
+        pair = _to_lat_lon_pair(raw)
+        if pair is None:
+            continue
+        rounded.append([round(float(pair[0]), digits), round(float(pair[1]), digits)])
+    return rounded
+
+
+def _route_response_cache_key(
+    endpoint: str,
+    points: list[Any],
+    optimize: bool,
+    route_type: str,
+) -> str:
+    payload = {
+        "endpoint": str(endpoint),
+        "points": _round_point_pairs(points, digits=6),
+        "optimize": bool(optimize),
+        "route_type": str(route_type or ""),
+        "config_version": _ROUTE_RESPONSE_CACHE_CONFIG_VERSION,
+    }
+    raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+
+def _route_response_cache_get(key: str) -> dict | None:
+    cached = _route_response_cache_manager.get(key)
+    if cached is None or not isinstance(cached, dict):
+        return None
+    return dict(cached)
+
+
+def _route_response_cache_put(key: str, payload: dict) -> None:
+    if not isinstance(payload, dict):
+        return
+    _route_response_cache_manager.put(key, dict(payload))
+
+
+def _unreachable_waypoints_response(payload: dict):
+    details = payload.get("details") or {}
+    pairs = details.get("unreachable_pairs") or []
+    pair_text = ", ".join([f"[{p[0]},{p[1]}]" for p in pairs]) if pairs else "bilinmiyor"
+    return jsonify({
+        "error": "Nokta ciftlerinden bazilari arasinda baglanti yok.",
+        "error_code": payload.get("error_code", "UNREACHABLE_WAYPOINTS"),
+        "details": details,
+        "message": f"Ulasilamayan waypoint ciftleri: {pair_text}",
+    }), 400
+
+
 def _build_primary_route_with_retries(
     point_tuples: list[tuple[float, float]],
     optimize: bool,
@@ -178,6 +231,7 @@ def _build_primary_route_with_retries(
     multipliers = _route_radius_multipliers(point_tuples)
     snap_limit_m = float(ROUTE_CONFIG.get("ROUTE_SNAP_MAX_DISTANCE_M", 900.0))
     route_index = _route_index_from_type(route_type)
+    unreachable_payload = None
 
     best_ctx = None
     for multiplier in multipliers:
@@ -185,7 +239,15 @@ def _build_primary_route_with_retries(
         _, worst_snap_m = _collect_snap_metrics(G, point_tuples)
 
         if optimize and len(point_tuples) > 2:
-            optimized_order = solve_tsp(G, point_tuples)
+            try:
+                optimized_order = solve_tsp(G, point_tuples)
+            except UnreachableWaypointsError as exc:
+                unreachable_payload = exc.to_payload()
+                print(
+                    f"[API] Route denemesi: multiplier={float(multiplier):.2f}, "
+                    f"unreachable_pairs={unreachable_payload.get('details', {}).get('unreachable_pairs', [])}"
+                )
+                continue
         else:
             optimized_order = list(range(len(point_tuples)))
         ordered_points = [point_tuples[i] for i in optimized_order]
@@ -216,6 +278,8 @@ def _build_primary_route_with_retries(
             f"[API] Route fallback secildi: multiplier={best_ctx['radius_multiplier']:.2f}, "
             f"worst_snap={best_ctx['worst_snap_m']:.1f}m (limit={snap_limit_m:.1f}m)"
         )
+    if unreachable_payload is not None:
+        return {"unreachable_error": unreachable_payload}
     return best_ctx
 
 
@@ -225,6 +289,7 @@ def _build_alternative_batch_with_retries(
 ):
     multipliers = _route_radius_multipliers(point_tuples)
     snap_limit_m = float(ROUTE_CONFIG.get("ROUTE_SNAP_MAX_DISTANCE_M", 900.0))
+    unreachable_payload = None
     best_ctx = None
 
     for multiplier in multipliers:
@@ -232,7 +297,15 @@ def _build_alternative_batch_with_retries(
         _, worst_snap_m = _collect_snap_metrics(G, point_tuples)
 
         if optimize and len(point_tuples) > 2:
-            optimized_order = solve_tsp(G, point_tuples)
+            try:
+                optimized_order = solve_tsp(G, point_tuples)
+            except UnreachableWaypointsError as exc:
+                unreachable_payload = exc.to_payload()
+                print(
+                    f"[API] Alt-route denemesi: multiplier={float(multiplier):.2f}, "
+                    f"unreachable_pairs={unreachable_payload.get('details', {}).get('unreachable_pairs', [])}"
+                )
+                continue
         else:
             optimized_order = list(range(len(point_tuples)))
         ordered_points = [point_tuples[i] for i in optimized_order]
@@ -268,6 +341,8 @@ def _build_alternative_batch_with_retries(
             f"[API] Alt-route fallback secildi: multiplier={best_ctx['radius_multiplier']:.2f}, "
             f"worst_snap={best_ctx['worst_snap_m']:.1f}m (limit={snap_limit_m:.1f}m)"
         )
+    if unreachable_payload is not None:
+        return {"unreachable_error": unreachable_payload}
     return best_ctx
 
 
@@ -606,6 +681,7 @@ from route_engine import (
     nodes_to_coords,
     calculate_route_stats,
     generate_google_maps_link,
+    UnreachableWaypointsError,
 )
 from route_storage import (
     save_route,
@@ -660,7 +736,13 @@ try:
     from nlp_concept_resolver import resolve_poi_concept
 except ImportError:
     resolve_poi_concept = None
-from cache_manager import get_graph_cache, get_poi_cache
+from cache_manager import (
+    get_graph_cache,
+    get_poi_cache,
+    get_route_response_cache,
+    get_all_cache_stats,
+    evaluate_cache_policy,
+)
 try:
     from openrouter_service import (
         is_openrouter_configured,
@@ -750,7 +832,7 @@ CORS(app)  # Frontend'den gelen isteklere izin ver
 Compress(app)  # gzip compression aktif et - %60-70 bandwidth tasarrufu
 
 # BERT Ãƒön-yÃƒükleme (opsiyonel). ENV: ORP_BERT_PRELOAD_ON_STARTUP=1
-_PRELOAD_BERT_ON_STARTUP = _env_flag("ORP_BERT_PRELOAD_ON_STARTUP", True)
+_PRELOAD_BERT_ON_STARTUP = _env_flag("ORP_BERT_PRELOAD_ON_STARTUP", False)
 
 def _preload_bert_async(force: bool = False) -> None:
     """Arka planda BERT NLP engine'i yukler (lazy warm-up).
@@ -760,8 +842,6 @@ def _preload_bert_async(force: bool = False) -> None:
     """
     if not force and not _PRELOAD_BERT_ON_STARTUP:
         return
-
-    import threading
 
     def _target():
         try:
@@ -782,6 +862,7 @@ _preload_bert_async()
 # Global degiskenler: LRU cache manager
 _graph_cache_manager = get_graph_cache()
 _poi_cache_manager = get_poi_cache()
+_route_response_cache_manager = get_route_response_cache()
 _runtime_initialized = False
 _graph_preload_initialized = False
 _last_bert_metrics_log_ts = 0.0
@@ -793,6 +874,44 @@ _BERT_METRICS_LOG_ENABLED = _env_flag("ORP_BERT_LOG_METRICS", True)
 _BERT_METRICS_INTERVAL_SEC = max(0.0, _env_float("ORP_BERT_METRICS_INTERVAL_SEC", 0.5))
 _PRELOAD_POPULAR_REGIONS_ON_STARTUP = _env_flag("ORP_PRELOAD_POPULAR_REGIONS_ON_STARTUP", True)
 _BERT_PARSE_TRACE_LOG_ENABLED = _env_flag("ORP_BERT_PARSE_TRACE", False)
+_ROUTE_RESPONSE_CACHE_CONFIG_VERSION = (
+    os.getenv("ROUTE_RESPONSE_CACHE_CONFIG_VERSION")
+    or os.getenv("ORP_ROUTE_RESPONSE_CACHE_CONFIG_VERSION")
+    or str(ROUTE_CONFIG.get("ROUTE_RESPONSE_CACHE_CONFIG_VERSION", "v1"))
+).strip() or "v1"
+_NLP_PARSE_MAX_CONCURRENCY = max(1, _env_int("ORP_NLP_PARSE_MAX_CONCURRENCY", 2))
+_NLP_PARSE_SEMAPHORE = threading.BoundedSemaphore(_NLP_PARSE_MAX_CONCURRENCY)
+_NLP_QUEUE_TIMEOUT_SEC = max(
+    0.1,
+    _env_float(
+        "NLP_QUEUE_TIMEOUT_SEC",
+        _env_float(
+            "ORP_NLP_QUEUE_TIMEOUT_SEC",
+            float(ROUTE_CONFIG.get("NLP_QUEUE_TIMEOUT_SEC", 20)),
+        ),
+    ),
+)
+_MULTIMODAL_COMPARE_MAX_CONCURRENCY = max(
+    1,
+    _env_int(
+        "ORP_MULTIMODAL_COMPARE_MAX_CONCURRENCY",
+        int(ROUTE_CONFIG.get("MULTIMODAL_COMPARE_MAX_CONCURRENCY", 2)),
+    ),
+)
+_MULTIMODAL_COMPARE_SEMAPHORE = threading.BoundedSemaphore(_MULTIMODAL_COMPARE_MAX_CONCURRENCY)
+_MULTIMODAL_QUEUE_TIMEOUT_SEC = max(
+    0.1,
+    _env_float(
+        "MULTIMODAL_QUEUE_TIMEOUT_SEC",
+        _env_float(
+            "ORP_MULTIMODAL_QUEUE_TIMEOUT_SEC",
+            float(ROUTE_CONFIG.get("MULTIMODAL_QUEUE_TIMEOUT_SEC", 25)),
+        ),
+    ),
+)
+_QUEUE_STATS_LOCK = threading.Lock()
+_NLP_QUEUE_TIMEOUT_COUNT = 0
+_MULTIMODAL_QUEUE_TIMEOUT_COUNT = 0
 
 # POI resolver/caching version pinleri
 _POI_DICT_VERSION = os.getenv("ORP_POI_DICT_VERSION", "dict-v1").strip() or "dict-v1"
@@ -803,6 +922,42 @@ _TRACE_RETENTION_DAYS = int(os.getenv("ORP_TRACE_RETENTION_DAYS", "14") or 14)
 
 def _poi_version_token() -> str:
     return f"dict:{_POI_DICT_VERSION}|thr:{_POI_THRESHOLD_PROFILE}|plan:{_POI_PLAN_VERSION}"
+
+
+def _increment_queue_timeout_counter(kind: str) -> None:
+    global _NLP_QUEUE_TIMEOUT_COUNT, _MULTIMODAL_QUEUE_TIMEOUT_COUNT
+    with _QUEUE_STATS_LOCK:
+        if kind == "nlp":
+            _NLP_QUEUE_TIMEOUT_COUNT += 1
+        elif kind == "multimodal":
+            _MULTIMODAL_QUEUE_TIMEOUT_COUNT += 1
+
+
+def _semaphore_snapshot(limit: int, semaphore: threading.BoundedSemaphore) -> dict[str, int | None]:
+    available = getattr(semaphore, "_value", None)
+    if isinstance(available, int):
+        inflight = max(0, int(limit) - int(available))
+        return {"limit": int(limit), "inflight": inflight, "available": int(available)}
+    return {"limit": int(limit), "inflight": None, "available": None}
+
+
+def _queue_stats_payload() -> dict:
+    with _QUEUE_STATS_LOCK:
+        nlp_timeout_count = int(_NLP_QUEUE_TIMEOUT_COUNT)
+        multimodal_timeout_count = int(_MULTIMODAL_QUEUE_TIMEOUT_COUNT)
+
+    return {
+        "nlp": {
+            **_semaphore_snapshot(_NLP_PARSE_MAX_CONCURRENCY, _NLP_PARSE_SEMAPHORE),
+            "timeout_sec": float(_NLP_QUEUE_TIMEOUT_SEC),
+            "timeouts": nlp_timeout_count,
+        },
+        "multimodal": {
+            **_semaphore_snapshot(_MULTIMODAL_COMPARE_MAX_CONCURRENCY, _MULTIMODAL_COMPARE_SEMAPHORE),
+            "timeout_sec": float(_MULTIMODAL_QUEUE_TIMEOUT_SEC),
+            "timeouts": multimodal_timeout_count,
+        },
+    }
 
 
 def _should_log_bert_metrics(force: bool = False) -> bool:
@@ -1095,8 +1250,21 @@ def api_get_route():
                 field="points",
             )
 
+        route_cache_key = _route_response_cache_key(
+            endpoint="/api/get-route",
+            points=points,
+            optimize=bool(optimize),
+            route_type=str(route_type),
+        )
+        cached_response = _route_response_cache_get(route_cache_key)
+        if cached_response is not None:
+            cached_response["cache_hit"] = True
+            return jsonify(cached_response)
+
         point_tuples = [(float(p[0]), float(p[1])) for p in points]
         route_ctx = _build_primary_route_with_retries(point_tuples, bool(optimize), route_type)
+        if isinstance(route_ctx, dict) and route_ctx.get("unreachable_error"):
+            return _unreachable_waypoints_response(route_ctx["unreachable_error"])
         if not route_ctx:
             return jsonify({"error": "Rota hesaplanamadi. Noktalar icin uygun yol bulunamadi."}), 400
 
@@ -1125,8 +1293,10 @@ def api_get_route():
             "estimated_route_minutes": stats["estimated_walk_minutes"],
             "google_maps_link": maps_link,
             "route_type": route_type,
+            "cache_hit": False,
         }
 
+        _route_response_cache_put(route_cache_key, response)
         print(f"[API] Rota tamamlandi: {stats['total_distance_km']}km, {stats['estimated_walk_minutes']}dk")
         return jsonify(response)
 
@@ -1170,8 +1340,21 @@ def api_get_route_steps():
                 field="points",
             )
 
+        route_cache_key = _route_response_cache_key(
+            endpoint="/api/get-route-steps",
+            points=points,
+            optimize=bool(optimize),
+            route_type=str(route_type),
+        )
+        cached_response = _route_response_cache_get(route_cache_key)
+        if cached_response is not None:
+            cached_response["cache_hit"] = True
+            return jsonify(cached_response)
+
         point_tuples = [(float(p[0]), float(p[1])) for p in points]
         route_ctx = _build_primary_route_with_retries(point_tuples, bool(optimize), route_type)
+        if isinstance(route_ctx, dict) and route_ctx.get("unreachable_error"):
+            return _unreachable_waypoints_response(route_ctx["unreachable_error"])
         if not route_ctx:
             return jsonify({"error": "Rota hesaplanamadi."}), 400
 
@@ -1286,7 +1469,13 @@ def api_get_route_steps():
             return steps
 
         steps = build_turn_by_turn_steps(G, route_nodes)
-        return jsonify({"steps": steps, "route_coords": nodes_to_coords(G, route_nodes)})
+        response = {
+            "steps": steps,
+            "route_coords": nodes_to_coords(G, route_nodes),
+            "cache_hit": False,
+        }
+        _route_response_cache_put(route_cache_key, response)
+        return jsonify(response)
 
     except Exception as e:
         print(f"[API] get-route-steps hata: {e}")
@@ -1345,6 +1534,7 @@ def api_get_alternative_routes():
 
         points = data["points"]
         optimize = data.get("optimize", False)
+        route_type = data.get("route_type", "")
 
         print(f"[API] Get-alternative-routes: {len(points)} nokta, optimize={optimize}")
 
@@ -1364,8 +1554,21 @@ def api_get_alternative_routes():
                 field="points",
             )
 
+        route_cache_key = _route_response_cache_key(
+            endpoint="/api/get-alternative-routes",
+            points=points,
+            optimize=bool(optimize),
+            route_type=str(route_type),
+        )
+        cached_response = _route_response_cache_get(route_cache_key)
+        if cached_response is not None:
+            cached_response["cache_hit"] = True
+            return jsonify(cached_response)
+
         point_tuples = [(float(p[0]), float(p[1])) for p in points]
         alt_ctx = _build_alternative_batch_with_retries(point_tuples, bool(optimize))
+        if isinstance(alt_ctx, dict) and alt_ctx.get("unreachable_error"):
+            return _unreachable_waypoints_response(alt_ctx["unreachable_error"])
         if not alt_ctx:
             return jsonify({"error": "Hicbir alternatif rota hesaplanamadi."}), 400
 
@@ -1391,22 +1594,38 @@ def api_get_alternative_routes():
         if not alternatives:
             return jsonify({"error": "HiÃƒçbir alternatif rota hesaplanamadÃı."}), 400
 
-        # AynÃı rotalarÃı filtrele: Birebir aynÃı koordinat listesi = tek rota
-        def _coords_equal(a, b):
+        # Ayni rotalari filtrele: rota uzunluguna gore dinamik koordinat toleransi.
+        def _coords_equal(a, b, distance_km: float):
             if len(a) != len(b):
                 return False
+            min_eps = float(ROUTE_CONFIG.get("ALT_ROUTE_DEDUP_EPSILON_MIN_DEG", 1e-6))
+            max_eps = float(ROUTE_CONFIG.get("ALT_ROUTE_DEDUP_EPSILON_MAX_DEG", 2.5e-5))
+            eps = min(max_eps, min_eps * (1.0 + max(float(distance_km), 0.0)))
             for i in range(len(a)):
-                if abs(a[i][0] - b[i][0]) > 1e-6 or abs(a[i][1] - b[i][1]) > 1e-6:
+                if abs(a[i][0] - b[i][0]) > eps or abs(a[i][1] - b[i][1]) > eps:
                     return False
             return True
 
         unique = []
         for alt in alternatives:
-            if not any(_coords_equal(alt["route_coords"], u["route_coords"]) for u in unique):
+            max_distance_km = max(float(alt.get("distance_km", 0.0) or 0.0), 0.0)
+            if not any(
+                _coords_equal(
+                    alt["route_coords"],
+                    u["route_coords"],
+                    max(max_distance_km, float(u.get("distance_km", 0.0) or 0.0)),
+                )
+                for u in unique
+            ):
                 unique.append(alt)
 
+        response = {
+            "alternatives": unique,
+            "cache_hit": False,
+        }
+        _route_response_cache_put(route_cache_key, response)
         print(f"[API] {len(unique)} alternatif rota")
-        return jsonify({"alternatives": unique})
+        return jsonify(response)
 
     except Exception as e:
         print(f"[API] Hata: {e}")
@@ -1557,6 +1776,21 @@ def api_search_pois():
 def health_check():
     """Sunucu saÃşlÃık kontrolÃƒü."""
     return jsonify({"status": "ok", "message": "OpenTrip API ÃƒçalÃıÃ…şÃıyor!"})
+
+
+@app.route("/api/cache/stats", methods=["GET"])
+def api_cache_stats():
+    """Graph/POI ve multimodal compare cache istatistiklerini dondurur."""
+    try:
+        payload = get_all_cache_stats()
+        if _multimodal_available:
+            payload["multimodal_compare"] = multimodal_compare_cache_stats()
+        payload["queue"] = _queue_stats_payload()
+        payload["policy"] = evaluate_cache_policy(payload)
+        payload["generated_at_utc"] = datetime.now(timezone.utc).isoformat()
+        return jsonify(payload)
+    except Exception as exc:
+        return jsonify({"error": f"Cache stats okunamadi: {exc}"}), 500
 
 
 @app.route("/api/geocode/suggest", methods=["GET"])
@@ -2388,6 +2622,8 @@ def api_nlp_parse():
         }
     """
     query = ""
+    permit_acquired = False
+    queue_wait_ms = 0.0
     try:
         trace_prefix = _request_trace_prefix()
         print(f"\n{'='*60}")
@@ -2417,6 +2653,19 @@ def api_nlp_parse():
         if not BERT_NLP_AVAILABLE:
             print(f"[NLP API] ? BERT motoru ZORUNLU! Regex fallback KALDIRILDI.")
             return jsonify({"error": "BERT motoru gereklidir. Transformers ve PyTorch kurun."}), 503
+
+        queue_wait_start = time.perf_counter()
+        permit_acquired = _NLP_PARSE_SEMAPHORE.acquire(timeout=_NLP_QUEUE_TIMEOUT_SEC)
+        queue_wait_ms = round((time.perf_counter() - queue_wait_start) * 1000, 2)
+        if not permit_acquired:
+            _increment_queue_timeout_counter("nlp")
+            return jsonify({
+                "error": "NLP kuyruk bekleme suresi asildi. Lutfen tekrar deneyin.",
+                "error_code": "NLP_QUEUE_TIMEOUT",
+                "max_concurrency": _NLP_PARSE_MAX_CONCURRENCY,
+                "retry_after_sec": max(1, int(round(_NLP_QUEUE_TIMEOUT_SEC))),
+                "queue_wait_ms": queue_wait_ms,
+            }), 429
 
         print(f"[NLP API] ?? BERT motoru kullanÃılÃıyor...")
         try:
@@ -2485,6 +2734,8 @@ def api_nlp_parse():
         except Exception as audit_exc:
             print(f"{trace_prefix} [NLP API] audit yazilamadi: {audit_exc}")
 
+        result["queue_wait_ms"] = queue_wait_ms
+        result["queue_timeout_sec"] = float(_NLP_QUEUE_TIMEOUT_SEC)
         return jsonify(result)
 
     except Exception as e:
@@ -2501,6 +2752,9 @@ def api_nlp_parse():
         except Exception:
             pass
         return jsonify({"error": f"NLP hatasÃı: {str(e)}"}), 500
+    finally:
+        if permit_acquired:
+            _NLP_PARSE_SEMAPHORE.release()
 
 
 @app.route("/api/nlp/status", methods=["GET"])
@@ -2515,12 +2769,42 @@ def api_nlp_status():
             "model": "dbmdz/bert-base-turkish-uncased"
         }
     """
+    runtime_metrics = {}
+    model_loaded = False
+    if BERT_NLP_AVAILABLE:
+        try:
+            import bert_nlp_engine as bert_nlp_module
+
+            nlp_singleton = getattr(bert_nlp_module, "_bert_nlp_engine", None)
+            bert_instance = getattr(nlp_singleton, "bert", None) if nlp_singleton is not None else None
+            if bert_instance is not None and hasattr(bert_instance, "get_runtime_metrics"):
+                runtime_metrics = bert_instance.get_runtime_metrics() or {}
+                model_loaded = True
+        except Exception:
+            runtime_metrics = {}
+
+    queue_stats = _queue_stats_payload()
     return jsonify({
         "available": BERT_NLP_AVAILABLE,
         "engine": "bert-nlp" if BERT_NLP_AVAILABLE else "regex-fallback",
         "model": "dbmdz/bert-base-turkish-uncased" if BERT_NLP_AVAILABLE else None,
         "bert_available": BERT_NLP_AVAILABLE,
-        "last_error": _BERT_NLP_ERROR
+        "last_error": _BERT_NLP_ERROR,
+        "queue": {
+            "nlp": queue_stats.get("nlp", {}),
+            "multimodal": queue_stats.get("multimodal", {}),
+        },
+        "bert_runtime": {
+            "loaded": model_loaded,
+            "device": runtime_metrics.get("device"),
+            "gpu_allocated_mb": runtime_metrics.get("gpu_allocated_mb"),
+            "gpu_reserved_mb": runtime_metrics.get("gpu_reserved_mb"),
+            "gpu_max_allocated_mb": runtime_metrics.get("gpu_max_allocated_mb"),
+            "cache_hit_rate": runtime_metrics.get("cache_hit_rate"),
+            "cache_size": runtime_metrics.get("cache_size"),
+            "cache_hits": runtime_metrics.get("cache_hits"),
+            "cache_misses": runtime_metrics.get("cache_misses"),
+        },
     })
 
 
@@ -4378,10 +4662,14 @@ def api_transit_init():
 # =============================================================================
 
 try:
-    from multimodal_engine import compare_routes as multimodal_compare
+    from multimodal_engine import (
+        compare_routes as multimodal_compare,
+        get_compare_cache_stats as multimodal_compare_cache_stats,
+    )
     _multimodal_available = True
 except ImportError:
     _multimodal_available = False
+    multimodal_compare_cache_stats = lambda: {}
     print("[API] multimodal_engine yuklenemedi")
 
 
@@ -4407,12 +4695,20 @@ def api_multimodal_compare():
     if not _multimodal_available:
         return jsonify({"error": "Multimodal motor yuklu degil"}), 503
 
+    permit_acquired = False
+    queue_wait_ms = 0.0
     try:
+        request_start = time.perf_counter()
+        stage_ms = {}
+
+        stage_start = time.perf_counter()
         data = request.get_json(silent=True)
+        stage_ms["parse_json_ms"] = round((time.perf_counter() - stage_start) * 1000, 2)
 
         if not data or "origin" not in data or "destination" not in data:
             return jsonify({"error": "'origin' ve 'destination' alanlari gerekli"}), 400
 
+        stage_start = time.perf_counter()
         origin = data["origin"]
         destination = data["destination"]
         allowed_modes = data.get("allowed_modes")
@@ -4420,6 +4716,22 @@ def api_multimodal_compare():
         if allowed_modes is not None and not isinstance(allowed_modes, list):
             return jsonify({"error": "allowed_modes liste formatinda olmali"}), 400
 
+        if isinstance(allowed_modes, list):
+            max_modes = int(ROUTE_CONFIG.get("MULTIMODAL_ALLOWED_MODES_MAX", 4))
+            normalized_modes = []
+            seen_modes = set()
+            for mode in allowed_modes:
+                mode_norm = str(mode).strip().lower()
+                if not mode_norm or mode_norm in seen_modes:
+                    continue
+                seen_modes.add(mode_norm)
+                normalized_modes.append(mode_norm)
+                if len(normalized_modes) >= max_modes:
+                    break
+            allowed_modes = normalized_modes
+        stage_ms["validate_input_ms"] = round((time.perf_counter() - stage_start) * 1000, 2)
+
+        stage_start = time.perf_counter()
         origin_pair = _to_lat_lon_pair(origin)
         destination_pair = _to_lat_lon_pair(destination)
         if origin_pair is None:
@@ -4433,18 +4745,48 @@ def api_multimodal_compare():
         # Asama 3 geofence: su an uygulama sadece Istanbul icin.
         if not (_is_in_istanbul_bbox(origin_lat, origin_lon) and _is_in_istanbul_bbox(destination_lat, destination_lon)):
             return _outside_istanbul_response(detail="Origin veya destination Istanbul disinda.", field="origin,destination")
+        stage_ms["normalize_geofence_ms"] = round((time.perf_counter() - stage_start) * 1000, 2)
 
+        queue_wait_start = time.perf_counter()
+        permit_acquired = _MULTIMODAL_COMPARE_SEMAPHORE.acquire(timeout=_MULTIMODAL_QUEUE_TIMEOUT_SEC)
+        queue_wait_ms = round((time.perf_counter() - queue_wait_start) * 1000, 2)
+        if not permit_acquired:
+            _increment_queue_timeout_counter("multimodal")
+            return jsonify({
+                "error": "Multimodal kuyruk bekleme suresi asildi. Lutfen tekrar deneyin.",
+                "error_code": "MULTIMODAL_QUEUE_TIMEOUT",
+                "max_concurrency": _MULTIMODAL_COMPARE_MAX_CONCURRENCY,
+                "retry_after_sec": max(1, int(round(_MULTIMODAL_QUEUE_TIMEOUT_SEC))),
+                "queue_wait_ms": queue_wait_ms,
+            }), 429
+
+        stage_start = time.perf_counter()
         result = multimodal_compare(
             origin_lat, origin_lon,
             destination_lat, destination_lon,
             allowed_modes=allowed_modes,
         )
+        stage_ms["engine_compare_ms"] = round((time.perf_counter() - stage_start) * 1000, 2)
+        stage_ms["total_ms"] = round((time.perf_counter() - request_start) * 1000, 2)
+
+        if isinstance(result, dict):
+            telemetry = result.get("telemetry")
+            if not isinstance(telemetry, dict):
+                telemetry = {}
+            telemetry["api_compare_stage_ms"] = stage_ms
+            telemetry["api_compare_allowed_modes"] = allowed_modes
+            telemetry["queue_wait_ms"] = queue_wait_ms
+            telemetry["queue_timeout_sec"] = float(_MULTIMODAL_QUEUE_TIMEOUT_SEC)
+            result["telemetry"] = telemetry
 
         return jsonify(result)
 
     except Exception as e:
         print(f"[API] Multimodal hatasi: {e}")
         return jsonify({"error": f"Sunucu hatasi: {str(e)}"}), 500
+    finally:
+        if permit_acquired:
+            _MULTIMODAL_COMPARE_SEMAPHORE.release()
 
 
 if __name__ == "__main__":
@@ -4477,7 +4819,7 @@ def api_nlp_warmup():
         else:
             force = str(request.args.get("force", "0")).lower() in ("1", "true", "yes")
 
-        _preload_bert_async(force=True if force else True)
+        _preload_bert_async(force=True)
         return jsonify({"started": True, "force": force, "message": "BERT warmup started in background."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

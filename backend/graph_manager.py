@@ -21,6 +21,7 @@ except ImportError:
 import networkx as nx
 from route_config import ROUTE_CONFIG
 from text_utils import tr_lower
+from cache_manager import get_point_graph_memory_cache
 
 try:
     from geocoder import geocode
@@ -75,6 +76,7 @@ _init_poi_db()
 
 _POI_REFRESH_LOCK = threading.Lock()
 _POI_REFRESH_INFLIGHT = set()
+_POINT_GRAPH_MEMORY_CACHE = get_point_graph_memory_cache()
 
 
 def _utc_now() -> datetime:
@@ -427,12 +429,20 @@ def get_graph_for_points(points: list, radius_multiplier: float = 1.0):
     # Cache key: merkez + yarıçap + net_type
     cache_key = f"point_{center_lat:.4f}_{center_lon:.4f}_{int(radius)}_{net_type}"
     cache_file = os.path.join(DATA_DIR, f"{cache_key}.graphml")
-    
+
+    # Disk cache oncesi RAM katmani
+    cached_graph = _POINT_GRAPH_MEMORY_CACHE.get(cache_key)
+    if cached_graph is not None:
+        print(f"[GraphManager] RAM cache hit: {cache_key} ({net_type})")
+        return cached_graph
+
     if os.path.exists(cache_file):
         print(f"[GraphManager] Cache'den okunuyor: {cache_file} ({net_type})")
         try:
             G = ox.load_graphml(cache_file)
-            return _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+            processed = _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+            _POINT_GRAPH_MEMORY_CACHE.put(cache_key, processed)
+            return processed
         except Exception as e:
             print(f"[GraphManager WARNING] Failed to load cached graph: {e}. Re-downloading...")
             if os.path.exists(cache_file):
@@ -452,7 +462,9 @@ def get_graph_for_points(points: list, radius_multiplier: float = 1.0):
         ox.save_graphml(G, cache_file)
         print(f"[GraphManager] Cache'e kaydedildi: {cache_file}")
         _prune_point_graph_cache()
-        return _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+        processed = _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+        _POINT_GRAPH_MEMORY_CACHE.put(cache_key, processed)
+        return processed
     except Exception as e:
         print(f"[GraphManager ERROR] OSMnx failed to load graph for point ({center_lat:.4f}, {center_lon:.4f}) with radius {radius} and type {net_type}: {e}")
         # Gelişmiş hata kurtarma (Fallback): Kadıköy merkezli varsayılan grafiği yükle
@@ -462,7 +474,9 @@ def get_graph_for_points(points: list, radius_multiplier: float = 1.0):
         if os.path.exists(fallback_file):
             try:
                 G = ox.load_graphml(fallback_file)
-                return _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+                processed = _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+                _POINT_GRAPH_MEMORY_CACHE.put(cache_key, processed)
+                return processed
             except:
                 pass
         
@@ -470,7 +484,9 @@ def get_graph_for_points(points: list, radius_multiplier: float = 1.0):
         try:
             G = ox.graph_from_place(fallback_place, network_type=net_type)
             ox.save_graphml(G, fallback_file)
-            return _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+            processed = _apply_routing_edge_weights(_filter_outdoor_walk_graph(G))
+            _POINT_GRAPH_MEMORY_CACHE.put(cache_key, processed)
+            return processed
         except Exception as fallback_exc:
             print(f"[GraphManager CRITICAL] Fallback graph fetch failed: {fallback_exc}. Returning empty MultiDiGraph.")
             import networkx as nx
