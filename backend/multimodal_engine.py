@@ -14,7 +14,12 @@ Algoritmalar:
 import math
 import re
 import copy
+import hashlib
+import json
+import os
 import requests
+import sqlite3
+import threading
 import time as _time
 import heapq
 from contextvars import ContextVar
@@ -58,11 +63,41 @@ MAX_RAIL_TRANSFER_WALK_M = float(ROUTE_CONFIG.get("MULTIMODAL_MAX_RAIL_TRANSFER_
 SEARCH_RADII = [600, 1000, 1500]
 
 # OSRM public API
-OSRM_BASE_URL = "http://router.project-osrm.org"
+OSRM_BASE_URL = str(ROUTE_CONFIG.get("MULTIMODAL_OSRM_BASE_URL", "http://router.project-osrm.org")).rstrip("/")
 _OSRM_SESSION = requests.Session()
 _OSRM_ROUTE_CACHE: Dict[Tuple, List[List[float]]] = {}
 _OSRM_MULTI_CACHE: Dict[Tuple, List[List[float]]] = {}
-_OSRM_CACHE_MAX_ITEMS = 800
+_OSRM_CACHE_MAX_ITEMS = int(ROUTE_CONFIG.get("MULTIMODAL_OSRM_MEMORY_CACHE_MAX_ITEMS", 800))
+_OSRM_ROUTE_MEMORY_HITS = 0
+_OSRM_ROUTE_MEMORY_MISSES = 0
+_OSRM_MULTI_MEMORY_HITS = 0
+_OSRM_MULTI_MEMORY_MISSES = 0
+_OSRM_ROUTE_REQUESTS = 0
+_OSRM_MULTI_REQUESTS = 0
+_OSRM_ROUTE_FALLBACKS = 0
+_OSRM_MULTI_FALLBACKS = 0
+_OSRM_SQLITE_CACHE_ENABLED = bool(ROUTE_CONFIG.get("MULTIMODAL_OSRM_SQLITE_CACHE_ENABLED", True))
+_OSRM_SQLITE_CACHE_TTL_SEC = float(ROUTE_CONFIG.get("MULTIMODAL_OSRM_SQLITE_CACHE_TTL_SEC", 604800))
+_OSRM_SQLITE_CACHE_MAX_ROWS = int(ROUTE_CONFIG.get("MULTIMODAL_OSRM_SQLITE_CACHE_MAX_ROWS", 50000))
+_OSRM_SQLITE_CACHE_HITS = 0
+_OSRM_SQLITE_CACHE_MISSES = 0
+_OSRM_SQLITE_CACHE_WRITES = 0
+_OSRM_SQLITE_CACHE_ERRORS = 0
+_OSRM_COALESCE_LEADERS = 0
+_OSRM_COALESCE_WAITS = 0
+_OSRM_COALESCE_TIMEOUTS = 0
+_OSRM_INFLIGHT_WAIT_SEC = float(ROUTE_CONFIG.get("MULTIMODAL_OSRM_INFLIGHT_WAIT_SEC", 20))
+_OSRM_SQLITE_LOCK = threading.Lock()
+_OSRM_INFLIGHT_LOCK = threading.Lock()
+_OSRM_INFLIGHT: Dict[str, Dict[str, Any]] = {}
+_OSRM_SQLITE_SCHEMA_READY = False
+_BACKEND_DIR = os.path.dirname(__file__)
+_OSRM_SQLITE_CACHE_DB = ROUTE_CONFIG.get(
+    "MULTIMODAL_OSRM_SQLITE_CACHE_DB",
+    os.path.join(_BACKEND_DIR, "cache", "osrm_cache.db"),
+)
+if not os.path.isabs(str(_OSRM_SQLITE_CACHE_DB)):
+    _OSRM_SQLITE_CACHE_DB = os.path.abspath(str(_OSRM_SQLITE_CACHE_DB))
 _COMPARE_ROUTE_CACHE: Dict[Tuple, Tuple[float, Dict]] = {}
 _COMPARE_CACHE_MAX_ITEMS = int(ROUTE_CONFIG.get("MULTIMODAL_COMPARE_CACHE_MAX_ITEMS", 220))
 _ENABLE_COMPARE_CACHE = bool(ROUTE_CONFIG.get("MULTIMODAL_COMPARE_CACHE_ENABLED", False))
@@ -124,6 +159,242 @@ def _telemetry_add_ms(name: str, elapsed_sec: float) -> None:
         telemetry["stage_ms"] = stage_ms
     key = name if name.endswith("_ms") else f"{name}_ms"
     stage_ms[key] = round(float(stage_ms.get(key, 0.0) or 0.0) + (elapsed_sec * 1000), 2)
+
+
+def _osrm_cache_key_hash(key: Tuple) -> str:
+    raw = json.dumps(key, ensure_ascii=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _osrm_sqlite_connect() -> sqlite3.Connection:
+    os.makedirs(os.path.dirname(str(_OSRM_SQLITE_CACHE_DB)), exist_ok=True)
+    conn = sqlite3.connect(str(_OSRM_SQLITE_CACHE_DB), timeout=2.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA temp_store = MEMORY;")
+    return conn
+
+
+def _ensure_osrm_sqlite_cache() -> None:
+    global _OSRM_SQLITE_SCHEMA_READY, _OSRM_SQLITE_CACHE_ERRORS
+    if not _OSRM_SQLITE_CACHE_ENABLED or _OSRM_SQLITE_SCHEMA_READY:
+        return
+    with _OSRM_SQLITE_LOCK:
+        if _OSRM_SQLITE_SCHEMA_READY:
+            return
+        try:
+            conn = _osrm_sqlite_connect()
+            try:
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS osrm_route_cache (
+                        key_hash TEXT PRIMARY KEY,
+                        route_kind TEXT NOT NULL,
+                        key_json TEXT NOT NULL,
+                        coords_json TEXT NOT NULL,
+                        point_count INTEGER NOT NULL DEFAULT 0,
+                        created_at REAL NOT NULL,
+                        updated_at REAL NOT NULL
+                    )
+                    """
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_osrm_route_cache_created "
+                    "ON osrm_route_cache(created_at);"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_osrm_route_cache_kind "
+                    "ON osrm_route_cache(route_kind);"
+                )
+                conn.commit()
+                _OSRM_SQLITE_SCHEMA_READY = True
+            finally:
+                conn.close()
+        except Exception:
+            _OSRM_SQLITE_CACHE_ERRORS += 1
+
+
+def _prune_osrm_sqlite_cache(conn: sqlite3.Connection) -> None:
+    if _OSRM_SQLITE_CACHE_MAX_ROWS <= 0:
+        return
+    row = conn.execute("SELECT COUNT(*) AS n FROM osrm_route_cache").fetchone()
+    count = int(row["n"] if row else 0)
+    overflow = count - int(_OSRM_SQLITE_CACHE_MAX_ROWS)
+    if overflow <= 0:
+        return
+    conn.execute(
+        """
+        DELETE FROM osrm_route_cache
+        WHERE key_hash IN (
+            SELECT key_hash
+            FROM osrm_route_cache
+            ORDER BY created_at ASC
+            LIMIT ?
+        )
+        """,
+        (overflow,),
+    )
+
+
+def _osrm_sqlite_cache_get(key: Tuple, route_kind: str) -> Optional[List[List[float]]]:
+    global _OSRM_SQLITE_CACHE_HITS, _OSRM_SQLITE_CACHE_MISSES, _OSRM_SQLITE_CACHE_ERRORS
+    if not _OSRM_SQLITE_CACHE_ENABLED or _OSRM_SQLITE_CACHE_TTL_SEC <= 0:
+        return None
+    _ensure_osrm_sqlite_cache()
+    if not _OSRM_SQLITE_SCHEMA_READY:
+        return None
+
+    key_hash = _osrm_cache_key_hash(key)
+    now = _time.time()
+    try:
+        with _OSRM_SQLITE_LOCK:
+            conn = _osrm_sqlite_connect()
+            try:
+                row = conn.execute(
+                    """
+                    SELECT coords_json, created_at
+                    FROM osrm_route_cache
+                    WHERE key_hash = ? AND route_kind = ?
+                    """,
+                    (key_hash, route_kind),
+                ).fetchone()
+                if row is None:
+                    _OSRM_SQLITE_CACHE_MISSES += 1
+                    _telemetry_count("osrm_sqlite_cache_misses")
+                    return None
+                if (now - float(row["created_at"])) > _OSRM_SQLITE_CACHE_TTL_SEC:
+                    conn.execute("DELETE FROM osrm_route_cache WHERE key_hash = ?", (key_hash,))
+                    conn.commit()
+                    _OSRM_SQLITE_CACHE_MISSES += 1
+                    _telemetry_count("osrm_sqlite_cache_misses")
+                    _telemetry_count("osrm_sqlite_cache_expired")
+                    return None
+                coords = json.loads(row["coords_json"])
+                if not isinstance(coords, list) or len(coords) < 2:
+                    conn.execute("DELETE FROM osrm_route_cache WHERE key_hash = ?", (key_hash,))
+                    conn.commit()
+                    _OSRM_SQLITE_CACHE_MISSES += 1
+                    _telemetry_count("osrm_sqlite_cache_misses")
+                    return None
+                _OSRM_SQLITE_CACHE_HITS += 1
+                _telemetry_count("osrm_sqlite_cache_hits")
+                return [[float(c[0]), float(c[1])] for c in coords]
+            finally:
+                conn.close()
+    except Exception:
+        _OSRM_SQLITE_CACHE_ERRORS += 1
+        _telemetry_count("osrm_sqlite_cache_errors")
+        return None
+
+
+def _osrm_sqlite_cache_put(key: Tuple, route_kind: str, coords: List[List[float]]) -> None:
+    global _OSRM_SQLITE_CACHE_WRITES, _OSRM_SQLITE_CACHE_ERRORS
+    if not _OSRM_SQLITE_CACHE_ENABLED or _OSRM_SQLITE_CACHE_TTL_SEC <= 0:
+        return
+    if not coords or len(coords) < 2:
+        return
+    _ensure_osrm_sqlite_cache()
+    if not _OSRM_SQLITE_SCHEMA_READY:
+        return
+
+    key_hash = _osrm_cache_key_hash(key)
+    now = _time.time()
+    try:
+        coords_safe = [[float(c[0]), float(c[1])] for c in coords]
+        key_json = json.dumps(key, ensure_ascii=True, separators=(",", ":"), default=str)
+        coords_json = json.dumps(coords_safe, ensure_ascii=True, separators=(",", ":"))
+        with _OSRM_SQLITE_LOCK:
+            conn = _osrm_sqlite_connect()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO osrm_route_cache
+                        (key_hash, route_kind, key_json, coords_json, point_count, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(key_hash) DO UPDATE SET
+                        coords_json = excluded.coords_json,
+                        point_count = excluded.point_count,
+                        updated_at = excluded.updated_at
+                    """,
+                    (key_hash, route_kind, key_json, coords_json, len(coords_safe), now, now),
+                )
+                _prune_osrm_sqlite_cache(conn)
+                conn.commit()
+                _OSRM_SQLITE_CACHE_WRITES += 1
+                _telemetry_count("osrm_sqlite_cache_writes")
+            finally:
+                conn.close()
+    except Exception:
+        _OSRM_SQLITE_CACHE_ERRORS += 1
+        _telemetry_count("osrm_sqlite_cache_errors")
+
+
+def _osrm_sqlite_cache_size() -> int:
+    if not _OSRM_SQLITE_CACHE_ENABLED:
+        return 0
+    _ensure_osrm_sqlite_cache()
+    if not _OSRM_SQLITE_SCHEMA_READY:
+        return 0
+    try:
+        with _OSRM_SQLITE_LOCK:
+            conn = _osrm_sqlite_connect()
+            try:
+                row = conn.execute("SELECT COUNT(*) AS n FROM osrm_route_cache").fetchone()
+                return int(row["n"] if row else 0)
+            finally:
+                conn.close()
+    except Exception:
+        return 0
+
+
+def _begin_osrm_inflight(key_hash: str) -> Tuple[bool, Dict[str, Any]]:
+    global _OSRM_COALESCE_LEADERS, _OSRM_COALESCE_WAITS
+    with _OSRM_INFLIGHT_LOCK:
+        entry = _OSRM_INFLIGHT.get(key_hash)
+        if entry is not None:
+            entry["waiters"] = int(entry.get("waiters", 0)) + 1
+            _OSRM_COALESCE_WAITS += 1
+            _telemetry_count("osrm_coalesced_waits")
+            return False, entry
+        entry = {"event": threading.Event(), "result": None, "waiters": 0}
+        _OSRM_INFLIGHT[key_hash] = entry
+        _OSRM_COALESCE_LEADERS += 1
+        return True, entry
+
+
+def _wait_osrm_inflight(key_hash: str, entry: Dict[str, Any]) -> Optional[List[List[float]]]:
+    global _OSRM_COALESCE_TIMEOUTS
+    event = entry["event"]
+    completed = event.wait(max(0.1, float(_OSRM_INFLIGHT_WAIT_SEC)))
+    with _OSRM_INFLIGHT_LOCK:
+        entry["waiters"] = max(0, int(entry.get("waiters", 0)) - 1)
+        if not completed:
+            _OSRM_COALESCE_TIMEOUTS += 1
+            _telemetry_count("osrm_coalesced_timeouts")
+            return None
+        result = entry.get("result")
+        if event.is_set() and int(entry.get("waiters", 0)) <= 0:
+            _OSRM_INFLIGHT.pop(key_hash, None)
+    if result is None:
+        return None
+    _telemetry_count("osrm_coalesced_result_hits")
+    return copy.deepcopy(result)
+
+
+def _finish_osrm_inflight(key_hash: str, entry: Dict[str, Any], result: List[List[float]]) -> None:
+    with _OSRM_INFLIGHT_LOCK:
+        current = _OSRM_INFLIGHT.get(key_hash)
+        if current is not entry:
+            try:
+                entry["event"].set()
+            except Exception:
+                pass
+            return
+        entry["result"] = copy.deepcopy(result) if result else None
+        entry["event"].set()
+        if int(entry.get("waiters", 0)) <= 0:
+            _OSRM_INFLIGHT.pop(key_hash, None)
 
 
 def _effective_walk_to_stop_limit_m(direct_walk_m: float) -> float:
@@ -291,6 +562,57 @@ def get_segment_cache_stats() -> Dict[str, object]:
     }
 
 
+def get_osrm_cache_stats() -> Dict[str, object]:
+    route_total = _OSRM_ROUTE_MEMORY_HITS + _OSRM_ROUTE_MEMORY_MISSES
+    multi_total = _OSRM_MULTI_MEMORY_HITS + _OSRM_MULTI_MEMORY_MISSES
+    sqlite_total = _OSRM_SQLITE_CACHE_HITS + _OSRM_SQLITE_CACHE_MISSES
+    route_hit_rate = (_OSRM_ROUTE_MEMORY_HITS / route_total) if route_total > 0 else 0.0
+    multi_hit_rate = (_OSRM_MULTI_MEMORY_HITS / multi_total) if multi_total > 0 else 0.0
+    sqlite_hit_rate = (_OSRM_SQLITE_CACHE_HITS / sqlite_total) if sqlite_total > 0 else 0.0
+    return {
+        "base_url": OSRM_BASE_URL,
+        "memory_route": {
+            "size": len(_OSRM_ROUTE_CACHE),
+            "max_items": int(_OSRM_CACHE_MAX_ITEMS),
+            "hits": int(_OSRM_ROUTE_MEMORY_HITS),
+            "misses": int(_OSRM_ROUTE_MEMORY_MISSES),
+            "hit_rate": f"{route_hit_rate:.1%}",
+        },
+        "memory_multi": {
+            "size": len(_OSRM_MULTI_CACHE),
+            "max_items": int(_OSRM_CACHE_MAX_ITEMS),
+            "hits": int(_OSRM_MULTI_MEMORY_HITS),
+            "misses": int(_OSRM_MULTI_MEMORY_MISSES),
+            "hit_rate": f"{multi_hit_rate:.1%}",
+        },
+        "sqlite": {
+            "enabled": bool(_OSRM_SQLITE_CACHE_ENABLED and _OSRM_SQLITE_CACHE_TTL_SEC > 0),
+            "db_path": str(_OSRM_SQLITE_CACHE_DB),
+            "size": _osrm_sqlite_cache_size(),
+            "max_rows": int(_OSRM_SQLITE_CACHE_MAX_ROWS),
+            "ttl_sec": float(_OSRM_SQLITE_CACHE_TTL_SEC),
+            "hits": int(_OSRM_SQLITE_CACHE_HITS),
+            "misses": int(_OSRM_SQLITE_CACHE_MISSES),
+            "writes": int(_OSRM_SQLITE_CACHE_WRITES),
+            "errors": int(_OSRM_SQLITE_CACHE_ERRORS),
+            "hit_rate": f"{sqlite_hit_rate:.1%}",
+        },
+        "requests": {
+            "route": int(_OSRM_ROUTE_REQUESTS),
+            "multi": int(_OSRM_MULTI_REQUESTS),
+            "route_fallbacks": int(_OSRM_ROUTE_FALLBACKS),
+            "multi_fallbacks": int(_OSRM_MULTI_FALLBACKS),
+        },
+        "coalescing": {
+            "leaders": int(_OSRM_COALESCE_LEADERS),
+            "waits": int(_OSRM_COALESCE_WAITS),
+            "timeouts": int(_OSRM_COALESCE_TIMEOUTS),
+            "inflight": len(_OSRM_INFLIGHT),
+            "wait_timeout_sec": float(_OSRM_INFLIGHT_WAIT_SEC),
+        },
+    }
+
+
 def _cached_get_stops_in_area(lat: float, lon: float, radius: float) -> List[Dict]:
     key = ("stops_area", id(get_stops_in_area), float(lat), float(lon), float(radius))
     cached = _lookup_cache_get(key)
@@ -359,6 +681,8 @@ def _cached_get_metro_line_stations(line_id: int) -> List[Dict]:
 def _osrm_route_coords(from_lat: float, from_lon: float,
                         to_lat: float, to_lon: float,
                         mode: str = "driving") -> List[List[float]]:
+    global _OSRM_ROUTE_MEMORY_HITS, _OSRM_ROUTE_MEMORY_MISSES
+    global _OSRM_ROUTE_REQUESTS, _OSRM_ROUTE_FALLBACKS
     """
     OSRM API ile iki nokta arasi yol koordinatlarini dondurur.
     Google Maps gibi yol takip eden polyline olusturur.
@@ -370,48 +694,76 @@ def _osrm_route_coords(from_lat: float, from_lon: float,
         [[lat, lon], ...] - yol uzerinden koordinatlar
     """
     key = (
-        "route", str(mode),
+        "route", OSRM_BASE_URL, str(mode),
         round(float(from_lat), 6), round(float(from_lon), 6),
         round(float(to_lat), 6), round(float(to_lon), 6),
     )
     cached = _cache_get(_OSRM_ROUTE_CACHE, key)
     if cached is not None:
+        _OSRM_ROUTE_MEMORY_HITS += 1
         _telemetry_count("osrm_route_cache_hits")
         return cached
+    _OSRM_ROUTE_MEMORY_MISSES += 1
     _telemetry_count("osrm_route_cache_misses")
 
+    cached = _osrm_sqlite_cache_get(key, "route")
+    if cached is not None:
+        _cache_put(_OSRM_ROUTE_CACHE, key, cached)
+        return cached
+
+    key_hash = _osrm_cache_key_hash(key)
+    is_leader, inflight_entry = _begin_osrm_inflight(key_hash)
+    if not is_leader:
+        coalesced = _wait_osrm_inflight(key_hash, inflight_entry)
+        if coalesced is not None:
+            _cache_put(_OSRM_ROUTE_CACHE, key, coalesced)
+            return coalesced
+
+    result: List[List[float]]
     try:
         url = f"{OSRM_BASE_URL}/route/v1/{mode}/{from_lon},{from_lat};{to_lon},{to_lat}"
         params = {"overview": "full", "geometries": "geojson"}
         request_start = _time.perf_counter()
         r = _OSRM_SESSION.get(url, params=params, timeout=8)
+        _OSRM_ROUTE_REQUESTS += 1
         _telemetry_count("osrm_route_requests")
         _telemetry_add_ms("osrm_route_request_ms", _time.perf_counter() - request_start)
 
         if r.status_code != 200:
             fallback = [[from_lat, from_lon], [to_lat, to_lon]]
             _cache_put(_OSRM_ROUTE_CACHE, key, fallback)
+            _OSRM_ROUTE_FALLBACKS += 1
             _telemetry_count("osrm_route_fallbacks")
-            return fallback
+            result = fallback
+            return result
 
         data = r.json()
         if data.get("code") != "Ok" or not data.get("routes"):
             fallback = [[from_lat, from_lon], [to_lat, to_lon]]
             _cache_put(_OSRM_ROUTE_CACHE, key, fallback)
+            _OSRM_ROUTE_FALLBACKS += 1
             _telemetry_count("osrm_route_fallbacks")
-            return fallback
+            result = fallback
+            return result
 
         # GeoJSON format: [lon, lat] -> [lat, lon] cevir
         coords = data["routes"][0]["geometry"]["coordinates"]
         out = [[c[1], c[0]] for c in coords]
         _cache_put(_OSRM_ROUTE_CACHE, key, out)
-        return out
+        _osrm_sqlite_cache_put(key, "route", out)
+        result = out
+        return result
 
     except Exception:
         fallback = [[from_lat, from_lon], [to_lat, to_lon]]
         _cache_put(_OSRM_ROUTE_CACHE, key, fallback)
+        _OSRM_ROUTE_FALLBACKS += 1
         _telemetry_count("osrm_route_fallbacks")
-        return fallback
+        result = fallback
+        return result
+    finally:
+        if is_leader:
+            _finish_osrm_inflight(key_hash, inflight_entry, result if "result" in locals() else [])
 
 
 def _get_bus_road_coords(stop_coords: List[List[float]]) -> List[List[float]]:
@@ -485,6 +837,8 @@ def _get_bus_road_coords(stop_coords: List[List[float]]) -> List[List[float]]:
 
 
 def _osrm_multi_waypoint(coords: List[List[float]]) -> List[List[float]]:
+    global _OSRM_MULTI_MEMORY_HITS, _OSRM_MULTI_MEMORY_MISSES
+    global _OSRM_MULTI_REQUESTS, _OSRM_MULTI_FALLBACKS
     """
     Birden fazla waypoint ile OSRM sorgusu yapar.
     Tum duraklarin uzerinden gecen tek bir rota dondurur.
@@ -493,13 +847,29 @@ def _osrm_multi_waypoint(coords: List[List[float]]) -> List[List[float]]:
         return coords
 
     compact = tuple((round(float(c[0]), 6), round(float(c[1]), 6)) for c in coords)
-    key = ("multi", compact)
+    key = ("multi", OSRM_BASE_URL, compact)
     cached = _cache_get(_OSRM_MULTI_CACHE, key)
     if cached is not None:
+        _OSRM_MULTI_MEMORY_HITS += 1
         _telemetry_count("osrm_multi_cache_hits")
         return cached
+    _OSRM_MULTI_MEMORY_MISSES += 1
     _telemetry_count("osrm_multi_cache_misses")
 
+    cached = _osrm_sqlite_cache_get(key, "multi")
+    if cached is not None:
+        _cache_put(_OSRM_MULTI_CACHE, key, cached)
+        return cached
+
+    key_hash = _osrm_cache_key_hash(key)
+    is_leader, inflight_entry = _begin_osrm_inflight(key_hash)
+    if not is_leader:
+        coalesced = _wait_osrm_inflight(key_hash, inflight_entry)
+        if coalesced is not None:
+            _cache_put(_OSRM_MULTI_CACHE, key, coalesced)
+            return coalesced
+
+    result: List[List[float]]
     try:
         # OSRM format: lon1,lat1;lon2,lat2;...
         waypoints = ";".join([f"{c[1]},{c[0]}" for c in coords])
@@ -508,28 +878,40 @@ def _osrm_multi_waypoint(coords: List[List[float]]) -> List[List[float]]:
 
         request_start = _time.perf_counter()
         r = _OSRM_SESSION.get(url, params=params, timeout=15)
+        _OSRM_MULTI_REQUESTS += 1
         _telemetry_count("osrm_multi_requests")
         _telemetry_add_ms("osrm_multi_request_ms", _time.perf_counter() - request_start)
         if r.status_code != 200:
             _cache_put(_OSRM_MULTI_CACHE, key, coords)
+            _OSRM_MULTI_FALLBACKS += 1
             _telemetry_count("osrm_multi_fallbacks")
-            return coords
+            result = coords
+            return result
 
         data = r.json()
         if data.get("code") != "Ok" or not data.get("routes"):
             _cache_put(_OSRM_MULTI_CACHE, key, coords)
+            _OSRM_MULTI_FALLBACKS += 1
             _telemetry_count("osrm_multi_fallbacks")
-            return coords
+            result = coords
+            return result
 
         geojson_coords = data["routes"][0]["geometry"]["coordinates"]
         out = [[c[1], c[0]] for c in geojson_coords]
         _cache_put(_OSRM_MULTI_CACHE, key, out)
-        return out
+        _osrm_sqlite_cache_put(key, "multi", out)
+        result = out
+        return result
 
     except Exception:
         _cache_put(_OSRM_MULTI_CACHE, key, coords)
+        _OSRM_MULTI_FALLBACKS += 1
         _telemetry_count("osrm_multi_fallbacks")
-        return coords
+        result = coords
+        return result
+    finally:
+        if is_leader:
+            _finish_osrm_inflight(key_hash, inflight_entry, result if "result" in locals() else [])
 
 
 def _get_walk_road_coords(from_lat: float, from_lon: float,

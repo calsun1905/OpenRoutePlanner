@@ -284,6 +284,19 @@ def test_cache_stats_endpoint(client, monkeypatch):
         lambda: {"enabled": True, "size": 6, "max_items": 1800, "hits": 2, "misses": 4, "hit_rate": "33.3%"},
         raising=False,
     )
+    monkeypatch.setattr(
+        app_module,
+        "multimodal_osrm_cache_stats",
+        lambda: {
+            "base_url": "http://router.project-osrm.org",
+            "memory_route": {"size": 2, "max_items": 800, "hits": 3, "misses": 4, "hit_rate": "42.9%"},
+            "memory_multi": {"size": 1, "max_items": 800, "hits": 2, "misses": 3, "hit_rate": "40.0%"},
+            "sqlite": {"enabled": True, "size": 5, "max_rows": 50000, "hits": 1, "misses": 2, "writes": 1, "errors": 0},
+            "requests": {"route": 2, "multi": 1, "route_fallbacks": 0, "multi_fallbacks": 0},
+            "coalescing": {"leaders": 1, "waits": 0, "timeouts": 0, "inflight": 0},
+        },
+        raising=False,
+    )
 
     rv = client.get("/api/cache/stats")
     assert rv.status_code == 200
@@ -293,6 +306,7 @@ def test_cache_stats_endpoint(client, monkeypatch):
     assert "multimodal_compare" in data
     assert "multimodal_transit_lookup" in data
     assert "multimodal_segment_cache" in data
+    assert "multimodal_osrm_cache" in data
     assert "route_response_cache" in data
     assert "point_graph_memory_cache" in data
     assert "queue" in data

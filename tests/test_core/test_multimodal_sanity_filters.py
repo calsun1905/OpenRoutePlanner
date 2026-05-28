@@ -23,6 +23,7 @@ from multimodal_engine import (
     compare_routes,
     get_compare_cache_stats,
     get_segment_cache_stats,
+    get_osrm_cache_stats,
 )
 
 
@@ -168,6 +169,106 @@ def test_segment_cache_reuses_bus_road_coords(monkeypatch):
     assert second[0][0] == pytest.approx(41.0)
     assert stats["hits"] == 1
     assert stats["misses"] == 1
+
+
+class _FakeOsrmResponse:
+    def __init__(self, status_code=200, payload=None):
+        self.status_code = status_code
+        self._payload = payload or {}
+
+    def json(self):
+        return self._payload
+
+
+class _FakeOsrmSession:
+    def __init__(self):
+        self.calls = 0
+        self.status_code = 200
+        self.payload = {
+            "code": "Ok",
+            "routes": [{
+                "geometry": {
+                    "coordinates": [
+                        [29.0, 41.0],
+                        [29.05, 41.05],
+                        [29.1, 41.1],
+                    ],
+                },
+            }],
+        }
+
+    def get(self, *_args, **_kwargs):
+        self.calls += 1
+        return _FakeOsrmResponse(self.status_code, self.payload)
+
+
+def _reset_osrm_sqlite_test_state(me, monkeypatch, tmp_path):
+    monkeypatch.setattr(me, "_OSRM_SQLITE_CACHE_DB", str(tmp_path / "osrm_cache.db"))
+    monkeypatch.setattr(me, "_OSRM_SQLITE_SCHEMA_READY", False)
+    monkeypatch.setattr(me, "_OSRM_SQLITE_CACHE_ENABLED", True)
+    monkeypatch.setattr(me, "_OSRM_SQLITE_CACHE_TTL_SEC", 3600.0)
+    monkeypatch.setattr(me, "_OSRM_SQLITE_CACHE_MAX_ROWS", 100)
+    me._OSRM_ROUTE_CACHE.clear()
+    me._OSRM_MULTI_CACHE.clear()
+    me._OSRM_INFLIGHT.clear()
+    for name in [
+        "_OSRM_ROUTE_MEMORY_HITS",
+        "_OSRM_ROUTE_MEMORY_MISSES",
+        "_OSRM_MULTI_MEMORY_HITS",
+        "_OSRM_MULTI_MEMORY_MISSES",
+        "_OSRM_ROUTE_REQUESTS",
+        "_OSRM_MULTI_REQUESTS",
+        "_OSRM_ROUTE_FALLBACKS",
+        "_OSRM_MULTI_FALLBACKS",
+        "_OSRM_SQLITE_CACHE_HITS",
+        "_OSRM_SQLITE_CACHE_MISSES",
+        "_OSRM_SQLITE_CACHE_WRITES",
+        "_OSRM_SQLITE_CACHE_ERRORS",
+        "_OSRM_COALESCE_LEADERS",
+        "_OSRM_COALESCE_WAITS",
+        "_OSRM_COALESCE_TIMEOUTS",
+    ]:
+        monkeypatch.setattr(me, name, 0)
+
+
+def test_osrm_sqlite_cache_reuses_route_after_memory_clear(monkeypatch, tmp_path):
+    import multimodal_engine as me
+
+    _reset_osrm_sqlite_test_state(me, monkeypatch, tmp_path)
+    fake_session = _FakeOsrmSession()
+    monkeypatch.setattr(me, "_OSRM_SESSION", fake_session)
+
+    first = me._osrm_route_coords(41.0, 29.0, 41.1, 29.1, mode="foot")
+    first[0][0] = 0.0
+    me._OSRM_ROUTE_CACHE.clear()
+    second = me._osrm_route_coords(41.0, 29.0, 41.1, 29.1, mode="foot")
+    stats = get_osrm_cache_stats()
+
+    assert fake_session.calls == 1
+    assert second[0][0] == pytest.approx(41.0)
+    assert stats["sqlite"]["hits"] == 1
+    assert stats["sqlite"]["misses"] == 1
+    assert stats["sqlite"]["writes"] == 1
+
+
+def test_osrm_sqlite_cache_does_not_persist_fallback(monkeypatch, tmp_path):
+    import multimodal_engine as me
+
+    _reset_osrm_sqlite_test_state(me, monkeypatch, tmp_path)
+    fake_session = _FakeOsrmSession()
+    fake_session.status_code = 503
+    monkeypatch.setattr(me, "_OSRM_SESSION", fake_session)
+
+    fallback = me._osrm_route_coords(41.0, 29.0, 41.1, 29.1, mode="foot")
+    me._OSRM_ROUTE_CACHE.clear()
+    fake_session.status_code = 200
+    recovered = me._osrm_route_coords(41.0, 29.0, 41.1, 29.1, mode="foot")
+    stats = get_osrm_cache_stats()
+
+    assert fake_session.calls == 2
+    assert len(fallback) == 2
+    assert len(recovered) == 3
+    assert stats["sqlite"]["writes"] == 1
 
 
 def test_same_side_ferry_detour_is_filtered():
