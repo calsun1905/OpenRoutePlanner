@@ -277,10 +277,16 @@ def _get_db_connection() -> sqlite3.Connection:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_stops_district ON stops(district)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_route_stops_route ON route_stops(route_code)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_route_stops_stop ON route_stops(stop_code)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_route_stops_route_dir_order ON route_stops(route_code, direction, stop_order)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_route_stops_route_stop ON route_stops(route_code, stop_code)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_route_stops_stop_route ON route_stops(stop_code, route_code)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_stations_lat ON metro_stations(lat)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_stations_lon ON metro_stations(lon)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_stations_lat_lon ON metro_stations(lat, lon)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_ls_line ON metro_line_stations(line_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_ls_station ON metro_line_stations(station_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_ls_line_order ON metro_line_stations(line_id, station_order)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_metro_ls_station_line ON metro_line_stations(station_id, line_id)")
 
     conn.commit()
     return conn

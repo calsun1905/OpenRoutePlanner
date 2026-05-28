@@ -18,7 +18,7 @@ import requests
 import time as _time
 import heapq
 from collections import defaultdict
-from typing import List, Dict, Optional, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 
 from ibb_transit import (
     get_stops_in_area,
@@ -61,11 +61,17 @@ OSRM_BASE_URL = "http://router.project-osrm.org"
 _OSRM_ROUTE_CACHE: Dict[Tuple, List[List[float]]] = {}
 _OSRM_MULTI_CACHE: Dict[Tuple, List[List[float]]] = {}
 _OSRM_CACHE_MAX_ITEMS = 800
-_COMPARE_ROUTE_CACHE: Dict[Tuple, Dict] = {}
+_COMPARE_ROUTE_CACHE: Dict[Tuple, Tuple[float, Dict]] = {}
 _COMPARE_CACHE_MAX_ITEMS = int(ROUTE_CONFIG.get("MULTIMODAL_COMPARE_CACHE_MAX_ITEMS", 220))
 _ENABLE_COMPARE_CACHE = bool(ROUTE_CONFIG.get("MULTIMODAL_COMPARE_CACHE_ENABLED", False))
+_COMPARE_CACHE_TTL_SEC = float(ROUTE_CONFIG.get("MULTIMODAL_COMPARE_CACHE_TTL_SEC", 300))
 _COMPARE_CACHE_HITS = 0
 _COMPARE_CACHE_MISSES = 0
+_TRANSIT_LOOKUP_CACHE: Dict[Tuple, Tuple[float, Any]] = {}
+_TRANSIT_LOOKUP_CACHE_MAX_ITEMS = int(ROUTE_CONFIG.get("MULTIMODAL_TRANSIT_LOOKUP_CACHE_MAX_ITEMS", 2500))
+_TRANSIT_LOOKUP_CACHE_TTL_SEC = float(ROUTE_CONFIG.get("MULTIMODAL_TRANSIT_LOOKUP_CACHE_TTL_SEC", 900))
+_TRANSIT_LOOKUP_CACHE_HITS = 0
+_TRANSIT_LOOKUP_CACHE_MISSES = 0
 
 
 def _effective_walk_to_stop_limit_m(direct_walk_m: float) -> float:
@@ -112,28 +118,61 @@ def _cache_put(cache: Dict[Tuple, List[List[float]]], key: Tuple, value: List[Li
     cache[key] = [list(c) for c in value]
 
 
+def _ttl_cache_get(cache: Dict[Tuple, Tuple[float, Any]], key: Tuple, ttl_sec: float) -> Optional[Any]:
+    if ttl_sec <= 0:
+        return None
+    item = cache.get(key)
+    if item is None:
+        return None
+    created_at, value = item
+    if (_time.time() - created_at) > ttl_sec:
+        cache.pop(key, None)
+        return None
+    return copy.deepcopy(value)
+
+
+def _ttl_cache_put(cache: Dict[Tuple, Tuple[float, Any]], key: Tuple, value: Any, max_items: int) -> None:
+    if max_items <= 0:
+        return
+    if len(cache) >= max_items:
+        try:
+            first_key = next(iter(cache))
+            cache.pop(first_key, None)
+        except Exception:
+            cache.clear()
+    cache[key] = (_time.time(), copy.deepcopy(value))
+
+
 def _compare_cache_get(key: Tuple) -> Optional[Dict]:
     global _COMPARE_CACHE_HITS, _COMPARE_CACHE_MISSES
     if not _ENABLE_COMPARE_CACHE:
         return None
-    data = _COMPARE_ROUTE_CACHE.get(key)
+    data = _ttl_cache_get(_COMPARE_ROUTE_CACHE, key, _COMPARE_CACHE_TTL_SEC)
     if data is None:
         _COMPARE_CACHE_MISSES += 1
         return None
     _COMPARE_CACHE_HITS += 1
-    return copy.deepcopy(data)
+    return data
 
 
 def _compare_cache_put(key: Tuple, value: Dict) -> None:
     if not _ENABLE_COMPARE_CACHE:
         return
-    if len(_COMPARE_ROUTE_CACHE) >= _COMPARE_CACHE_MAX_ITEMS:
-        try:
-            first_key = next(iter(_COMPARE_ROUTE_CACHE))
-            _COMPARE_ROUTE_CACHE.pop(first_key, None)
-        except Exception:
-            _COMPARE_ROUTE_CACHE.clear()
-    _COMPARE_ROUTE_CACHE[key] = copy.deepcopy(value)
+    _ttl_cache_put(_COMPARE_ROUTE_CACHE, key, value, _COMPARE_CACHE_MAX_ITEMS)
+
+
+def _lookup_cache_get(key: Tuple) -> Optional[Any]:
+    global _TRANSIT_LOOKUP_CACHE_HITS, _TRANSIT_LOOKUP_CACHE_MISSES
+    data = _ttl_cache_get(_TRANSIT_LOOKUP_CACHE, key, _TRANSIT_LOOKUP_CACHE_TTL_SEC)
+    if data is None:
+        _TRANSIT_LOOKUP_CACHE_MISSES += 1
+        return None
+    _TRANSIT_LOOKUP_CACHE_HITS += 1
+    return data
+
+
+def _lookup_cache_put(key: Tuple, value: Any) -> None:
+    _ttl_cache_put(_TRANSIT_LOOKUP_CACHE, key, value, _TRANSIT_LOOKUP_CACHE_MAX_ITEMS)
 
 
 def get_compare_cache_stats() -> Dict[str, object]:
@@ -143,10 +182,86 @@ def get_compare_cache_stats() -> Dict[str, object]:
         "enabled": bool(_ENABLE_COMPARE_CACHE),
         "size": len(_COMPARE_ROUTE_CACHE),
         "max_items": int(_COMPARE_CACHE_MAX_ITEMS),
+        "ttl_sec": float(_COMPARE_CACHE_TTL_SEC),
         "hits": int(_COMPARE_CACHE_HITS),
         "misses": int(_COMPARE_CACHE_MISSES),
         "hit_rate": f"{hit_rate:.1%}",
     }
+
+
+def get_transit_lookup_cache_stats() -> Dict[str, object]:
+    total = _TRANSIT_LOOKUP_CACHE_HITS + _TRANSIT_LOOKUP_CACHE_MISSES
+    hit_rate = (_TRANSIT_LOOKUP_CACHE_HITS / total) if total > 0 else 0.0
+    return {
+        "enabled": _TRANSIT_LOOKUP_CACHE_MAX_ITEMS > 0 and _TRANSIT_LOOKUP_CACHE_TTL_SEC > 0,
+        "size": len(_TRANSIT_LOOKUP_CACHE),
+        "max_items": int(_TRANSIT_LOOKUP_CACHE_MAX_ITEMS),
+        "ttl_sec": float(_TRANSIT_LOOKUP_CACHE_TTL_SEC),
+        "hits": int(_TRANSIT_LOOKUP_CACHE_HITS),
+        "misses": int(_TRANSIT_LOOKUP_CACHE_MISSES),
+        "hit_rate": f"{hit_rate:.1%}",
+    }
+
+
+def _cached_get_stops_in_area(lat: float, lon: float, radius: float) -> List[Dict]:
+    key = ("stops_area", id(get_stops_in_area), float(lat), float(lon), float(radius))
+    cached = _lookup_cache_get(key)
+    if cached is not None:
+        return cached
+    data = get_stops_in_area(lat, lon, radius)
+    _lookup_cache_put(key, data)
+    return copy.deepcopy(data)
+
+
+def _cached_find_connecting_routes(stop_a: int, stop_b: int) -> List[Dict]:
+    key = ("connecting_routes", id(find_connecting_routes), int(stop_a), int(stop_b))
+    cached = _lookup_cache_get(key)
+    if cached is not None:
+        return cached
+    data = find_connecting_routes(stop_a, stop_b)
+    _lookup_cache_put(key, data)
+    return copy.deepcopy(data)
+
+
+def _cached_get_route_info(route_code: str) -> Optional[Dict]:
+    key = ("route_info", id(get_route_info), str(route_code))
+    cached = _lookup_cache_get(key)
+    if cached is not None:
+        return cached
+    data = get_route_info(route_code)
+    if data is not None:
+        _lookup_cache_put(key, data)
+    return copy.deepcopy(data)
+
+
+def _cached_get_metro_stations_in_area(lat: float, lon: float, radius: float) -> List[Dict]:
+    key = ("metro_stations_area", id(get_metro_stations_in_area), float(lat), float(lon), float(radius))
+    cached = _lookup_cache_get(key)
+    if cached is not None:
+        return cached
+    data = get_metro_stations_in_area(lat, lon, radius)
+    _lookup_cache_put(key, data)
+    return copy.deepcopy(data)
+
+
+def _cached_get_metro_lines_for_station(station_id: int) -> List[Dict]:
+    key = ("metro_lines_for_station", id(get_metro_lines_for_station), int(station_id))
+    cached = _lookup_cache_get(key)
+    if cached is not None:
+        return cached
+    data = get_metro_lines_for_station(station_id)
+    _lookup_cache_put(key, data)
+    return copy.deepcopy(data)
+
+
+def _cached_get_metro_line_stations(line_id: int) -> List[Dict]:
+    key = ("metro_line_stations", id(get_metro_line_stations), int(line_id))
+    cached = _lookup_cache_get(key)
+    if cached is not None:
+        return cached
+    data = get_metro_line_stations(line_id)
+    _lookup_cache_put(key, data)
+    return copy.deepcopy(data)
 
 
 # ============================================================================
@@ -850,6 +965,10 @@ def _build_walk_leg(
 
 def _get_routes_at_stop(stop_code: int) -> List[str]:
     """Bir duraktan gecen hatlari dondurur."""
+    key = ("routes_at_stop", int(stop_code))
+    cached = _lookup_cache_get(key)
+    if cached is not None:
+        return cached
     conn = _get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -858,6 +977,7 @@ def _get_routes_at_stop(stop_code: int) -> List[str]:
     )
     routes = [row["route_code"] for row in cursor.fetchall()]
     conn.close()
+    _lookup_cache_put(key, routes)
     return routes
 
 
@@ -888,6 +1008,11 @@ def _expand_route_stop_code_aliases(cursor, route_code: str, stop_code: int) -> 
     except Exception:
         return set()
 
+    key = ("route_stop_aliases", str(route_code), stop_code_int)
+    cached = _lookup_cache_get(key)
+    if cached is not None:
+        return set(cached)
+
     cursor.execute(
         """
         SELECT rs.stop_code, s.name
@@ -899,7 +1024,9 @@ def _expand_route_stop_code_aliases(cursor, route_code: str, stop_code: int) -> 
     )
     rows = cursor.fetchall()
     if not rows:
-        return {stop_code_int}
+        aliases = {stop_code_int}
+        _lookup_cache_put(key, aliases)
+        return aliases
 
     target_norm = ""
     for row in rows:
@@ -919,6 +1046,7 @@ def _expand_route_stop_code_aliases(cursor, route_code: str, stop_code: int) -> 
 
     aliases: set[int] = {stop_code_int}
     if not target_norm:
+        _lookup_cache_put(key, aliases)
         return aliases
 
     for row in rows:
@@ -929,6 +1057,7 @@ def _expand_route_stop_code_aliases(cursor, route_code: str, stop_code: int) -> 
         if _normalize_transit_stop_name(row["name"]) == target_norm:
             aliases.add(code)
 
+    _lookup_cache_put(key, aliases)
     return aliases
 
 
@@ -943,6 +1072,11 @@ def _get_route_stop_coords(route_code: str, from_stop_code: int, to_stop_code: i
     Returns:
         [[lat, lon], [lat, lon], ...] - binis'ten inis'e sirali koordinatlar
     """
+    cache_key = ("route_stop_coords", str(route_code), int(from_stop_code), int(to_stop_code))
+    cached = _lookup_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     conn = _get_db_connection()
     cursor = conn.cursor()
 
@@ -951,6 +1085,7 @@ def _get_route_stop_coords(route_code: str, from_stop_code: int, to_stop_code: i
     code_pool = sorted(from_aliases | to_aliases)
     if len(code_pool) < 2:
         conn.close()
+        _lookup_cache_put(cache_key, [])
         return []
     placeholders = ",".join(["?"] * len(code_pool))
 
@@ -999,6 +1134,7 @@ def _get_route_stop_coords(route_code: str, from_stop_code: int, to_stop_code: i
 
     if not selected:
         conn.close()
+        _lookup_cache_put(cache_key, [])
         return []
 
     _, direction, start_order, end_order, reverse_needed = selected
@@ -1026,12 +1162,13 @@ def _get_route_stop_coords(route_code: str, from_stop_code: int, to_stop_code: i
         coords.reverse()
 
     conn.close()
+    _lookup_cache_put(cache_key, coords)
     return coords
 
 
 def _get_nearby_routes(lat: float, lon: float, radius: int = 500) -> List[Dict]:
     """Belirli yaricaptaki duraklardan gecen hatlari toplar."""
-    stops = get_stops_in_area(lat, lon, radius)
+    stops = _cached_get_stops_in_area(lat, lon, radius)
     route_set = {}
     for stop in stops[:15]:
         routes = _get_routes_at_stop(stop["code"])
@@ -1064,7 +1201,7 @@ def _normalize_station_name(name: str) -> str:
 
 
 def _get_line_path_between_stations(line_id: int, from_station_id: int, to_station_id: int) -> List[Dict]:
-    stations = get_metro_line_stations(line_id)
+    stations = _cached_get_metro_line_stations(line_id)
     if len(stations) < 2:
         return []
     from_idx = None
@@ -1153,8 +1290,8 @@ def _build_metro_options(
     origin_candidates = []
     dest_candidates = []
     for radius in search_radii:
-        origin_candidates = get_metro_stations_in_area(origin_lat, origin_lon, radius)
-        dest_candidates = get_metro_stations_in_area(dest_lat, dest_lon, radius)
+        origin_candidates = _cached_get_metro_stations_in_area(origin_lat, origin_lon, radius)
+        dest_candidates = _cached_get_metro_stations_in_area(dest_lat, dest_lon, radius)
         if origin_candidates and dest_candidates:
             break
 
@@ -1167,8 +1304,8 @@ def _build_metro_options(
     seen = set()
     for o in origin_candidates:
         for d in dest_candidates:
-            o_lines = get_metro_lines_for_station(o["id"])
-            d_lines = get_metro_lines_for_station(d["id"])
+            o_lines = _cached_get_metro_lines_for_station(o["id"])
+            d_lines = _cached_get_metro_lines_for_station(d["id"])
             if not o_lines or not d_lines:
                 continue
 
@@ -1261,14 +1398,14 @@ def _build_metro_options(
             o_lines_map = {ln["id"]: ln for ln in o_lines}
             d_lines_map = {ln["id"]: ln for ln in d_lines}
             for line_a_id, line_a in o_lines_map.items():
-                a_stations = get_metro_line_stations(line_a_id)
+                a_stations = _cached_get_metro_line_stations(line_a_id)
                 if len(a_stations) < 2:
                     continue
 
                 for line_b_id, line_b in d_lines_map.items():
                     if line_a_id == line_b_id:
                         continue
-                    b_stations = get_metro_line_stations(line_b_id)
+                    b_stations = _cached_get_metro_line_stations(line_b_id)
                     if len(b_stations) < 2:
                         continue
                     transfer_pairs = _find_metro_transfer_pairs(a_stations, b_stations)
@@ -1872,8 +2009,8 @@ def _build_graph_metro_option(
     prefer_non_ferry = same_side and direct_walk_m <= 18000
 
     for radius in search_radii:
-        raw_origin = get_metro_stations_in_area(origin_lat, origin_lon, radius)
-        raw_dest = get_metro_stations_in_area(dest_lat, dest_lon, radius)
+        raw_origin = _cached_get_metro_stations_in_area(origin_lat, origin_lon, radius)
+        raw_dest = _cached_get_metro_stations_in_area(dest_lat, dest_lon, radius)
         access_cap = 2000 if direct_walk_m < 20000 else 2600
         max_access_m = min(access_cap, max(800, int(radius * 0.50)))
         origin_candidates = [dict(s) for s in raw_origin if float(s.get("distance_m", 10**9)) <= max_access_m][:12]
@@ -2230,7 +2367,7 @@ def _build_ferry_only_options(
         return str(st.get("description") or st.get("name") or "Iskele")
 
     def _near_ferry_terminals(lat: float, lon: float) -> List[Dict]:
-        candidates = get_metro_stations_in_area(lat, lon, 4500)
+        candidates = _cached_get_metro_stations_in_area(lat, lon, 4500)
         out = []
         for c in candidates:
             nm = _normalized_station_name(str(c.get("description") or c.get("name") or ""))
@@ -2863,7 +3000,7 @@ def _build_bus_metro_mixed_options(
 
     origin_stops: List[Dict] = []
     for radius in [700, 1100, 1600]:
-        origin_stops = get_stops_in_area(origin_lat, origin_lon, radius)
+        origin_stops = _cached_get_stops_in_area(origin_lat, origin_lon, radius)
         origin_stops = sorted(origin_stops, key=lambda s: float(s.get("distance_m", 10**9)))
         origin_stops = [s for s in origin_stops if float(s.get("distance_m", 10**9)) <= max_walk_to_stop_m][:8]
         if origin_stops:
@@ -2896,7 +3033,7 @@ def _build_bus_metro_mixed_options(
                 t_lon = float(t_stop["lon"])
 
                 # Otobus duragindan metroyla baglanabilecek istasyonlar
-                near_metro = get_metro_stations_in_area(t_lat, t_lon, 500)[:2]
+                near_metro = _cached_get_metro_stations_in_area(t_lat, t_lon, 500)[:2]
                 near_metro = sorted(near_metro, key=lambda s: float(s.get("distance_m", 10**9)))[:2]
                 if not near_metro:
                     continue
@@ -3096,7 +3233,7 @@ def _build_metro_bus_mixed_options(
     # Hedefe yakin inis duraklari
     dest_stops: List[Dict] = []
     for radius in [700, 1100, 1600]:
-        dest_stops = get_stops_in_area(dest_lat, dest_lon, radius)
+        dest_stops = _cached_get_stops_in_area(dest_lat, dest_lon, radius)
         dest_stops = sorted(dest_stops, key=lambda s: float(s.get("distance_m", 10**9)))
         dest_stops = [s for s in dest_stops if float(s.get("distance_m", 10**9)) <= max_walk_to_stop_m][:10]
         if dest_stops:
@@ -3159,7 +3296,7 @@ def _build_metro_bus_mixed_options(
                 near_radii = [900, 1500, 2400] if is_metrobus else [700, 1200, 1800]
                 near_limit = 10 if is_metrobus else 4
                 for mr in near_radii:
-                    near_metro = get_metro_stations_in_area(b_lat, b_lon, mr)
+                    near_metro = _cached_get_metro_stations_in_area(b_lat, b_lon, mr)
                     near_metro = sorted(
                         near_metro,
                         key=lambda s: float(s.get("distance_m", 10**9))
@@ -3484,9 +3621,9 @@ def find_transit_routes(
 
     for radius_idx, radius in enumerate(SEARCH_RADII):
         # Baslangica yakin duraklar
-        origin_stops = get_stops_in_area(origin_lat, origin_lon, radius)
+        origin_stops = _cached_get_stops_in_area(origin_lat, origin_lon, radius)
         # Hedefe yakin duraklar
-        dest_stops = get_stops_in_area(dest_lat, dest_lon, radius)
+        dest_stops = _cached_get_stops_in_area(dest_lat, dest_lon, radius)
         origin_stops = sorted(origin_stops, key=lambda s: float(s.get("distance_m", 10**9)))
         dest_stops = sorted(dest_stops, key=lambda s: float(s.get("distance_m", 10**9)))
 
@@ -3503,7 +3640,7 @@ def find_transit_routes(
                     continue
 
                 # Ortak hat bul
-                connections = find_connecting_routes(o_stop["code"], d_stop["code"])
+                connections = _cached_find_connecting_routes(o_stop["code"], d_stop["code"])
 
                 for conn in connections:
                     walk_to_seg = _build_walk_leg(
@@ -3635,8 +3772,8 @@ def find_transit_routes(
                     ):
                         continue
 
-                    route_a_info = get_route_info(route_a) or {}
-                    route_b_info = get_route_info(route_b) or {}
+                    route_a_info = _cached_get_route_info(route_a) or {}
+                    route_b_info = _cached_get_route_info(route_b) or {}
 
                     transit_options.append({
                         "type": "transit_transfer",

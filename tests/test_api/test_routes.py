@@ -272,6 +272,12 @@ def test_cache_stats_endpoint(client, monkeypatch):
         lambda: {"enabled": False, "size": 0, "max_items": 220, "hits": 0, "misses": 0, "hit_rate": "0.0%"},
         raising=False,
     )
+    monkeypatch.setattr(
+        app_module,
+        "multimodal_transit_lookup_cache_stats",
+        lambda: {"enabled": True, "size": 12, "max_items": 2500, "hits": 4, "misses": 8, "hit_rate": "33.3%"},
+        raising=False,
+    )
 
     rv = client.get("/api/cache/stats")
     assert rv.status_code == 200
@@ -279,6 +285,7 @@ def test_cache_stats_endpoint(client, monkeypatch):
     assert "graph" in data
     assert "poi" in data
     assert "multimodal_compare" in data
+    assert "multimodal_transit_lookup" in data
     assert "route_response_cache" in data
     assert "point_graph_memory_cache" in data
     assert "queue" in data

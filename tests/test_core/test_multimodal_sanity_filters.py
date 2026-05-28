@@ -78,6 +78,31 @@ def test_name_based_metro_transfer_requires_physical_proximity():
     assert (1, 11) in pair_ids
 
 
+def test_transit_lookup_cache_reuses_read_only_results(monkeypatch):
+    import multimodal_engine as me
+
+    me._TRANSIT_LOOKUP_CACHE.clear()
+    me._TRANSIT_LOOKUP_CACHE_HITS = 0
+    me._TRANSIT_LOOKUP_CACHE_MISSES = 0
+    calls = {"count": 0}
+
+    def fake_get_stops_in_area(lat, lon, radius):
+        calls["count"] += 1
+        return [{"code": 1, "name": "A", "distance_m": 10}]
+
+    monkeypatch.setattr(me, "get_stops_in_area", fake_get_stops_in_area)
+
+    first = me._cached_get_stops_in_area(41.0, 29.0, 500)
+    first[0]["name"] = "mutated"
+    second = me._cached_get_stops_in_area(41.0, 29.0, 500)
+    stats = me.get_transit_lookup_cache_stats()
+
+    assert calls["count"] == 1
+    assert second[0]["name"] == "A"
+    assert stats["hits"] == 1
+    assert stats["misses"] == 1
+
+
 def test_same_side_ferry_detour_is_filtered():
     option = _build_option(
         total_time_min=73.2,
