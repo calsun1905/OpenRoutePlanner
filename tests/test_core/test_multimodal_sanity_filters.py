@@ -22,6 +22,7 @@ from multimodal_engine import (
     _is_major_water_crossing_straight,
     compare_routes,
     get_compare_cache_stats,
+    get_segment_cache_stats,
 )
 
 
@@ -99,6 +100,72 @@ def test_transit_lookup_cache_reuses_read_only_results(monkeypatch):
 
     assert calls["count"] == 1
     assert second[0]["name"] == "A"
+    assert stats["hits"] == 1
+    assert stats["misses"] == 1
+
+
+def test_segment_cache_reuses_walk_leg_results(monkeypatch):
+    import multimodal_engine as me
+
+    me._SEGMENT_CACHE.clear()
+    me._SEGMENT_CACHE_HITS = 0
+    me._SEGMENT_CACHE_MISSES = 0
+    calls = {"count": 0}
+
+    def fake_walk_road_coords(from_lat, from_lon, to_lat, to_lon):
+        calls["count"] += 1
+        return [[from_lat, from_lon], [to_lat, to_lon]]
+
+    monkeypatch.setattr(me, "_get_walk_road_coords", fake_walk_road_coords)
+
+    first = me._build_walk_leg(
+        41.0, 29.0, 41.001, 29.001,
+        max_distance_m=500,
+        allow_fallback_if_short=True,
+        fallback_max_m=300,
+        max_ratio=3.0,
+    )
+    assert first is not None
+    first["coords"][0][0] = 0.0
+
+    second = me._build_walk_leg(
+        41.0, 29.0, 41.001, 29.001,
+        max_distance_m=500,
+        allow_fallback_if_short=True,
+        fallback_max_m=300,
+        max_ratio=3.0,
+    )
+    stats = get_segment_cache_stats()
+
+    assert calls["count"] == 1
+    assert second is not None
+    assert second["coords"][0][0] == pytest.approx(41.0)
+    assert stats["hits"] == 1
+    assert stats["misses"] == 1
+
+
+def test_segment_cache_reuses_bus_road_coords(monkeypatch):
+    import multimodal_engine as me
+
+    me._SEGMENT_CACHE.clear()
+    me._SEGMENT_CACHE_HITS = 0
+    me._SEGMENT_CACHE_MISSES = 0
+    calls = {"count": 0}
+    stop_coords = [[41.0, 29.0], [41.001, 29.001], [41.002, 29.002]]
+
+    def fake_multi_waypoint(coords):
+        calls["count"] += 1
+        return [list(c) for c in coords]
+
+    monkeypatch.setattr(me, "_osrm_multi_waypoint", fake_multi_waypoint)
+
+    first = me._get_bus_road_coords(stop_coords)
+    first[0][0] = 0.0
+    second = me._get_bus_road_coords(stop_coords)
+    stats = get_segment_cache_stats()
+
+    assert calls["count"] == 1
+    assert second[0][0] == pytest.approx(41.0)
     assert stats["hits"] == 1
     assert stats["misses"] == 1
 

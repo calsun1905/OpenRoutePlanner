@@ -1786,6 +1786,7 @@ def api_cache_stats():
         if _multimodal_available:
             payload["multimodal_compare"] = multimodal_compare_cache_stats()
             payload["multimodal_transit_lookup"] = multimodal_transit_lookup_cache_stats()
+            payload["multimodal_segment_cache"] = multimodal_segment_cache_stats()
         payload["queue"] = _queue_stats_payload()
         payload["policy"] = evaluate_cache_policy(payload)
         payload["generated_at_utc"] = datetime.now(timezone.utc).isoformat()
@@ -4667,12 +4668,14 @@ try:
         compare_routes as multimodal_compare,
         get_compare_cache_stats as multimodal_compare_cache_stats,
         get_transit_lookup_cache_stats as multimodal_transit_lookup_cache_stats,
+        get_segment_cache_stats as multimodal_segment_cache_stats,
     )
     _multimodal_available = True
 except ImportError:
     _multimodal_available = False
     multimodal_compare_cache_stats = lambda: {}
     multimodal_transit_lookup_cache_stats = lambda: {}
+    multimodal_segment_cache_stats = lambda: {}
     print("[API] multimodal_engine yuklenemedi")
 
 

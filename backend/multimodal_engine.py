@@ -17,6 +17,7 @@ import copy
 import requests
 import time as _time
 import heapq
+from contextvars import ContextVar
 from collections import defaultdict
 from typing import Any, List, Dict, Optional, Tuple
 
@@ -58,6 +59,7 @@ SEARCH_RADII = [600, 1000, 1500]
 
 # OSRM public API
 OSRM_BASE_URL = "http://router.project-osrm.org"
+_OSRM_SESSION = requests.Session()
 _OSRM_ROUTE_CACHE: Dict[Tuple, List[List[float]]] = {}
 _OSRM_MULTI_CACHE: Dict[Tuple, List[List[float]]] = {}
 _OSRM_CACHE_MAX_ITEMS = 800
@@ -72,6 +74,56 @@ _TRANSIT_LOOKUP_CACHE_MAX_ITEMS = int(ROUTE_CONFIG.get("MULTIMODAL_TRANSIT_LOOKU
 _TRANSIT_LOOKUP_CACHE_TTL_SEC = float(ROUTE_CONFIG.get("MULTIMODAL_TRANSIT_LOOKUP_CACHE_TTL_SEC", 900))
 _TRANSIT_LOOKUP_CACHE_HITS = 0
 _TRANSIT_LOOKUP_CACHE_MISSES = 0
+_SEGMENT_CACHE: Dict[Tuple, Tuple[float, Any]] = {}
+_SEGMENT_CACHE_MAX_ITEMS = int(ROUTE_CONFIG.get("MULTIMODAL_SEGMENT_CACHE_MAX_ITEMS", 1800))
+_SEGMENT_CACHE_TTL_SEC = float(ROUTE_CONFIG.get("MULTIMODAL_SEGMENT_CACHE_TTL_SEC", 900))
+_SEGMENT_CACHE_HITS = 0
+_SEGMENT_CACHE_MISSES = 0
+_TRANSIT_TELEMETRY_CTX: ContextVar[Optional[Dict[str, object]]] = ContextVar(
+    "multimodal_transit_telemetry",
+    default=None,
+)
+
+
+def _current_telemetry() -> Optional[Dict[str, object]]:
+    telemetry = _TRANSIT_TELEMETRY_CTX.get()
+    if isinstance(telemetry, dict):
+        return telemetry
+    return None
+
+
+def _telemetry_count(name: str, amount: int = 1) -> None:
+    telemetry = _current_telemetry()
+    if telemetry is None:
+        return
+    counters = telemetry.setdefault("counters", {})
+    if not isinstance(counters, dict):
+        counters = {}
+        telemetry["counters"] = counters
+    counters[name] = int(counters.get(name, 0) or 0) + int(amount)
+
+
+def _telemetry_set_count(name: str, value: int) -> None:
+    telemetry = _current_telemetry()
+    if telemetry is None:
+        return
+    counters = telemetry.setdefault("counters", {})
+    if not isinstance(counters, dict):
+        counters = {}
+        telemetry["counters"] = counters
+    counters[name] = int(value)
+
+
+def _telemetry_add_ms(name: str, elapsed_sec: float) -> None:
+    telemetry = _current_telemetry()
+    if telemetry is None:
+        return
+    stage_ms = telemetry.setdefault("stage_ms", {})
+    if not isinstance(stage_ms, dict):
+        stage_ms = {}
+        telemetry["stage_ms"] = stage_ms
+    key = name if name.endswith("_ms") else f"{name}_ms"
+    stage_ms[key] = round(float(stage_ms.get(key, 0.0) or 0.0) + (elapsed_sec * 1000), 2)
 
 
 def _effective_walk_to_stop_limit_m(direct_walk_m: float) -> float:
@@ -166,13 +218,35 @@ def _lookup_cache_get(key: Tuple) -> Optional[Any]:
     data = _ttl_cache_get(_TRANSIT_LOOKUP_CACHE, key, _TRANSIT_LOOKUP_CACHE_TTL_SEC)
     if data is None:
         _TRANSIT_LOOKUP_CACHE_MISSES += 1
+        _telemetry_count("transit_lookup_cache_misses")
         return None
     _TRANSIT_LOOKUP_CACHE_HITS += 1
+    _telemetry_count("transit_lookup_cache_hits")
     return data
 
 
 def _lookup_cache_put(key: Tuple, value: Any) -> None:
     _ttl_cache_put(_TRANSIT_LOOKUP_CACHE, key, value, _TRANSIT_LOOKUP_CACHE_MAX_ITEMS)
+
+
+def _segment_cache_get(key: Tuple) -> Optional[Any]:
+    global _SEGMENT_CACHE_HITS, _SEGMENT_CACHE_MISSES
+    if _SEGMENT_CACHE_MAX_ITEMS <= 0 or _SEGMENT_CACHE_TTL_SEC <= 0:
+        return None
+    data = _ttl_cache_get(_SEGMENT_CACHE, key, _SEGMENT_CACHE_TTL_SEC)
+    if data is None:
+        _SEGMENT_CACHE_MISSES += 1
+        _telemetry_count("segment_cache_misses")
+        return None
+    _SEGMENT_CACHE_HITS += 1
+    _telemetry_count("segment_cache_hits")
+    return data
+
+
+def _segment_cache_put(key: Tuple, value: Any) -> None:
+    if _SEGMENT_CACHE_MAX_ITEMS <= 0 or _SEGMENT_CACHE_TTL_SEC <= 0:
+        return
+    _ttl_cache_put(_SEGMENT_CACHE, key, value, _SEGMENT_CACHE_MAX_ITEMS)
 
 
 def get_compare_cache_stats() -> Dict[str, object]:
@@ -199,6 +273,20 @@ def get_transit_lookup_cache_stats() -> Dict[str, object]:
         "ttl_sec": float(_TRANSIT_LOOKUP_CACHE_TTL_SEC),
         "hits": int(_TRANSIT_LOOKUP_CACHE_HITS),
         "misses": int(_TRANSIT_LOOKUP_CACHE_MISSES),
+        "hit_rate": f"{hit_rate:.1%}",
+    }
+
+
+def get_segment_cache_stats() -> Dict[str, object]:
+    total = _SEGMENT_CACHE_HITS + _SEGMENT_CACHE_MISSES
+    hit_rate = (_SEGMENT_CACHE_HITS / total) if total > 0 else 0.0
+    return {
+        "enabled": _SEGMENT_CACHE_MAX_ITEMS > 0 and _SEGMENT_CACHE_TTL_SEC > 0,
+        "size": len(_SEGMENT_CACHE),
+        "max_items": int(_SEGMENT_CACHE_MAX_ITEMS),
+        "ttl_sec": float(_SEGMENT_CACHE_TTL_SEC),
+        "hits": int(_SEGMENT_CACHE_HITS),
+        "misses": int(_SEGMENT_CACHE_MISSES),
         "hit_rate": f"{hit_rate:.1%}",
     }
 
@@ -288,22 +376,29 @@ def _osrm_route_coords(from_lat: float, from_lon: float,
     )
     cached = _cache_get(_OSRM_ROUTE_CACHE, key)
     if cached is not None:
+        _telemetry_count("osrm_route_cache_hits")
         return cached
+    _telemetry_count("osrm_route_cache_misses")
 
     try:
         url = f"{OSRM_BASE_URL}/route/v1/{mode}/{from_lon},{from_lat};{to_lon},{to_lat}"
         params = {"overview": "full", "geometries": "geojson"}
-        r = requests.get(url, params=params, timeout=8)
+        request_start = _time.perf_counter()
+        r = _OSRM_SESSION.get(url, params=params, timeout=8)
+        _telemetry_count("osrm_route_requests")
+        _telemetry_add_ms("osrm_route_request_ms", _time.perf_counter() - request_start)
 
         if r.status_code != 200:
             fallback = [[from_lat, from_lon], [to_lat, to_lon]]
             _cache_put(_OSRM_ROUTE_CACHE, key, fallback)
+            _telemetry_count("osrm_route_fallbacks")
             return fallback
 
         data = r.json()
         if data.get("code") != "Ok" or not data.get("routes"):
             fallback = [[from_lat, from_lon], [to_lat, to_lon]]
             _cache_put(_OSRM_ROUTE_CACHE, key, fallback)
+            _telemetry_count("osrm_route_fallbacks")
             return fallback
 
         # GeoJSON format: [lon, lat] -> [lat, lon] cevir
@@ -315,6 +410,7 @@ def _osrm_route_coords(from_lat: float, from_lon: float,
     except Exception:
         fallback = [[from_lat, from_lon], [to_lat, to_lon]]
         _cache_put(_OSRM_ROUTE_CACHE, key, fallback)
+        _telemetry_count("osrm_route_fallbacks")
         return fallback
 
 
@@ -335,6 +431,12 @@ def _get_bus_road_coords(stop_coords: List[List[float]]) -> List[List[float]]:
     """
     if len(stop_coords) < 2:
         return stop_coords
+
+    compact = tuple((round(float(c[0]), 6), round(float(c[1]), 6)) for c in stop_coords)
+    cache_key = ("bus_road_coords", id(_osrm_multi_waypoint), compact)
+    cached = _segment_cache_get(cache_key)
+    if cached is not None:
+        return cached
 
     def _sample_waypoints(coords: List[List[float]], max_waypoints: int = 20) -> List[List[float]]:
         if len(coords) <= max_waypoints:
@@ -374,9 +476,12 @@ def _get_bus_road_coords(stop_coords: List[List[float]]) -> List[List[float]]:
     # OSRM detour'u cok buyukse veya cok kucukse durak polyline'ina geri don.
     if stop_path_dist > 0:
         if road_dist > (stop_path_dist * 1.85) or road_dist < (stop_path_dist * 0.55):
-            return stop_coords
+            _segment_cache_put(cache_key, stop_coords)
+            return [list(c) for c in stop_coords]
 
-    return road_coords if len(road_coords) >= 2 else stop_coords
+    result = road_coords if len(road_coords) >= 2 else stop_coords
+    _segment_cache_put(cache_key, result)
+    return [list(c) for c in result]
 
 
 def _osrm_multi_waypoint(coords: List[List[float]]) -> List[List[float]]:
@@ -391,7 +496,9 @@ def _osrm_multi_waypoint(coords: List[List[float]]) -> List[List[float]]:
     key = ("multi", compact)
     cached = _cache_get(_OSRM_MULTI_CACHE, key)
     if cached is not None:
+        _telemetry_count("osrm_multi_cache_hits")
         return cached
+    _telemetry_count("osrm_multi_cache_misses")
 
     try:
         # OSRM format: lon1,lat1;lon2,lat2;...
@@ -399,14 +506,19 @@ def _osrm_multi_waypoint(coords: List[List[float]]) -> List[List[float]]:
         url = f"{OSRM_BASE_URL}/route/v1/driving/{waypoints}"
         params = {"overview": "full", "geometries": "geojson"}
 
-        r = requests.get(url, params=params, timeout=15)
+        request_start = _time.perf_counter()
+        r = _OSRM_SESSION.get(url, params=params, timeout=15)
+        _telemetry_count("osrm_multi_requests")
+        _telemetry_add_ms("osrm_multi_request_ms", _time.perf_counter() - request_start)
         if r.status_code != 200:
             _cache_put(_OSRM_MULTI_CACHE, key, coords)
+            _telemetry_count("osrm_multi_fallbacks")
             return coords
 
         data = r.json()
         if data.get("code") != "Ok" or not data.get("routes"):
             _cache_put(_OSRM_MULTI_CACHE, key, coords)
+            _telemetry_count("osrm_multi_fallbacks")
             return coords
 
         geojson_coords = data["routes"][0]["geometry"]["coordinates"]
@@ -416,6 +528,7 @@ def _osrm_multi_waypoint(coords: List[List[float]]) -> List[List[float]]:
 
     except Exception:
         _cache_put(_OSRM_MULTI_CACHE, key, coords)
+        _telemetry_count("osrm_multi_fallbacks")
         return coords
 
 
@@ -918,6 +1031,22 @@ def _build_walk_leg(
     if _is_forbidden_bosphorus_walk(from_lat, from_lon, to_lat, to_lon):
         return None
 
+    cache_key = (
+        "walk_leg",
+        id(_get_walk_road_coords),
+        round(float(from_lat), 6),
+        round(float(from_lon), 6),
+        round(float(to_lat), 6),
+        round(float(to_lon), 6),
+        round(float(max_distance_m), 2),
+        bool(allow_fallback_if_short),
+        round(float(fallback_max_m), 2),
+        round(float(max_ratio), 3),
+    )
+    cached = _segment_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     major_water_straight = _is_major_water_crossing_straight(from_lat, from_lon, to_lat, to_lon)
     short_fallback_ok = allow_fallback_if_short and straight_m <= fallback_max_m and not major_water_straight
 
@@ -956,11 +1085,13 @@ def _build_walk_leg(
         else:
             return None
 
-    return {
+    result = {
         "coords": coords,
         "distance_m": float(road_m),
         "duration_min": _walking_time_minutes(float(road_m)),
     }
+    _segment_cache_put(cache_key, result)
+    return copy.deepcopy(result)
 
 
 def _get_routes_at_stop(stop_code: int) -> List[str]:
@@ -1201,8 +1332,20 @@ def _normalize_station_name(name: str) -> str:
 
 
 def _get_line_path_between_stations(line_id: int, from_station_id: int, to_station_id: int) -> List[Dict]:
+    cache_key = (
+        "metro_line_path",
+        id(get_metro_line_stations),
+        int(line_id),
+        int(from_station_id),
+        int(to_station_id),
+    )
+    cached = _segment_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     stations = _cached_get_metro_line_stations(line_id)
     if len(stations) < 2:
+        _segment_cache_put(cache_key, [])
         return []
     from_idx = None
     to_idx = None
@@ -1212,12 +1355,16 @@ def _get_line_path_between_stations(line_id: int, from_station_id: int, to_stati
         if st["id"] == to_station_id:
             to_idx = i
     if from_idx is None or to_idx is None:
+        _segment_cache_put(cache_key, [])
         return []
     if from_idx <= to_idx:
-        return stations[from_idx:to_idx + 1]
+        result = stations[from_idx:to_idx + 1]
+        _segment_cache_put(cache_key, result)
+        return copy.deepcopy(result)
     seg = stations[to_idx:from_idx + 1]
     seg.reverse()
-    return seg
+    _segment_cache_put(cache_key, seg)
+    return copy.deepcopy(seg)
 
 
 def _find_metro_transfer_pairs(
@@ -2830,10 +2977,16 @@ def _find_one_transfer_candidates(origin_stop_code: int, dest_stop_code: int, li
     """
     Tek aktarmali secenekler icin (hat A -> transfer duragi -> hat B) adaylarini bulur.
     """
+    cache_key = ("one_transfer_candidates", int(origin_stop_code), int(dest_stop_code), int(limit))
+    cached = _lookup_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     origin_routes = _get_routes_at_stop(origin_stop_code)
     dest_routes = _get_routes_at_stop(dest_stop_code)
 
     if not origin_routes or not dest_routes:
+        _lookup_cache_put(cache_key, [])
         return []
 
     # IN (...) parametreleri
@@ -2867,13 +3020,20 @@ def _find_one_transfer_candidates(origin_stop_code: int, dest_stop_code: int, li
     rows = cursor.fetchall()
     conn.close()
 
-    return [dict(row) for row in rows]
+    result = [dict(row) for row in rows]
+    _lookup_cache_put(cache_key, result)
+    return copy.deepcopy(result)
 
 
 def _get_route_stop_candidates_after(route_code: str, from_stop_code: int, limit: int = 24) -> List[Dict]:
     """
     Verilen hatta, baslangic duragindan sonra gelebilecek aday duraklari dondurur.
     """
+    cache_key = ("route_stop_candidates_after", str(route_code), int(from_stop_code), int(limit))
+    cached = _lookup_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     conn = _get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -2890,6 +3050,7 @@ def _get_route_stop_candidates_after(route_code: str, from_stop_code: int, limit
     conn.close()
 
     if not rows:
+        _lookup_cache_put(cache_key, [])
         return []
 
     by_dir: Dict[str, List[Dict]] = defaultdict(list)
@@ -2918,7 +3079,9 @@ def _get_route_stop_candidates_after(route_code: str, from_stop_code: int, limit
             out.append(cand)
             if len(out) >= limit:
                 return out
-    return out[:limit]
+    result = out[:limit]
+    _lookup_cache_put(cache_key, result)
+    return copy.deepcopy(result)
 
 
 def _get_route_stop_candidates_before(
@@ -3574,9 +3737,11 @@ def find_transit_routes(
     max_transit_options = max(1, int(ROUTE_CONFIG.get("MULTIMODAL_MAX_TRANSIT_OPTIONS", max_results)))
 
     # Direkt yurume mesafesi (OSRM foot bazli)
+    stage_start = _time.perf_counter()
     direct_walk_m, direct_walk_min, walking_road_coords = _direct_walk_metrics(
         origin_lat, origin_lon, dest_lat, dest_lon
     )
+    _telemetry_add_ms("direct_walk_metrics_ms", _time.perf_counter() - stage_start)
     max_walk_to_stop_m = _effective_walk_to_stop_limit_m(direct_walk_m)
     allowed_user_modes = _normalize_allowed_modes(allowed_modes)
     walking_option = {
@@ -3597,6 +3762,7 @@ def find_transit_routes(
 
     # Transit cizimini/senaryosunu yalnizca vapur istendiginde bus/metro akisiyla karistirma.
     if allowed_user_modes == {"ferry"}:
+        stage_start = _time.perf_counter()
         ferry_options = _build_ferry_only_options(
             origin_lat=origin_lat,
             origin_lon=origin_lon,
@@ -3605,7 +3771,10 @@ def find_transit_routes(
             direct_walk_min=direct_walk_min,
             max_results=max_results,
         )
+        _telemetry_add_ms("ferry_only_options_ms", _time.perf_counter() - stage_start)
         ferry_diverse = _diversify_transit_options(ferry_options, max_options=max_results)
+        _telemetry_set_count("ferry_options", len(ferry_options))
+        _telemetry_set_count("final_transit_options", len(ferry_diverse))
         return [walking_option] + ferry_diverse
 
     # Artan yaricaplarla dene
@@ -3619,6 +3788,7 @@ def find_transit_routes(
     else:
         stop_pair_scan_limit = 20
 
+    stage_start = _time.perf_counter()
     for radius_idx, radius in enumerate(SEARCH_RADII):
         # Baslangica yakin duraklar
         origin_stops = _cached_get_stops_in_area(origin_lat, origin_lon, radius)
@@ -3835,13 +4005,19 @@ def find_transit_routes(
         # En az ikinci yaricapi da (>=1000m) tarayalim.
         if transit_options and len(transit_options) >= (max_results * 2) and radius_idx >= 1:
             break
+    _telemetry_add_ms("direct_bus_scan_ms", _time.perf_counter() - stage_start)
+    _telemetry_set_count("direct_bus_candidates", len(transit_options))
 
+    stage_start = _time.perf_counter()
     unique_options = _diversify_transit_options(transit_options, max_options=max_results)
+    _telemetry_add_ms("direct_bus_diversify_ms", _time.perf_counter() - stage_start)
+    _telemetry_set_count("direct_bus_unique_options", len(unique_options))
 
     # Yurume secenegi her zaman ekle
     result = [walking_option]
 
     # Transit secenekleri ekle
+    stage_start = _time.perf_counter()
     for opt in unique_options:
         walk_to_stop_coords = opt.get("origin_stop", {}).get("walk_coords") or _get_walk_road_coords(
             origin_lat, origin_lon,
@@ -3977,7 +4153,9 @@ def find_transit_routes(
                     },
                 ],
             })
+    _telemetry_add_ms("bus_geometry_finalize_ms", _time.perf_counter() - stage_start)
 
+    stage_start = _time.perf_counter()
     metro_options = _build_metro_options(
         origin_lat=origin_lat,
         origin_lon=origin_lon,
@@ -3987,9 +4165,12 @@ def find_transit_routes(
         direct_walk_m=direct_walk_m,
         max_results=5,
     )
+    _telemetry_add_ms("metro_options_ms", _time.perf_counter() - stage_start)
+    _telemetry_set_count("metro_options", len(metro_options))
 
     # Direkt/tek aktarma metro secenekleri cikmazsa cok aktarmali ag fallback'i dene.
     if not metro_options and allowed_user_modes != {"ferry"}:
+        stage_start = _time.perf_counter()
         graph_metro = _build_graph_metro_option(
             origin_lat=origin_lat,
             origin_lon=origin_lon,
@@ -4000,7 +4181,10 @@ def find_transit_routes(
         )
         if graph_metro:
             metro_options = [graph_metro]
+        _telemetry_add_ms("graph_metro_fallback_ms", _time.perf_counter() - stage_start)
+        _telemetry_set_count("graph_metro_options", len(metro_options))
 
+    stage_start = _time.perf_counter()
     mixed_options = _build_bus_metro_mixed_options(
         origin_lat=origin_lat,
         origin_lon=origin_lon,
@@ -4010,6 +4194,9 @@ def find_transit_routes(
         direct_walk_m=direct_walk_m,
         max_results=3,
     )
+    _telemetry_add_ms("bus_metro_mixed_ms", _time.perf_counter() - stage_start)
+    _telemetry_set_count("bus_metro_mixed_options", len(mixed_options))
+    stage_start = _time.perf_counter()
     reverse_mixed_options = _build_metro_bus_mixed_options(
         origin_lat=origin_lat,
         origin_lon=origin_lon,
@@ -4019,6 +4206,9 @@ def find_transit_routes(
         direct_walk_m=direct_walk_m,
         max_results=6,
     )
+    _telemetry_add_ms("metro_bus_mixed_ms", _time.perf_counter() - stage_start)
+    _telemetry_set_count("metro_bus_mixed_options", len(reverse_mixed_options))
+    stage_start = _time.perf_counter()
     ferry_options = _build_ferry_only_options(
         origin_lat=origin_lat,
         origin_lon=origin_lon,
@@ -4027,6 +4217,8 @@ def find_transit_routes(
         direct_walk_min=direct_walk_min,
         max_results=2,
     )
+    _telemetry_add_ms("ferry_options_ms", _time.perf_counter() - stage_start)
+    _telemetry_set_count("ferry_options", len(ferry_options))
 
     result.extend(metro_options)
     result.extend(mixed_options)
@@ -4034,6 +4226,7 @@ def find_transit_routes(
     result.extend(ferry_options)
 
     # Yurumeyi sabit ilk eleman olarak koru; toplu tasimayi cesitlendir.
+    stage_start = _time.perf_counter()
     walking = result[0]
     transit = []
     for opt in result[1:]:
@@ -4056,6 +4249,10 @@ def find_transit_routes(
         transit.append(opt)
     merged = _diversify_transit_options(transit, max_options=max_transit_options)
     result = [walking] + merged
+    _telemetry_add_ms("final_filter_diversify_ms", _time.perf_counter() - stage_start)
+    _telemetry_set_count("final_transit_candidates", len(transit))
+    _telemetry_set_count("final_transit_options", len(merged))
+    _telemetry_set_count("final_total_options", len(result))
     return result
 
 
@@ -4071,7 +4268,7 @@ def compare_routes(
     Direkt baglanti bulunamazsa yakin hatlari bilgi olarak dondurur.
     """
     compare_start = _time.perf_counter()
-    telemetry: Dict[str, object] = {"stage_ms": {}}
+    telemetry: Dict[str, object] = {"stage_ms": {}, "counters": {}}
     stage_ms = telemetry["stage_ms"]
     allowed_modes_norm = sorted(_normalize_allowed_modes(allowed_modes))
     cache_key = (
@@ -4091,10 +4288,14 @@ def compare_routes(
         return cached
 
     t0 = _time.perf_counter()
-    options = find_transit_routes(
-        origin_lat, origin_lon, dest_lat, dest_lon,
-        allowed_modes=allowed_modes_norm,
-    )
+    token = _TRANSIT_TELEMETRY_CTX.set(telemetry)
+    try:
+        options = find_transit_routes(
+            origin_lat, origin_lon, dest_lat, dest_lon,
+            allowed_modes=allowed_modes_norm,
+        )
+    finally:
+        _TRANSIT_TELEMETRY_CTX.reset(token)
     stage_ms["find_transit_routes_ms"] = round((_time.perf_counter() - t0) * 1000, 2)
 
     t0 = _time.perf_counter()
