@@ -90,14 +90,38 @@ _OSRM_INFLIGHT_WAIT_SEC = float(ROUTE_CONFIG.get("MULTIMODAL_OSRM_INFLIGHT_WAIT_
 _OSRM_SQLITE_LOCK = threading.Lock()
 _OSRM_INFLIGHT_LOCK = threading.Lock()
 _OSRM_INFLIGHT: Dict[str, Dict[str, Any]] = {}
-_OSRM_SQLITE_SCHEMA_READY = False
+_OSRM_SQLITE_SCHEMA_READY: Dict[str, bool] = {}
 _BACKEND_DIR = os.path.dirname(__file__)
-_OSRM_SQLITE_CACHE_DB = ROUTE_CONFIG.get(
-    "MULTIMODAL_OSRM_SQLITE_CACHE_DB",
+_PROJECT_DIR = os.path.abspath(os.path.join(_BACKEND_DIR, os.pardir))
+
+
+def _resolve_cache_path(raw_path: Any, default_abs_path: str) -> str:
+    path_str = str(raw_path if raw_path not in (None, "") else default_abs_path)
+    if os.path.isabs(path_str):
+        return os.path.abspath(path_str)
+    normalized = path_str.replace("/", os.sep).replace("\\", os.sep)
+    backend_prefix = f"backend{os.sep}"
+    if normalized.startswith(backend_prefix):
+        return os.path.abspath(os.path.join(_PROJECT_DIR, normalized))
+    return os.path.abspath(os.path.join(_BACKEND_DIR, normalized))
+
+
+_OSRM_SQLITE_CACHE_DB = _resolve_cache_path(
+    ROUTE_CONFIG.get("MULTIMODAL_OSRM_SQLITE_CACHE_DB"),
     os.path.join(_BACKEND_DIR, "cache", "osrm_cache.db"),
 )
-if not os.path.isabs(str(_OSRM_SQLITE_CACHE_DB)):
-    _OSRM_SQLITE_CACHE_DB = os.path.abspath(str(_OSRM_SQLITE_CACHE_DB))
+_OSRM_SQLITE_CACHE_SHARD_DIR = _resolve_cache_path(
+    ROUTE_CONFIG.get("MULTIMODAL_OSRM_SQLITE_CACHE_SHARD_DIR"),
+    os.path.join(_BACKEND_DIR, "cache", "osrm_shards"),
+)
+_OSRM_SQLITE_CACHE_SHARD_COUNT = max(
+    1,
+    int(ROUTE_CONFIG.get("MULTIMODAL_OSRM_SQLITE_CACHE_SHARD_COUNT", 1)),
+)
+_OSRM_SQLITE_SHARDING_ENABLED = _OSRM_SQLITE_CACHE_SHARD_COUNT > 1
+_OSRM_SQLITE_LEGACY_FALLBACK_ENABLED = bool(
+    ROUTE_CONFIG.get("MULTIMODAL_OSRM_SQLITE_CACHE_LEGACY_FALLBACK_ENABLED", True)
+)
 _COMPARE_ROUTE_CACHE: Dict[Tuple, Tuple[float, Dict]] = {}
 _COMPARE_CACHE_MAX_ITEMS = int(ROUTE_CONFIG.get("MULTIMODAL_COMPARE_CACHE_MAX_ITEMS", 220))
 _ENABLE_COMPARE_CACHE = bool(ROUTE_CONFIG.get("MULTIMODAL_COMPARE_CACHE_ENABLED", False))
@@ -166,9 +190,49 @@ def _osrm_cache_key_hash(key: Tuple) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _osrm_sqlite_connect() -> sqlite3.Connection:
-    os.makedirs(os.path.dirname(str(_OSRM_SQLITE_CACHE_DB)), exist_ok=True)
-    conn = sqlite3.connect(str(_OSRM_SQLITE_CACHE_DB), timeout=2.0)
+def _osrm_sqlite_shard_width() -> int:
+    return max(2, len(f"{int(_OSRM_SQLITE_CACHE_SHARD_COUNT) - 1:x}"))
+
+
+def _osrm_sqlite_shard_db_path(shard_idx: int) -> str:
+    shard_dir_name = f"{int(shard_idx):0{_osrm_sqlite_shard_width()}x}"
+    return os.path.join(str(_OSRM_SQLITE_CACHE_SHARD_DIR), shard_dir_name, "osrm_cache.db")
+
+
+def _osrm_sqlite_db_paths() -> List[str]:
+    if not _OSRM_SQLITE_SHARDING_ENABLED:
+        return [str(_OSRM_SQLITE_CACHE_DB)]
+    return [_osrm_sqlite_shard_db_path(i) for i in range(int(_OSRM_SQLITE_CACHE_SHARD_COUNT))]
+
+
+def _osrm_sqlite_target_db_path(key_hash: str) -> str:
+    if not _OSRM_SQLITE_SHARDING_ENABLED:
+        return str(_OSRM_SQLITE_CACHE_DB)
+    shard_idx = int(key_hash[:8], 16) % int(_OSRM_SQLITE_CACHE_SHARD_COUNT)
+    return _osrm_sqlite_shard_db_path(shard_idx)
+
+
+def _osrm_sqlite_legacy_fallback_db_path() -> Optional[str]:
+    if not _OSRM_SQLITE_SHARDING_ENABLED or not _OSRM_SQLITE_LEGACY_FALLBACK_ENABLED:
+        return None
+    legacy_path = str(_OSRM_SQLITE_CACHE_DB)
+    if not os.path.exists(legacy_path):
+        return None
+    return legacy_path
+
+
+def _osrm_sqlite_candidate_db_paths(key_hash: str) -> List[str]:
+    primary = _osrm_sqlite_target_db_path(key_hash)
+    paths = [primary]
+    legacy = _osrm_sqlite_legacy_fallback_db_path()
+    if legacy and os.path.abspath(legacy) != os.path.abspath(primary):
+        paths.append(legacy)
+    return paths
+
+
+def _osrm_sqlite_connect(db_path: str) -> sqlite3.Connection:
+    os.makedirs(os.path.dirname(str(db_path)), exist_ok=True)
+    conn = sqlite3.connect(str(db_path), timeout=2.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous = NORMAL;")
@@ -176,51 +240,71 @@ def _osrm_sqlite_connect() -> sqlite3.Connection:
     return conn
 
 
+def _ensure_osrm_sqlite_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS osrm_route_cache (
+            key_hash TEXT PRIMARY KEY,
+            route_kind TEXT NOT NULL,
+            key_json TEXT NOT NULL,
+            coords_json TEXT NOT NULL,
+            point_count INTEGER NOT NULL DEFAULT 0,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_osrm_route_cache_created "
+        "ON osrm_route_cache(created_at);"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_osrm_route_cache_kind "
+        "ON osrm_route_cache(route_kind);"
+    )
+
+
 def _ensure_osrm_sqlite_cache() -> None:
-    global _OSRM_SQLITE_SCHEMA_READY, _OSRM_SQLITE_CACHE_ERRORS
-    if not _OSRM_SQLITE_CACHE_ENABLED or _OSRM_SQLITE_SCHEMA_READY:
+    global _OSRM_SQLITE_CACHE_ERRORS
+    if not _OSRM_SQLITE_CACHE_ENABLED:
         return
+    db_paths = _osrm_sqlite_db_paths()
+    legacy_path = _osrm_sqlite_legacy_fallback_db_path()
+    if legacy_path and legacy_path not in db_paths:
+        db_paths = db_paths + [legacy_path]
     with _OSRM_SQLITE_LOCK:
-        if _OSRM_SQLITE_SCHEMA_READY:
-            return
-        try:
-            conn = _osrm_sqlite_connect()
+        for db_path in db_paths:
+            if _OSRM_SQLITE_SCHEMA_READY.get(db_path):
+                continue
             try:
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS osrm_route_cache (
-                        key_hash TEXT PRIMARY KEY,
-                        route_kind TEXT NOT NULL,
-                        key_json TEXT NOT NULL,
-                        coords_json TEXT NOT NULL,
-                        point_count INTEGER NOT NULL DEFAULT 0,
-                        created_at REAL NOT NULL,
-                        updated_at REAL NOT NULL
-                    )
-                    """
-                )
-                conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_osrm_route_cache_created "
-                    "ON osrm_route_cache(created_at);"
-                )
-                conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_osrm_route_cache_kind "
-                    "ON osrm_route_cache(route_kind);"
-                )
-                conn.commit()
-                _OSRM_SQLITE_SCHEMA_READY = True
-            finally:
-                conn.close()
-        except Exception:
-            _OSRM_SQLITE_CACHE_ERRORS += 1
+                conn = _osrm_sqlite_connect(db_path)
+                try:
+                    _ensure_osrm_sqlite_schema(conn)
+                    conn.commit()
+                    _OSRM_SQLITE_SCHEMA_READY[db_path] = True
+                finally:
+                    conn.close()
+            except Exception:
+                _OSRM_SQLITE_SCHEMA_READY[db_path] = False
+                _OSRM_SQLITE_CACHE_ERRORS += 1
+
+
+def _osrm_sqlite_max_rows_per_db() -> int:
+    total = int(_OSRM_SQLITE_CACHE_MAX_ROWS)
+    if total <= 0:
+        return 0
+    if not _OSRM_SQLITE_SHARDING_ENABLED:
+        return total
+    return max(1, int(math.ceil(total / float(_OSRM_SQLITE_CACHE_SHARD_COUNT))))
 
 
 def _prune_osrm_sqlite_cache(conn: sqlite3.Connection) -> None:
-    if _OSRM_SQLITE_CACHE_MAX_ROWS <= 0:
+    per_db_limit = _osrm_sqlite_max_rows_per_db()
+    if per_db_limit <= 0:
         return
     row = conn.execute("SELECT COUNT(*) AS n FROM osrm_route_cache").fetchone()
     count = int(row["n"] if row else 0)
-    overflow = count - int(_OSRM_SQLITE_CACHE_MAX_ROWS)
+    overflow = count - int(per_db_limit)
     if overflow <= 0:
         return
     conn.execute(
@@ -242,50 +326,59 @@ def _osrm_sqlite_cache_get(key: Tuple, route_kind: str) -> Optional[List[List[fl
     if not _OSRM_SQLITE_CACHE_ENABLED or _OSRM_SQLITE_CACHE_TTL_SEC <= 0:
         return None
     _ensure_osrm_sqlite_cache()
-    if not _OSRM_SQLITE_SCHEMA_READY:
-        return None
 
     key_hash = _osrm_cache_key_hash(key)
     now = _time.time()
+    primary_db_path = _osrm_sqlite_target_db_path(key_hash)
+    hit_from_fallback = False
+    cached_coords: Optional[List[List[float]]] = None
     try:
         with _OSRM_SQLITE_LOCK:
-            conn = _osrm_sqlite_connect()
-            try:
-                row = conn.execute(
-                    """
-                    SELECT coords_json, created_at
-                    FROM osrm_route_cache
-                    WHERE key_hash = ? AND route_kind = ?
-                    """,
-                    (key_hash, route_kind),
-                ).fetchone()
-                if row is None:
-                    _OSRM_SQLITE_CACHE_MISSES += 1
-                    _telemetry_count("osrm_sqlite_cache_misses")
-                    return None
-                if (now - float(row["created_at"])) > _OSRM_SQLITE_CACHE_TTL_SEC:
-                    conn.execute("DELETE FROM osrm_route_cache WHERE key_hash = ?", (key_hash,))
-                    conn.commit()
-                    _OSRM_SQLITE_CACHE_MISSES += 1
-                    _telemetry_count("osrm_sqlite_cache_misses")
-                    _telemetry_count("osrm_sqlite_cache_expired")
-                    return None
-                coords = json.loads(row["coords_json"])
-                if not isinstance(coords, list) or len(coords) < 2:
-                    conn.execute("DELETE FROM osrm_route_cache WHERE key_hash = ?", (key_hash,))
-                    conn.commit()
-                    _OSRM_SQLITE_CACHE_MISSES += 1
-                    _telemetry_count("osrm_sqlite_cache_misses")
-                    return None
-                _OSRM_SQLITE_CACHE_HITS += 1
-                _telemetry_count("osrm_sqlite_cache_hits")
-                return [[float(c[0]), float(c[1])] for c in coords]
-            finally:
-                conn.close()
+            for db_path in _osrm_sqlite_candidate_db_paths(key_hash):
+                if not _OSRM_SQLITE_SCHEMA_READY.get(db_path):
+                    continue
+                conn = _osrm_sqlite_connect(db_path)
+                try:
+                    row = conn.execute(
+                        """
+                        SELECT coords_json, created_at
+                        FROM osrm_route_cache
+                        WHERE key_hash = ? AND route_kind = ?
+                        """,
+                        (key_hash, route_kind),
+                    ).fetchone()
+                    if row is None:
+                        continue
+                    if (now - float(row["created_at"])) > _OSRM_SQLITE_CACHE_TTL_SEC:
+                        conn.execute("DELETE FROM osrm_route_cache WHERE key_hash = ?", (key_hash,))
+                        conn.commit()
+                        _telemetry_count("osrm_sqlite_cache_expired")
+                        continue
+                    coords = json.loads(row["coords_json"])
+                    if not isinstance(coords, list) or len(coords) < 2:
+                        conn.execute("DELETE FROM osrm_route_cache WHERE key_hash = ?", (key_hash,))
+                        conn.commit()
+                        continue
+                    cached_coords = [[float(c[0]), float(c[1])] for c in coords]
+                    hit_from_fallback = os.path.abspath(db_path) != os.path.abspath(primary_db_path)
+                    break
+                finally:
+                    conn.close()
     except Exception:
         _OSRM_SQLITE_CACHE_ERRORS += 1
         _telemetry_count("osrm_sqlite_cache_errors")
         return None
+
+    if cached_coords is None:
+        _OSRM_SQLITE_CACHE_MISSES += 1
+        _telemetry_count("osrm_sqlite_cache_misses")
+        return None
+    _OSRM_SQLITE_CACHE_HITS += 1
+    _telemetry_count("osrm_sqlite_cache_hits")
+    if hit_from_fallback:
+        _telemetry_count("osrm_sqlite_cache_legacy_hits")
+        _osrm_sqlite_cache_put(key, route_kind, cached_coords)
+    return cached_coords
 
 
 def _osrm_sqlite_cache_put(key: Tuple, route_kind: str, coords: List[List[float]]) -> None:
@@ -295,8 +388,6 @@ def _osrm_sqlite_cache_put(key: Tuple, route_kind: str, coords: List[List[float]
     if not coords or len(coords) < 2:
         return
     _ensure_osrm_sqlite_cache()
-    if not _OSRM_SQLITE_SCHEMA_READY:
-        return
 
     key_hash = _osrm_cache_key_hash(key)
     now = _time.time()
@@ -304,8 +395,11 @@ def _osrm_sqlite_cache_put(key: Tuple, route_kind: str, coords: List[List[float]
         coords_safe = [[float(c[0]), float(c[1])] for c in coords]
         key_json = json.dumps(key, ensure_ascii=True, separators=(",", ":"), default=str)
         coords_json = json.dumps(coords_safe, ensure_ascii=True, separators=(",", ":"))
+        target_db_path = _osrm_sqlite_target_db_path(key_hash)
+        if not _OSRM_SQLITE_SCHEMA_READY.get(target_db_path):
+            return
         with _OSRM_SQLITE_LOCK:
-            conn = _osrm_sqlite_connect()
+            conn = _osrm_sqlite_connect(target_db_path)
             try:
                 conn.execute(
                     """
@@ -334,16 +428,19 @@ def _osrm_sqlite_cache_size() -> int:
     if not _OSRM_SQLITE_CACHE_ENABLED:
         return 0
     _ensure_osrm_sqlite_cache()
-    if not _OSRM_SQLITE_SCHEMA_READY:
-        return 0
     try:
+        total = 0
         with _OSRM_SQLITE_LOCK:
-            conn = _osrm_sqlite_connect()
-            try:
-                row = conn.execute("SELECT COUNT(*) AS n FROM osrm_route_cache").fetchone()
-                return int(row["n"] if row else 0)
-            finally:
-                conn.close()
+            for db_path in _osrm_sqlite_db_paths():
+                if not _OSRM_SQLITE_SCHEMA_READY.get(db_path):
+                    continue
+                conn = _osrm_sqlite_connect(db_path)
+                try:
+                    row = conn.execute("SELECT COUNT(*) AS n FROM osrm_route_cache").fetchone()
+                    total += int(row["n"] if row else 0)
+                finally:
+                    conn.close()
+        return total
     except Exception:
         return 0
 
@@ -587,9 +684,13 @@ def get_osrm_cache_stats() -> Dict[str, object]:
         },
         "sqlite": {
             "enabled": bool(_OSRM_SQLITE_CACHE_ENABLED and _OSRM_SQLITE_CACHE_TTL_SEC > 0),
+            "layout": "sharded" if _OSRM_SQLITE_SHARDING_ENABLED else "single",
             "db_path": str(_OSRM_SQLITE_CACHE_DB),
+            "shard_dir": str(_OSRM_SQLITE_CACHE_SHARD_DIR) if _OSRM_SQLITE_SHARDING_ENABLED else None,
+            "shard_count": int(_OSRM_SQLITE_CACHE_SHARD_COUNT) if _OSRM_SQLITE_SHARDING_ENABLED else 1,
             "size": _osrm_sqlite_cache_size(),
             "max_rows": int(_OSRM_SQLITE_CACHE_MAX_ROWS),
+            "max_rows_per_shard": int(_osrm_sqlite_max_rows_per_db()),
             "ttl_sec": float(_OSRM_SQLITE_CACHE_TTL_SEC),
             "hits": int(_OSRM_SQLITE_CACHE_HITS),
             "misses": int(_OSRM_SQLITE_CACHE_MISSES),

@@ -28,8 +28,14 @@ backend/models/bert-base-turkish-uncased/*
 backend/cache/*
 !backend/cache/.gitkeep
 !backend/cache/*.db
+!backend/cache/osrm_shards/
+!backend/cache/osrm_shards/**/
+!backend/cache/osrm_shards/**/*.db
+backend/cache/*.local.db
 backend/cache/*.db-wal
 backend/cache/*.db-shm
+backend/cache/osrm_shards/**/*.db-wal
+backend/cache/osrm_shards/**/*.db-shm
 # !backend/cache/*.json
 backend/*.pid
 
