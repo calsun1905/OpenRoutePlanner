@@ -1,0 +1,3923 @@
+{
+  "version": "warmup_pool_v1",
+  "generated_at_utc": "2026-05-28T20:53:50.690296+00:00",
+  "generator_seed": 42,
+  "istanbul_bbox": {
+    "min_lat": 40.78,
+    "max_lat": 41.4,
+    "min_lon": 28.3,
+    "max_lon": 29.7
+  },
+  "notes": "Randomized OD pool for cache warmup. Deterministic seed.",
+  "case_count": 220,
+  "cases": [
+    {
+      "id": "R0001",
+      "origin": [
+        41.03456,
+        29.005775
+      ],
+      "destination": [
+        41.056514,
+        28.96252
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0002",
+      "origin": [
+        41.084058,
+        29.077793
+      ],
+      "destination": [
+        41.03735,
+        28.898634
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0003",
+      "origin": [
+        41.044499,
+        28.948332
+      ],
+      "destination": [
+        41.040669,
+        29.005829
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0004",
+      "origin": [
+        40.988986,
+        29.024224
+      ],
+      "destination": [
+        41.037501,
+        28.954179
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0005",
+      "origin": [
+        41.061993,
+        29.019507
+      ],
+      "destination": [
+        40.998994,
+        28.864221
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0006",
+      "origin": [
+        41.189613,
+        29.064235
+      ],
+      "destination": [
+        41.061249,
+        28.9641
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0007",
+      "origin": [
+        41.093746,
+        29.076979
+      ],
+      "destination": [
+        40.982082,
+        29.12042
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0008",
+      "origin": [
+        40.974874,
+        29.096108
+      ],
+      "destination": [
+        41.065311,
+        28.952765
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0009",
+      "origin": [
+        40.982644,
+        29.131423
+      ],
+      "destination": [
+        41.034332,
+        28.915255
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0010",
+      "origin": [
+        41.179125,
+        29.065658
+      ],
+      "destination": [
+        41.014387,
+        28.956932
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0011",
+      "origin": [
+        41.037137,
+        28.918092
+      ],
+      "destination": [
+        40.877898,
+        29.223446
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0012",
+      "origin": [
+        40.991253,
+        28.866023
+      ],
+      "destination": [
+        40.936067,
+        29.134405
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0013",
+      "origin": [
+        41.039897,
+        29.016647
+      ],
+      "destination": [
+        41.072807,
+        28.774903
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0014",
+      "origin": [
+        41.018261,
+        28.953899
+      ],
+      "destination": [
+        41.181769,
+        29.06772
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0015",
+      "origin": [
+        40.976737,
+        29.089945
+      ],
+      "destination": [
+        41.019078,
+        29.035364
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0016",
+      "origin": [
+        40.940295,
+        29.122395
+      ],
+      "destination": [
+        41.185978,
+        29.069389
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0017",
+      "origin": [
+        41.035806,
+        29.008491
+      ],
+      "destination": [
+        40.881134,
+        29.239115
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0018",
+      "origin": [
+        41.034911,
+        28.670109
+      ],
+      "destination": [
+        40.991904,
+        29.033808
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0019",
+      "origin": [
+        41.02938,
+        29.042669
+      ],
+      "destination": [
+        41.009312,
+        28.873016
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0020",
+      "origin": [
+        41.110836,
+        29.014402
+      ],
+      "destination": [
+        40.879827,
+        29.23965
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0021",
+      "origin": [
+        40.972869,
+        29.098045
+      ],
+      "destination": [
+        41.030834,
+        28.988942
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0022",
+      "origin": [
+        41.177449,
+        29.06588
+      ],
+      "destination": [
+        41.026317,
+        29.038006
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0023",
+      "origin": [
+        40.989676,
+        29.127228
+      ],
+      "destination": [
+        41.185866,
+        29.064583
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0024",
+      "origin": [
+        41.054801,
+        28.922714
+      ],
+      "destination": [
+        41.028522,
+        28.668658
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0025",
+      "origin": [
+        41.083704,
+        29.088233
+      ],
+      "destination": [
+        40.970248,
+        29.089546
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0026",
+      "origin": [
+        40.882004,
+        29.227634
+      ],
+      "destination": [
+        41.06759,
+        29.014267
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0027",
+      "origin": [
+        40.981028,
+        29.091637
+      ],
+      "destination": [
+        41.067596,
+        28.777728
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0028",
+      "origin": [
+        41.046439,
+        28.889321
+      ],
+      "destination": [
+        41.05771,
+        28.929485
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0029",
+      "origin": [
+        40.995186,
+        28.865148
+      ],
+      "destination": [
+        41.014081,
+        28.944434
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0030",
+      "origin": [
+        41.021042,
+        29.041365
+      ],
+      "destination": [
+        41.046593,
+        28.889682
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0031",
+      "origin": [
+        40.975252,
+        29.096583
+      ],
+      "destination": [
+        40.995351,
+        29.034842
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0032",
+      "origin": [
+        41.004488,
+        28.855008
+      ],
+      "destination": [
+        41.012291,
+        28.977635
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0033",
+      "origin": [
+        41.048734,
+        28.950648
+      ],
+      "destination": [
+        41.020845,
+        28.943832
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0034",
+      "origin": [
+        40.98714,
+        29.124717
+      ],
+      "destination": [
+        41.040471,
+        28.977472
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0035",
+      "origin": [
+        40.996735,
+        29.020862
+      ],
+      "destination": [
+        41.032376,
+        28.986616
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0036",
+      "origin": [
+        41.003859,
+        28.860184
+      ],
+      "destination": [
+        41.061636,
+        28.950676
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0037",
+      "origin": [
+        41.037837,
+        28.947928
+      ],
+      "destination": [
+        40.884272,
+        29.228
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0038",
+      "origin": [
+        41.067199,
+        29.022074
+      ],
+      "destination": [
+        41.015344,
+        28.971145
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0039",
+      "origin": [
+        41.029507,
+        28.674233
+      ],
+      "destination": [
+        40.928891,
+        29.126353
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0040",
+      "origin": [
+        40.994906,
+        29.03146
+      ],
+      "destination": [
+        41.057108,
+        28.935283
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0041",
+      "origin": [
+        41.029311,
+        28.916178
+      ],
+      "destination": [
+        41.189121,
+        29.060083
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0042",
+      "origin": [
+        41.061266,
+        28.95463
+      ],
+      "destination": [
+        41.01921,
+        28.953399
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0043",
+      "origin": [
+        41.037282,
+        28.913492
+      ],
+      "destination": [
+        41.037816,
+        29.016539
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0044",
+      "origin": [
+        41.066699,
+        29.009804
+      ],
+      "destination": [
+        41.034251,
+        29.014209
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0045",
+      "origin": [
+        40.989262,
+        29.031496
+      ],
+      "destination": [
+        41.018577,
+        28.943102
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0046",
+      "origin": [
+        41.187618,
+        29.067703
+      ],
+      "destination": [
+        41.031833,
+        28.978667
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0047",
+      "origin": [
+        41.011045,
+        28.867571
+      ],
+      "destination": [
+        41.033293,
+        28.978247
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0048",
+      "origin": [
+        41.106026,
+        29.028308
+      ],
+      "destination": [
+        41.02295,
+        28.957796
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0049",
+      "origin": [
+        41.036583,
+        28.904116
+      ],
+      "destination": [
+        41.012266,
+        28.976899
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0050",
+      "origin": [
+        40.939238,
+        29.124038
+      ],
+      "destination": [
+        40.995459,
+        29.034096
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0051",
+      "origin": [
+        40.983835,
+        29.129449
+      ],
+      "destination": [
+        41.060847,
+        28.92229
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0052",
+      "origin": [
+        40.994312,
+        28.85168
+      ],
+      "destination": [
+        40.885736,
+        29.228869
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0053",
+      "origin": [
+        41.029769,
+        28.905369
+      ],
+      "destination": [
+        41.188229,
+        29.062241
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0054",
+      "origin": [
+        41.038291,
+        28.982377
+      ],
+      "destination": [
+        41.064625,
+        28.957419
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0055",
+      "origin": [
+        40.993037,
+        28.851255
+      ],
+      "destination": [
+        41.089879,
+        29.085039
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0056",
+      "origin": [
+        40.999108,
+        28.875292
+      ],
+      "destination": [
+        41.038755,
+        28.893737
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0057",
+      "origin": [
+        41.017803,
+        28.952537
+      ],
+      "destination": [
+        40.888297,
+        29.243053
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0058",
+      "origin": [
+        40.988375,
+        29.121945
+      ],
+      "destination": [
+        41.044773,
+        28.891358
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0059",
+      "origin": [
+        41.002306,
+        28.855666
+      ],
+      "destination": [
+        41.178627,
+        29.071158
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0060",
+      "origin": [
+        40.984121,
+        29.028263
+      ],
+      "destination": [
+        41.034114,
+        28.910598
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0061",
+      "origin": [
+        41.028235,
+        28.908285
+      ],
+      "destination": [
+        40.883952,
+        29.235362
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0062",
+      "origin": [
+        41.110358,
+        29.027564
+      ],
+      "destination": [
+        41.06889,
+        29.017312
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0063",
+      "origin": [
+        41.069713,
+        28.781553
+      ],
+      "destination": [
+        40.99038,
+        28.863266
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0064",
+      "origin": [
+        41.036533,
+        28.904685
+      ],
+      "destination": [
+        40.976859,
+        29.089254
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0065",
+      "origin": [
+        41.05522,
+        28.957899
+      ],
+      "destination": [
+        41.055948,
+        28.928002
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0066",
+      "origin": [
+        41.060036,
+        28.933664
+      ],
+      "destination": [
+        41.109945,
+        29.027917
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0067",
+      "origin": [
+        40.995306,
+        29.027151
+      ],
+      "destination": [
+        41.021326,
+        28.955478
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0068",
+      "origin": [
+        41.036625,
+        28.672968
+      ],
+      "destination": [
+        41.067316,
+        28.775257
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0069",
+      "origin": [
+        41.177593,
+        29.061731
+      ],
+      "destination": [
+        41.070593,
+        29.017109
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0070",
+      "origin": [
+        40.881309,
+        29.223959
+      ],
+      "destination": [
+        41.187594,
+        29.064421
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0071",
+      "origin": [
+        41.090469,
+        29.092227
+      ],
+      "destination": [
+        40.9946,
+        28.85713
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0072",
+      "origin": [
+        41.186179,
+        29.071398
+      ],
+      "destination": [
+        41.023428,
+        28.9495
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0073",
+      "origin": [
+        41.034418,
+        28.894114
+      ],
+      "destination": [
+        41.07598,
+        28.777273
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0074",
+      "origin": [
+        41.062422,
+        28.92758
+      ],
+      "destination": [
+        41.03146,
+        29.043562
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0075",
+      "origin": [
+        41.066772,
+        29.019836
+      ],
+      "destination": [
+        41.036817,
+        29.005523
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0076",
+      "origin": [
+        40.983507,
+        29.128441
+      ],
+      "destination": [
+        41.053759,
+        28.931284
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0077",
+      "origin": [
+        40.934672,
+        29.134933
+      ],
+      "destination": [
+        41.06135,
+        29.021283
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0078",
+      "origin": [
+        41.04545,
+        29.01218
+      ],
+      "destination": [
+        41.071461,
+        29.021243
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0079",
+      "origin": [
+        41.003194,
+        28.972046
+      ],
+      "destination": [
+        41.11344,
+        29.022087
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0080",
+      "origin": [
+        41.05199,
+        28.924771
+      ],
+      "destination": [
+        41.043125,
+        28.957583
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0081",
+      "origin": [
+        40.984457,
+        29.019937
+      ],
+      "destination": [
+        40.888092,
+        29.242715
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0082",
+      "origin": [
+        40.993156,
+        28.860566
+      ],
+      "destination": [
+        41.04636,
+        28.945328
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0083",
+      "origin": [
+        41.0366,
+        28.918436
+      ],
+      "destination": [
+        41.111949,
+        29.013198
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0084",
+      "origin": [
+        41.025993,
+        28.915908
+      ],
+      "destination": [
+        40.998282,
+        28.871141
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0085",
+      "origin": [
+        41.067135,
+        28.960805
+      ],
+      "destination": [
+        41.045933,
+        28.900424
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0086",
+      "origin": [
+        40.990413,
+        29.030558
+      ],
+      "destination": [
+        41.019369,
+        28.956834
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0087",
+      "origin": [
+        41.060191,
+        28.928572
+      ],
+      "destination": [
+        41.038641,
+        28.892573
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0088",
+      "origin": [
+        40.931412,
+        29.1301
+      ],
+      "destination": [
+        41.057089,
+        28.924943
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0089",
+      "origin": [
+        41.068818,
+        28.774006
+      ],
+      "destination": [
+        40.886089,
+        29.228686
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0090",
+      "origin": [
+        41.183039,
+        29.061048
+      ],
+      "destination": [
+        41.004476,
+        28.976809
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0091",
+      "origin": [
+        41.043701,
+        28.949544
+      ],
+      "destination": [
+        41.077618,
+        28.771982
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0092",
+      "origin": [
+        40.993804,
+        28.861787
+      ],
+      "destination": [
+        41.039714,
+        28.950609
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0093",
+      "origin": [
+        41.041926,
+        28.894381
+      ],
+      "destination": [
+        41.017034,
+        28.946413
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0094",
+      "origin": [
+        41.056073,
+        28.952032
+      ],
+      "destination": [
+        41.018216,
+        28.954157
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0095",
+      "origin": [
+        41.014482,
+        28.951223
+      ],
+      "destination": [
+        41.077147,
+        28.780545
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0096",
+      "origin": [
+        40.982076,
+        29.118551
+      ],
+      "destination": [
+        40.883804,
+        29.24028
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0097",
+      "origin": [
+        41.185643,
+        29.059947
+      ],
+      "destination": [
+        40.896106,
+        29.239545
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0098",
+      "origin": [
+        41.090359,
+        29.083688
+      ],
+      "destination": [
+        40.886255,
+        29.232073
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0099",
+      "origin": [
+        41.05907,
+        28.951259
+      ],
+      "destination": [
+        41.069664,
+        29.006011
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0100",
+      "origin": [
+        41.084827,
+        29.080419
+      ],
+      "destination": [
+        40.891636,
+        29.238275
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0101",
+      "origin": [
+        41.034087,
+        28.675826
+      ],
+      "destination": [
+        41.002686,
+        28.867331
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0102",
+      "origin": [
+        41.084467,
+        29.092522
+      ],
+      "destination": [
+        41.105229,
+        29.025467
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0103",
+      "origin": [
+        40.929069,
+        29.126278
+      ],
+      "destination": [
+        41.032949,
+        28.907561
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0104",
+      "origin": [
+        41.056851,
+        28.923451
+      ],
+      "destination": [
+        41.037733,
+        28.953218
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0105",
+      "origin": [
+        41.063961,
+        29.009597
+      ],
+      "destination": [
+        41.036394,
+        28.914926
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0106",
+      "origin": [
+        41.041842,
+        28.89941
+      ],
+      "destination": [
+        41.066381,
+        28.964053
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0107",
+      "origin": [
+        41.041114,
+        28.986616
+      ],
+      "destination": [
+        40.994769,
+        29.03516
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0108",
+      "origin": [
+        41.063217,
+        28.961895
+      ],
+      "destination": [
+        41.061875,
+        28.927008
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0109",
+      "origin": [
+        41.056912,
+        28.93362
+      ],
+      "destination": [
+        41.071177,
+        29.015363
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0110",
+      "origin": [
+        41.074452,
+        29.019311
+      ],
+      "destination": [
+        40.977683,
+        29.104563
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0111",
+      "origin": [
+        41.094589,
+        29.079178
+      ],
+      "destination": [
+        41.037173,
+        28.984018
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0112",
+      "origin": [
+        40.989177,
+        29.033342
+      ],
+      "destination": [
+        41.097554,
+        29.08419
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0113",
+      "origin": [
+        41.037351,
+        28.910507
+      ],
+      "destination": [
+        41.063289,
+        28.9549
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0114",
+      "origin": [
+        41.182149,
+        29.063147
+      ],
+      "destination": [
+        41.034355,
+        28.992993
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0115",
+      "origin": [
+        41.03707,
+        28.677524
+      ],
+      "destination": [
+        41.006951,
+        28.973089
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0116",
+      "origin": [
+        41.112806,
+        29.02542
+      ],
+      "destination": [
+        41.069131,
+        28.779737
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0117",
+      "origin": [
+        41.05528,
+        28.918991
+      ],
+      "destination": [
+        41.043472,
+        28.954788
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0118",
+      "origin": [
+        40.883797,
+        29.238136
+      ],
+      "destination": [
+        41.178836,
+        29.072104
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0119",
+      "origin": [
+        41.057627,
+        28.921118
+      ],
+      "destination": [
+        41.06673,
+        28.954962
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0120",
+      "origin": [
+        41.048116,
+        28.892543
+      ],
+      "destination": [
+        41.074138,
+        28.776921
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0121",
+      "origin": [
+        41.071727,
+        29.019625
+      ],
+      "destination": [
+        40.932794,
+        29.135591
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0122",
+      "origin": [
+        41.011455,
+        28.984137
+      ],
+      "destination": [
+        40.891951,
+        29.242419
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0123",
+      "origin": [
+        41.055275,
+        28.924151
+      ],
+      "destination": [
+        41.186585,
+        29.064213
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0124",
+      "origin": [
+        40.982239,
+        29.122011
+      ],
+      "destination": [
+        41.046727,
+        28.948183
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0125",
+      "origin": [
+        41.020655,
+        28.954994
+      ],
+      "destination": [
+        41.07176,
+        28.781683
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0126",
+      "origin": [
+        41.068018,
+        28.786811
+      ],
+      "destination": [
+        41.034481,
+        28.978206
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0127",
+      "origin": [
+        41.06641,
+        28.950261
+      ],
+      "destination": [
+        41.029676,
+        28.683106
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0128",
+      "origin": [
+        41.071854,
+        29.009605
+      ],
+      "destination": [
+        41.075175,
+        28.777157
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0129",
+      "origin": [
+        40.886975,
+        29.22936
+      ],
+      "destination": [
+        41.02956,
+        28.917118
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0130",
+      "origin": [
+        41.184491,
+        29.061791
+      ],
+      "destination": [
+        41.039555,
+        28.981385
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0131",
+      "origin": [
+        41.016749,
+        28.942874
+      ],
+      "destination": [
+        41.069726,
+        29.019934
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0132",
+      "origin": [
+        40.987212,
+        29.019992
+      ],
+      "destination": [
+        41.039071,
+        28.942154
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0133",
+      "origin": [
+        41.000196,
+        28.87303
+      ],
+      "destination": [
+        41.042149,
+        28.901873
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0134",
+      "origin": [
+        40.991677,
+        29.026003
+      ],
+      "destination": [
+        41.070437,
+        29.01356
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0135",
+      "origin": [
+        40.978586,
+        29.096213
+      ],
+      "destination": [
+        41.057903,
+        28.933781
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0136",
+      "origin": [
+        40.891471,
+        29.232456
+      ],
+      "destination": [
+        41.038611,
+        28.92169
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0137",
+      "origin": [
+        41.044141,
+        29.008866
+      ],
+      "destination": [
+        41.038351,
+        28.905389
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0138",
+      "origin": [
+        41.058792,
+        28.956102
+      ],
+      "destination": [
+        40.973661,
+        29.100288
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0139",
+      "origin": [
+        41.028953,
+        28.914521
+      ],
+      "destination": [
+        41.000176,
+        28.863159
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0140",
+      "origin": [
+        41.110953,
+        29.027871
+      ],
+      "destination": [
+        41.014621,
+        28.954781
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0141",
+      "origin": [
+        40.972138,
+        29.092661
+      ],
+      "destination": [
+        41.04508,
+        29.014147
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0142",
+      "origin": [
+        41.047209,
+        29.012088
+      ],
+      "destination": [
+        41.057749,
+        28.957494
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0143",
+      "origin": [
+        41.011798,
+        28.946217
+      ],
+      "destination": [
+        41.029164,
+        29.036486
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0144",
+      "origin": [
+        41.183244,
+        29.073329
+      ],
+      "destination": [
+        41.010059,
+        28.868368
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0145",
+      "origin": [
+        40.896134,
+        29.244872
+      ],
+      "destination": [
+        41.017244,
+        28.94248
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0146",
+      "origin": [
+        41.034711,
+        28.911656
+      ],
+      "destination": [
+        41.022679,
+        28.950674
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0147",
+      "origin": [
+        40.994108,
+        28.852601
+      ],
+      "destination": [
+        41.006308,
+        28.982633
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0148",
+      "origin": [
+        41.095443,
+        29.092185
+      ],
+      "destination": [
+        40.99186,
+        28.854475
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0149",
+      "origin": [
+        41.108523,
+        29.022871
+      ],
+      "destination": [
+        41.184926,
+        29.068602
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0150",
+      "origin": [
+        41.043749,
+        28.943183
+      ],
+      "destination": [
+        40.884253,
+        29.231833
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0151",
+      "origin": [
+        40.971354,
+        29.096112
+      ],
+      "destination": [
+        41.185255,
+        29.070433
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0152",
+      "origin": [
+        41.094063,
+        29.091252
+      ],
+      "destination": [
+        41.019931,
+        28.955373
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0153",
+      "origin": [
+        40.93784,
+        29.125894
+      ],
+      "destination": [
+        41.036104,
+        28.980514
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0154",
+      "origin": [
+        41.05859,
+        28.965329
+      ],
+      "destination": [
+        41.034286,
+        28.905929
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0155",
+      "origin": [
+        40.992466,
+        29.129511
+      ],
+      "destination": [
+        41.05462,
+        28.953606
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0156",
+      "origin": [
+        41.033207,
+        28.978641
+      ],
+      "destination": [
+        40.88273,
+        29.224066
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0157",
+      "origin": [
+        41.095308,
+        29.080161
+      ],
+      "destination": [
+        40.989951,
+        29.128907
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0158",
+      "origin": [
+        40.94212,
+        29.131384
+      ],
+      "destination": [
+        41.029899,
+        29.035369
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0159",
+      "origin": [
+        41.023559,
+        29.046903
+      ],
+      "destination": [
+        41.009479,
+        28.970168
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0160",
+      "origin": [
+        41.040381,
+        28.985443
+      ],
+      "destination": [
+        41.029138,
+        29.041596
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0161",
+      "origin": [
+        41.02917,
+        28.676865
+      ],
+      "destination": [
+        41.097214,
+        29.076937
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0162",
+      "origin": [
+        41.062182,
+        28.919534
+      ],
+      "destination": [
+        41.041097,
+        29.007927
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0163",
+      "origin": [
+        41.0793,
+        28.771649
+      ],
+      "destination": [
+        41.035563,
+        28.951541
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0164",
+      "origin": [
+        41.02739,
+        29.043451
+      ],
+      "destination": [
+        40.938155,
+        29.128675
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0165",
+      "origin": [
+        41.057018,
+        28.920186
+      ],
+      "destination": [
+        41.037706,
+        28.682797
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0166",
+      "origin": [
+        41.046789,
+        28.895435
+      ],
+      "destination": [
+        41.060215,
+        28.925278
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0167",
+      "origin": [
+        40.8791,
+        29.227233
+      ],
+      "destination": [
+        41.047732,
+        28.900076
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0168",
+      "origin": [
+        41.044722,
+        28.894735
+      ],
+      "destination": [
+        41.055174,
+        28.95102
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0169",
+      "origin": [
+        41.030916,
+        28.919751
+      ],
+      "destination": [
+        41.066852,
+        28.95719
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0170",
+      "origin": [
+        40.888099,
+        29.232961
+      ],
+      "destination": [
+        41.111107,
+        29.01513
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0171",
+      "origin": [
+        40.974442,
+        29.097857
+      ],
+      "destination": [
+        41.054954,
+        28.954736
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0172",
+      "origin": [
+        41.048033,
+        28.902313
+      ],
+      "destination": [
+        41.184435,
+        29.068726
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0173",
+      "origin": [
+        41.115744,
+        29.017047
+      ],
+      "destination": [
+        41.027598,
+        28.916846
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0174",
+      "origin": [
+        40.874688,
+        29.237688
+      ],
+      "destination": [
+        41.006255,
+        28.870813
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0175",
+      "origin": [
+        41.024494,
+        28.94276
+      ],
+      "destination": [
+        41.041839,
+        29.007495
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0176",
+      "origin": [
+        40.879929,
+        29.235167
+      ],
+      "destination": [
+        40.994086,
+        29.029149
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0177",
+      "origin": [
+        41.031967,
+        28.987003
+      ],
+      "destination": [
+        41.028105,
+        29.038126
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0178",
+      "origin": [
+        41.072565,
+        28.775044
+      ],
+      "destination": [
+        41.114671,
+        29.014435
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0179",
+      "origin": [
+        41.063066,
+        28.960083
+      ],
+      "destination": [
+        40.891188,
+        29.236443
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0180",
+      "origin": [
+        40.991089,
+        28.853975
+      ],
+      "destination": [
+        41.117413,
+        29.025545
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0181",
+      "origin": [
+        41.178914,
+        29.067298
+      ],
+      "destination": [
+        41.04402,
+        28.947221
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0182",
+      "origin": [
+        41.016782,
+        28.949016
+      ],
+      "destination": [
+        41.030821,
+        28.981822
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0183",
+      "origin": [
+        41.093817,
+        29.083301
+      ],
+      "destination": [
+        40.991958,
+        28.850855
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0184",
+      "origin": [
+        40.989525,
+        29.031223
+      ],
+      "destination": [
+        41.109011,
+        29.019924
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0185",
+      "origin": [
+        40.97788,
+        29.097307
+      ],
+      "destination": [
+        41.039699,
+        28.893675
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0186",
+      "origin": [
+        40.980619,
+        29.089698
+      ],
+      "destination": [
+        40.883718,
+        29.23192
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0187",
+      "origin": [
+        41.022237,
+        28.945217
+      ],
+      "destination": [
+        41.036309,
+        29.004454
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0188",
+      "origin": [
+        41.036751,
+        29.014238
+      ],
+      "destination": [
+        41.067715,
+        29.017926
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0189",
+      "origin": [
+        41.034259,
+        28.921671
+      ],
+      "destination": [
+        41.088254,
+        29.092707
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0190",
+      "origin": [
+        41.019383,
+        29.041018
+      ],
+      "destination": [
+        41.052661,
+        28.923169
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0191",
+      "origin": [
+        40.999168,
+        28.87185
+      ],
+      "destination": [
+        41.028142,
+        28.674569
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0192",
+      "origin": [
+        41.073045,
+        29.01964
+      ],
+      "destination": [
+        41.043056,
+        29.00972
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0193",
+      "origin": [
+        41.097341,
+        29.088762
+      ],
+      "destination": [
+        41.176191,
+        29.073254
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0194",
+      "origin": [
+        40.881449,
+        29.225465
+      ],
+      "destination": [
+        41.104691,
+        29.01426
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0195",
+      "origin": [
+        41.041666,
+        28.944134
+      ],
+      "destination": [
+        41.064168,
+        29.012542
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0196",
+      "origin": [
+        41.10904,
+        29.028105
+      ],
+      "destination": [
+        40.988479,
+        29.032666
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0197",
+      "origin": [
+        40.879348,
+        29.232385
+      ],
+      "destination": [
+        41.066167,
+        29.009384
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0198",
+      "origin": [
+        40.882991,
+        29.225304
+      ],
+      "destination": [
+        41.065637,
+        29.021551
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0199",
+      "origin": [
+        41.028607,
+        29.03494
+      ],
+      "destination": [
+        41.111848,
+        29.023439
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0200",
+      "origin": [
+        41.028521,
+        29.049601
+      ],
+      "destination": [
+        41.039359,
+        28.920412
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0201",
+      "origin": [
+        41.040297,
+        29.007251
+      ],
+      "destination": [
+        41.030221,
+        28.907964
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0202",
+      "origin": [
+        40.877365,
+        29.2399
+      ],
+      "destination": [
+        41.068431,
+        28.775428
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0203",
+      "origin": [
+        41.039626,
+        28.683323
+      ],
+      "destination": [
+        41.176144,
+        29.063525
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0204",
+      "origin": [
+        41.106021,
+        29.015574
+      ],
+      "destination": [
+        41.000277,
+        28.861121
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0205",
+      "origin": [
+        41.011129,
+        28.947393
+      ],
+      "destination": [
+        41.058662,
+        28.934983
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0206",
+      "origin": [
+        41.01387,
+        28.945266
+      ],
+      "destination": [
+        41.062205,
+        28.931834
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0207",
+      "origin": [
+        41.011739,
+        28.880735
+      ],
+      "destination": [
+        41.031648,
+        28.90969
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0208",
+      "origin": [
+        41.045763,
+        28.902021
+      ],
+      "destination": [
+        40.984893,
+        29.02375
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0209",
+      "origin": [
+        41.011554,
+        28.876094
+      ],
+      "destination": [
+        41.183029,
+        29.05992
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0210",
+      "origin": [
+        40.98937,
+        29.028227
+      ],
+      "destination": [
+        40.939867,
+        29.123759
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0211",
+      "origin": [
+        41.061699,
+        28.925553
+      ],
+      "destination": [
+        41.003809,
+        28.870357
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0212",
+      "origin": [
+        41.063833,
+        29.010518
+      ],
+      "destination": [
+        40.999527,
+        28.87615
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0213",
+      "origin": [
+        41.042911,
+        28.984532
+      ],
+      "destination": [
+        40.895568,
+        29.2441
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0214",
+      "origin": [
+        41.048376,
+        28.919847
+      ],
+      "destination": [
+        41.107485,
+        29.026694
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0215",
+      "origin": [
+        41.056722,
+        28.952071
+      ],
+      "destination": [
+        40.887034,
+        29.242062
+      ],
+      "allowed_modes": [
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0216",
+      "origin": [
+        41.072648,
+        29.013597
+      ],
+      "destination": [
+        41.061019,
+        28.960743
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0217",
+      "origin": [
+        41.038594,
+        28.941227
+      ],
+      "destination": [
+        41.023481,
+        29.043201
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus",
+        "ferry"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0218",
+      "origin": [
+        41.074635,
+        29.006251
+      ],
+      "destination": [
+        41.035175,
+        28.676925
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro",
+        "metrobus"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0219",
+      "origin": [
+        40.990927,
+        28.857077
+      ],
+      "destination": [
+        41.071576,
+        28.783104
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    },
+    {
+      "id": "R0220",
+      "origin": [
+        41.064072,
+        29.016271
+      ],
+      "destination": [
+        40.999593,
+        28.873892
+      ],
+      "allowed_modes": [
+        "bus",
+        "metro"
+      ],
+      "optimize": false,
+      "route_type": "route_1"
+    }
+  ]
+}
