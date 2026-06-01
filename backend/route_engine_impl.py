@@ -164,6 +164,8 @@ def nodes_to_coords(G, node_list: list) -> list:
     """
     if not node_list:
         return []
+    if not _is_valid_path(G, node_list):
+        return []
     if len(node_list) == 1:
         return [_node_coord(G, node_list[0])]
 

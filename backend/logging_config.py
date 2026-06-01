@@ -16,6 +16,19 @@ KULLANIM:
 
 import logging
 import sys
+import io
+
+import os
+
+# Force UTF-8 stdout/stderr on Windows to avoid CP1254 terminal and redirect encoding mojibakes
+# Skip inside pytest environments to prevent standard output stream capturing issues
+if sys.platform.startswith('win') and "pytest" not in sys.argv[0] and "PYTEST_CURRENT_TEST" not in os.environ:
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 import json
 from datetime import datetime
 from pathlib import Path

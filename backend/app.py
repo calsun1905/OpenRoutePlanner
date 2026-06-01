@@ -6,6 +6,24 @@ Rota optimizasyonu ve POI arama endpoint'leri saÃşlar.
 """
 import os
 import sys
+import io
+
+# Force UTF-8 stdout/stderr on Windows to avoid CP1254 terminal and redirect encoding mojibakes
+# Skip inside pytest environments to prevent standard output stream capturing issues
+if sys.platform.startswith('win') and "pytest" not in sys.argv[0] and "PYTEST_CURRENT_TEST" not in os.environ:
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
+    # Auto-re-execute using virtual environment python if running globally on Windows
+    import subprocess
+    venv_python = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".venv", "Scripts", "python.exe"))
+    if os.path.exists(venv_python) and os.path.abspath(sys.executable).lower() != venv_python.lower():
+        print(f"[app.py] Sanal ortam disinda calistirildi. Otomatik olarak .venv (GPU/CUDA) ortaminda yeniden baslatiliyor...")
+        sys.exit(subprocess.call([venv_python] + sys.argv))
+
 import json
 import time
 import hashlib
@@ -13,6 +31,7 @@ import builtins
 import uuid
 import re
 import threading
+import difflib
 from datetime import datetime, timezone
 from functools import partial
 from typing import Any
@@ -381,20 +400,30 @@ def _is_place_text_in_istanbul(place_text: Any) -> tuple[bool | None, dict[str, 
 
 def _extract_nlp_places_for_scope_check(parse_result: dict[str, Any]) -> list[str]:
     candidates: list[str] = []
-    for key in ("origin", "destination", "location"):
-        raw = parse_result.get(key)
-        if isinstance(raw, str) and raw.strip():
-            candidates.append(raw.strip())
+    intent_type = str(parse_result.get("type", "") or "").strip().lower()
 
-    raw_locations = parse_result.get("locations")
-    if isinstance(raw_locations, list):
-        for item in raw_locations:
-            if isinstance(item, str) and item.strip():
-                candidates.append(item.strip())
-            elif isinstance(item, dict):
-                place = item.get("place")
-                if isinstance(place, str) and place.strip():
-                    candidates.append(place.strip())
+    # POI sorgularinda sadece ana "location" alanini scope-check'e sok.
+    # BERT'in "locations" yan adayi bazen alakasiz ilce/sehir (ornegin Kiraz/Izmir)
+    # uretebiliyor ve gereksiz geofence blokuna sebep oluyor.
+    if intent_type == "poi":
+        raw_location = parse_result.get("location")
+        if isinstance(raw_location, str) and raw_location.strip():
+            candidates.append(raw_location.strip())
+    else:
+        for key in ("origin", "destination", "location"):
+            raw = parse_result.get(key)
+            if isinstance(raw, str) and raw.strip():
+                candidates.append(raw.strip())
+
+        raw_locations = parse_result.get("locations")
+        if isinstance(raw_locations, list):
+            for item in raw_locations:
+                if isinstance(item, str) and item.strip():
+                    candidates.append(item.strip())
+                elif isinstance(item, dict):
+                    place = item.get("place")
+                    if isinstance(place, str) and place.strip():
+                        candidates.append(place.strip())
 
     seen: set[str] = set()
     unique: list[str] = []
@@ -405,6 +434,75 @@ def _extract_nlp_places_for_scope_check(parse_result: dict[str, Any]) -> list[st
         seen.add(place_key)
         unique.append(place)
     return unique[:4]
+
+
+def _is_route_intent_query_text(query: str) -> bool:
+    q = str(query or "").strip().lower()
+    if not q:
+        return False
+    route_cues = (
+        "rota", "git", "giderim", "gider", "ulas", "ulaş", "varis", "varış",
+        "aktarma", "nasil giderim", "nasıl giderim", "nereden", "nereye",
+    )
+    if any(cue in q for cue in route_cues):
+        return True
+    # "x'den y'ye" benzeri yön kalıpları
+    if re.search(r"\b\w+(?:'?(?:den|dan))\b.*\b\w+(?:'?(?:e|a|ye|ya))\b", q):
+        return True
+    return False
+
+
+def _has_poi_concept_cue(query: str) -> bool:
+    q = str(query or "").strip().lower()
+    if not q:
+        return False
+    poi_cues = (
+        "pastane", "kafe", "cafe", "restoran", "restaurant", "eczane", "hastane",
+        "market", "avm", "otel", "müze", "muze", "kasap", "firin", "fırın", "park",
+    )
+    return any(c in q for c in poi_cues)
+
+
+def _has_single_location_style_cue(query: str) -> bool:
+    q = str(query or "").strip().lower()
+    if not q:
+        return False
+    # "maltepede", "kadikoy'de", "besiktasta" vb.
+    return bool(re.search(r"\b\w+(?:'?(?:de|da|te|ta))\b", q))
+
+
+def _postprocess_nlp_result_for_poi(query: str, result: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(result, dict):
+        return result
+    query_type = str(result.get("type", "") or "").strip().lower()
+    if query_type != "route":
+        return result
+    if _is_route_intent_query_text(query):
+        return result
+    if not _has_poi_concept_cue(query):
+        return result
+    if not _has_single_location_style_cue(query):
+        return result
+
+    origin = result.get("origin")
+    destination = result.get("destination")
+    location = result.get("location")
+    resolved_location = None
+    for cand in (location, origin, destination):
+        if isinstance(cand, str) and cand.strip():
+            resolved_location = cand.strip()
+            break
+    if not resolved_location:
+        return result
+
+    patched = dict(result)
+    patched["type"] = "poi"
+    patched["location"] = resolved_location
+    patched["origin"] = None
+    patched["destination"] = None
+    patched["locations"] = None
+    patched["postprocess_note"] = "route_to_poi_single_location_guard"
+    return patched
 
 
 def _openrouter_system_prompt() -> str:
@@ -439,7 +537,18 @@ def _inject_system_message(messages: list[dict]) -> list[dict]:
 
 
 def _local_llm_system_prompt() -> str:
-    return os.getenv("LOCAL_LLM_SYSTEM_PROMPT", "").strip()
+    prompt = os.getenv("LOCAL_LLM_SYSTEM_PROMPT", "").strip()
+    if prompt:
+        return prompt
+    return (
+        "Sen yardimci bir asistansin. "
+        "Her zaman Turkce cevap ver. "
+        "Kisa, net ve dogru ol. "
+        "Yalnizca son kullanici sorusunu cevapla; onceki yanitlari tekrar etme. "
+        "Kullanici selamlasma/genel sohbet yapiyorsa dogal cevap ver; konu disi bilgi uydurma. "
+        "Emin olmadigin olgusal detaylarda tahmin yurutup uydurma bilgi verme; belirsizligi acikca belirt. "
+        "Metni temiz UTF-8 olarak uret."
+    )
 
 
 def _inject_local_system_message(messages: list[dict]) -> list[dict]:
@@ -544,6 +653,418 @@ def _local_llm_int_param(data: dict[str, Any], key: str, env_name: str, default:
         return int(raw_value)
     except (TypeError, ValueError):
         return _env_int(env_name, default)
+
+
+_RAG_LINE_CODE_RE = re.compile(r"\b(?:m\d{1,2}[ab]?|t\d{1,2}|f\d{1,2}|mr\d?|bn\d{1,2}|34[a-z]{0,2})\b", re.IGNORECASE)
+
+
+def _normalize_common_turkish_glitches(text: str) -> str:
+    if not text:
+        return ""
+    out = str(text)
+    fixes = {
+        "duraklar? s?ras?yla": "duraklari sirasiyla",
+        "duraklar?": "duraklari",
+        "s?ras?yla": "sirasiyla",
+        "?skudar": "uskudar",
+        "?stanbul": "istanbul",
+        "samand?ra": "samandira",
+        "?mraniye": "umraniye",
+        "?ekmekoy": "cekmekoy",
+        "?ar?i": "carsi",
+        "?ar?amba": "carsamba",
+        "?": "?",
+    }
+    lowered = out.lower()
+    for src, dst in fixes.items():
+        if src in lowered:
+            out = re.sub(re.escape(src), dst, out, flags=re.IGNORECASE)
+            lowered = out.lower()
+    return out
+
+
+def _normalize_for_match(text: str) -> str:
+    raw = _normalize_common_turkish_glitches(repair_text(text)).lower()
+    tr_map = str.maketrans({
+        "i": "i",
+        "ı": "i",
+        "ğ": "g",
+        "ü": "u",
+        "ş": "s",
+        "ö": "o",
+        "ç": "c",
+        "â": "a",
+        "î": "i",
+        "û": "u",
+    })
+    raw = raw.translate(tr_map)
+    raw = re.sub(r"[^a-z0-9\s]", " ", raw)
+    raw = re.sub(r"\s+", " ", raw).strip()
+    return raw
+
+
+def _contains_route_relation(text: str) -> bool:
+    q = _normalize_for_match(text)
+    return bool(
+        re.search(r"\b\w+(?:den|dan|tan|ten)\b", q)
+        and re.search(r"\b\w+(?:e|a|ye|ya)\b", q)
+    )
+
+
+def _is_dynamic_route_request(text: str) -> bool:
+    q = _normalize_for_match(text)
+    if not q:
+        return False
+    if not _contains_route_relation(q):
+        return False
+    if "durak" in q or "uzerinde" in q or "hattinda" in q:
+        return False
+    return True
+
+
+def _is_poi_request(text: str) -> bool:
+    q = _normalize_for_match(text)
+    poi_tokens = (
+        "eczane", "kafe", "cafe", "kasap", "restoran", "restaurant", "muze",
+        "market", "bakkal", "hastane", "otel", "bar", "pub",
+    )
+    return any(tok in q for tok in poi_tokens)
+
+
+def _should_use_rag_for_query_with_reason(text: str) -> tuple[bool, str]:
+    q = _normalize_for_match(text)
+    if not q:
+        return False, "empty_query"
+
+    greeting_like = {
+        "selam", "merhaba", "naber", "nasilsin", "iyi misin",
+        "gunaydin", "iyi aksamlar", "tesekkurler", "sag ol", "tamam", "ok", "eyvallah",
+    }
+    if q in greeting_like:
+        return False, "smalltalk_query"
+
+    transit_keywords = (
+        "rota", "durak", "hat", "metro", "metrobus", "marmaray", "vapur",
+        "otobus", "tramvay", "istanbulkart", "aktarma", "sefer", "ucret",
+        "dakika", "km", "yurume", "yurumek", "kalkis", "varis", "nereden",
+        "nasil giderim", "nasil gider", "hangi durak", "toplu tasima", "havalimani",
+    )
+    poi_keywords = (
+        "eczane", "kafe", "cafe", "kasap", "restoran", "restaurant", "muze", "müze",
+        "bakkal", "market", "hastane", "otel", "otel", "bar", "pub",
+    )
+
+    if _RAG_LINE_CODE_RE.search(q):
+        return True, "line_code_detected"
+    if any(k in q for k in transit_keywords):
+        return True, "transit_keyword"
+    if any(k in q for k in poi_keywords):
+        return True, "poi_keyword"
+    if _contains_route_relation(q):
+        return True, "from_to_pattern"
+
+    non_istanbul_city_markers = (
+        "ankara", "izmir", "bursa", "antalya", "adana", "konya", "kocaeli",
+        "gaziantep", "trabzon", "eskisehir", "samsun", "kayseri",
+    )
+    if any(city in q for city in non_istanbul_city_markers):
+        return False, "non_istanbul_general_query"
+
+    return False, "non_transit_or_general_query"
+
+
+def _should_use_rag_for_query(text: str) -> bool:
+    return _should_use_rag_for_query_with_reason(text)[0]
+
+
+def _resolve_rag_min_similarity(payload: dict[str, Any]) -> float:
+    raw = payload.get("rag_min_similarity")
+    if raw is None:
+        raw = payload.get("min_similarity")
+    if raw is None:
+        raw = os.getenv("ORP_RAG_MIN_SIMILARITY", "0.43")
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        val = 0.43
+    return max(-1.0, min(1.0, val))
+
+
+def _should_fallback_from_rag(rag_result: dict[str, Any], min_similarity: float) -> tuple[bool, str]:
+    count = int(rag_result.get("count") or 0)
+    if count <= 0:
+        return True, "empty_rag_result"
+    top_sim = rag_result.get("top_similarity")
+    if isinstance(top_sim, (int, float)):
+        sim = float(top_sim)
+        if sim < min_similarity:
+            return True, f"low_similarity_fallback:{sim:.3f}<{min_similarity:.3f}"
+        return False, ""
+    return False, ""
+
+
+def _extract_stop_names_from_text(text: str) -> list[str]:
+    raw = _normalize_common_turkish_glitches(repair_text(text)).strip()
+    if not raw:
+        return []
+
+    lower = raw.lower()
+    marker_idx = lower.find("duraklari")
+    if marker_idx < 0:
+        marker_idx = lower.find("duraklar")
+    if marker_idx >= 0:
+        colon_idx = raw.find(":", marker_idx)
+        if colon_idx >= 0:
+            raw = raw[colon_idx + 1 :]
+
+    raw = raw.replace("\n", " ").strip().rstrip(". ")
+    raw = re.sub(r"\s+", " ", raw)
+    if not raw:
+        return []
+
+    parts = [p.strip(" .") for p in raw.split(",")]
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in parts:
+        if not item:
+            continue
+        item = re.sub(r"^\s*ve\s+", "", item, flags=re.IGNORECASE)
+        if len(item) < 2:
+            continue
+        key = _normalize_for_match(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
+def _extract_query_line_code(user_text: str) -> str:
+    q = _normalize_for_match(user_text)
+    m = _RAG_LINE_CODE_RE.search(q)
+    return (m.group(0).upper() if m else "").strip()
+
+
+def _extract_station_candidate_for_line_query(user_text: str, line_code: str) -> str:
+    q = _normalize_common_turkish_glitches(repair_text(user_text))
+    if not line_code:
+        return ""
+    m = re.search(rf"(.+?)\b{re.escape(line_code)}\b", q, flags=re.IGNORECASE)
+    if not m:
+        return ""
+    candidate = m.group(1).strip(" ?.,:;!-")
+    candidate = re.sub(r"\b(uzatmasi|uzatması|uzantisi|uzantısı|uzerinde|üzerinde|mi|mı|mu|mü)\b", "", candidate, flags=re.IGNORECASE)
+    candidate = re.sub(r"\s+", " ", candidate).strip()
+    if len(candidate) < 2:
+        return ""
+    return candidate
+
+
+def _try_direct_rag_structured_answer(user_text: str, rag_result: dict[str, Any]) -> str | None:
+    qn = _normalize_for_match(user_text)
+    chunks = rag_result.get("chunks", [])
+    if not isinstance(chunks, list) or not chunks:
+        return None
+
+    line_code = _extract_query_line_code(user_text)
+
+    # 1) "M5 duraklarini say" turu sorulari LLM'e birakmadan deterministic yanitla.
+    if "durak" in qn and (line_code or any(tok in qn for tok in ("kac", "say", "liste"))):
+        best_stops: list[str] = []
+        best_line = line_code
+        for ch in chunks:
+            if not isinstance(ch, dict):
+                continue
+            meta = ch.get("meta") or {}
+            text = _normalize_common_turkish_glitches(repair_text(ch.get("text")))
+            rtype = str(ch.get("record_type") or meta.get("record_type") or "").strip().upper()
+            line_meta = str(meta.get("hat_kodlari") or meta.get("hat_kodu") or "").upper()
+            if line_code and line_code not in line_meta and line_code not in text.upper():
+                continue
+            if rtype and "DURAK" not in rtype and "HAT" not in rtype:
+                continue
+            stops = _extract_stop_names_from_text(text)
+            if len(stops) > len(best_stops):
+                best_stops = stops
+                if line_meta:
+                    best_line = line_meta.split(",")[0].strip()
+        if best_stops:
+            header = f"{best_line} hattinda toplam {len(best_stops)} durak var." if best_line else f"Toplam {len(best_stops)} durak var."
+            body = "\n".join(f"{idx}. {name}" for idx, name in enumerate(best_stops, start=1))
+            return f"{header}\n\n{body}"
+        if line_code:
+            return f"{line_code} icin baglamda net durak listesi bulunamadi. Uydurma bilgi vermemek icin kesin sayi paylasmiyorum."
+
+    # 2) "Samandira Merkez M5 uzerinde mi?" turu sorular.
+    if line_code and re.search(r"(uzerinde|zerinde|hattinda)\s*(mi|mi\?)?", qn):
+        station = _extract_station_candidate_for_line_query(user_text, line_code)
+        if station:
+            station_norm = _normalize_for_match(station)
+            best_stops: list[str] = []
+            for ch in chunks:
+                if not isinstance(ch, dict):
+                    continue
+                text = _normalize_common_turkish_glitches(repair_text(ch.get("text")))
+                stops = _extract_stop_names_from_text(text)
+                if len(stops) > len(best_stops):
+                    best_stops = stops
+            if best_stops:
+                stop_norms = {_normalize_for_match(s) for s in best_stops}
+                if station_norm in stop_norms:
+                    return f"Evet, {station} {line_code} hattinin duraklari arasindadir."
+                station_compact = station_norm.replace(" ", "")
+                for stop_norm in stop_norms:
+                    stop_compact = stop_norm.replace(" ", "")
+                    if station_compact in stop_compact or stop_compact in station_compact:
+                        return f"Evet, {station} {line_code} hattinin duraklari arasindadir."
+                    if difflib.SequenceMatcher(a=station_compact, b=stop_compact).ratio() >= 0.86:
+                        return f"Evet, {station} {line_code} hattinin duraklari arasindadir."
+                return f"Hayir, {station} {line_code} durak listesinde gorunmuyor."
+
+    # 3) "X hangi metro hattinda?" sorulari.
+    if "hangi metro hatt" in qn or "hangi hat" in qn:
+        codes: list[str] = []
+        for ch in chunks:
+            if not isinstance(ch, dict):
+                continue
+            meta = ch.get("meta") or {}
+            hats = str(meta.get("hat_kodlari") or meta.get("hat_kodu") or "")
+            for piece in hats.split(","):
+                c = piece.strip().upper()
+                if c and c not in codes:
+                    codes.append(c)
+            text_codes = _RAG_LINE_CODE_RE.findall(str(ch.get("text") or ""))
+            for c in text_codes:
+                cc = str(c).upper().strip()
+                if cc and cc not in codes:
+                    codes.append(cc)
+        if line_code:
+            return f"Bu soru icin baglamdaki hat kodu: {line_code}."
+        if codes:
+            return f"Bu soru icin baglamdaki en ilgili hat: {codes[0]}."
+
+    return None
+
+
+_RAG_EXTRACTIVE_STOPWORDS = {
+    "ve", "ile", "icin", "için", "ama", "fakat", "gibi", "olan", "olarak",
+    "nedir", "nasil", "nasil", "nerede", "hangi", "kac", "kaç", "midir",
+    "midir", "mi", "mu", "mü", "mı", "veya", "sadece", "lütfen", "lutfen",
+    "istanbul", "hakkinda", "hattinda", "uzerinde", "sorusu", "soru",
+}
+
+
+def _split_text_sentences(text: str) -> list[str]:
+    raw = _normalize_common_turkish_glitches(repair_text(text))
+    if not raw:
+        return []
+    raw = raw.replace("\r", "\n")
+    parts = re.split(r"[.!?\n;]+", raw)
+    out: list[str] = []
+    for p in parts:
+        s = re.sub(r"\s+", " ", p).strip(" -\t")
+        if len(s) < 12:
+            continue
+        out.append(s)
+    return out
+
+
+def _query_tokens_for_extractive(user_text: str) -> list[str]:
+    qn = _normalize_for_match(user_text)
+    tokens = re.findall(r"[a-z0-9]+", qn)
+    out = [t for t in tokens if len(t) >= 3 and t not in _RAG_EXTRACTIVE_STOPWORDS]
+    # sirayi koru, tekrarli tokenleri ele
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for t in out:
+        if t in seen:
+            continue
+        seen.add(t)
+        uniq.append(t)
+    return uniq
+
+
+def _build_extractive_rag_answer(user_text: str, rag_result: dict[str, Any], *, max_sentences: int = 4) -> str:
+    chunks = rag_result.get("chunks", [])
+    if not isinstance(chunks, list) or not chunks:
+        return "Baglamda ilgili kayit bulunamadi."
+
+    q_tokens = _query_tokens_for_extractive(user_text)
+    line_code = _extract_query_line_code(user_text)
+    qn = _normalize_for_match(user_text)
+
+    must_have_tokens: list[str] = []
+    for tok in ("istanbulkart", "eczane", "havalimani", "marmaray", "metrobus", "vapur", "tramvay"):
+        if tok in qn:
+            must_have_tokens.append(tok)
+
+    candidates: list[tuple[float, str]] = []
+    for ch in chunks:
+        if not isinstance(ch, dict):
+            continue
+        text = str(ch.get("text") or "")
+        for sent in _split_text_sentences(text):
+            sn = _normalize_for_match(sent)
+            if not sn:
+                continue
+            s_tokens = set(re.findall(r"[a-z0-9]+", sn))
+            if not s_tokens:
+                continue
+            if must_have_tokens and not any(mt in sn for mt in must_have_tokens):
+                continue
+            overlap = 0
+            if q_tokens:
+                overlap = sum(1 for t in q_tokens if t in s_tokens)
+            score = float(overlap)
+            if line_code and line_code.lower() in sn:
+                score += 1.5
+            if "durak" in _normalize_for_match(user_text) and "durak" in sn:
+                score += 1.0
+            if score <= 0:
+                continue
+            candidates.append((score, sent.strip()))
+
+    if not candidates:
+        return "Baglamda bu soruyu dogrudan yanitlayacak acik bilgi yok."
+
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    picked: list[str] = []
+    seen_norm: set[str] = set()
+    for _, sent in candidates:
+        norm = _normalize_for_match(sent)
+        if norm in seen_norm:
+            continue
+        seen_norm.add(norm)
+        picked.append(sent)
+        if len(picked) >= max_sentences:
+            break
+
+    if not picked:
+        return "Baglamda bu soruyu dogrudan yanitlayacak acik bilgi yok."
+
+    lines = [f"{idx}. {p}" for idx, p in enumerate(picked, start=1)]
+    return "Baglamdan dogrudan bulunan bilgiler:\n" + "\n".join(lines)
+
+
+def _is_rag_context_relevant(user_text: str, rag_context: str) -> bool:
+    q = _normalize_for_match(user_text)
+    c = _normalize_for_match(rag_context)
+    if not q or not c:
+        return False
+    if "istanbulkart" in q and "istanbulkart" not in c and "istanbul kart" not in c:
+        return False
+
+    tokens = re.findall(r"[a-z0-9]+", q)
+    stop = {
+        "icin", "neden", "nasil", "mi", "mi", "mu", "ve", "ile", "bir", "olan",
+        "olur", "olabilir", "mantikli", "gezebilir", "yurumek", "gitmek", "nedir",
+    }
+    keys = [t for t in tokens if len(t) >= 4 and t not in stop]
+    if not keys:
+        return True
+    hit = sum(1 for k in keys if k in c)
+    ratio = hit / max(1, len(keys))
+    return ratio >= 0.20
 
 
 def _local_llm_generation_options(data: dict[str, Any]) -> dict[str, Any]:
@@ -2678,6 +3199,7 @@ def api_nlp_parse():
                 bert_engine_instance=getattr(nlp_engine, "bert", None)
             )
             result = nlp_engine.parse(query, include_trace=debug_trace_requested)
+            result = _postprocess_nlp_result_for_poi(query, result)
             result["engine"] = "bert-nlp"
             result["trace_policy"] = {
                 "request_id": getattr(g, "request_id", None),
@@ -4035,8 +4557,6 @@ def api_local_llm_chat_rag():
         return jsonify({"error": "Local LLM servisi mevcut degil"}), 503
     if not is_local_llm_configured():
         return jsonify({"error": "LOCAL_LLM_ENABLED/BASE_URL ayari eksik"}), 503
-    if not RAG_SERVICE_AVAILABLE or not is_rag_available():
-        return jsonify({"error": "RAG servisi aktif degil veya bagimliliklar eksik"}), 503
 
     data = request.get_json(silent=True) or {}
 
@@ -4064,52 +4584,173 @@ def api_local_llm_chat_rag():
     if not user_text:
         return jsonify({"error": "Kullanici mesaji bos olamaz"}), 400
 
+    rag_top_k_raw = data.get("rag_top_k", data.get("top_k", 5))
     try:
-        top_k = int(data.get("top_k", 5))
+        top_k = int(rag_top_k_raw)
     except (TypeError, ValueError):
         top_k = 5
     top_k = max(1, min(top_k, 12))
 
     rag_collection = str(data.get("rag_collection", "") or "").strip() or None
+    rag_min_similarity = _resolve_rag_min_similarity(data)
     include_chunks = _as_bool(data.get("include_chunks", False), default=False)
     rag_debug = _as_bool(data.get("rag_debug", False), default=False)
     rag_marker = repair_text(data.get("rag_marker")).strip()
+    rag_result = {
+        "collection": rag_collection or "",
+        "top_k": top_k,
+        "count": 0,
+        "sources": [],
+        "chunks": [],
+    }
+    rag_context = ""
+    rag_used = False
+    rag_skip_reason = ""
 
-    try:
-        rag_result = rag_query(user_text, top_k=top_k, collection=rag_collection)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    except RuntimeError as exc:
-        return jsonify({"error": str(exc)}), 503
-    except Exception as exc:
-        return jsonify({"error": f"RAG sorgu hatasi: {exc}"}), 500
+    use_rag_for_query, rag_reason = _should_use_rag_for_query_with_reason(user_text)
+    if use_rag_for_query:
+        if not RAG_SERVICE_AVAILABLE or not is_rag_available():
+            return jsonify({"error": "RAG servisi aktif degil veya bagimliliklar eksik"}), 503
+        try:
+            rag_result = rag_query(user_text, top_k=top_k, collection=rag_collection)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except RuntimeError as exc:
+            return jsonify({"error": str(exc)}), 503
+        except Exception as exc:
+            return jsonify({"error": f"RAG sorgu hatasi: {exc}"}), 500
 
-    rag_context = repair_text(rag_result.get("context", ""))
-    if not rag_context:
-        rag_context = "[Baglam bulunamadi]"
+        rag_context = _normalize_common_turkish_glitches(repair_text(rag_result.get("context", "")))
+        if not rag_context:
+            rag_context = "[Baglam bulunamadi]"
+        fallback_from_rag, fallback_reason = _should_fallback_from_rag(
+            rag_result,
+            rag_min_similarity,
+        )
+        if fallback_from_rag:
+            rag_used = False
+            rag_skip_reason = fallback_reason
+            rag_context = ""
+        else:
+            rag_used = True
+    else:
+        rag_skip_reason = rag_reason
 
     marker_prefix = f"RAG_MARKER: {rag_marker}\n\n" if rag_marker else ""
-    rag_prompt = (
-        f"{marker_prefix}"
-        f"Soru: {user_text}\n\n"
-        f"Baglam:\n{rag_context}\n\n"
-        "Yalnizca verilen baglama dayanarak cevap ver. "
-        "Kesin olmayan saat/ucret/sefer bilgilerini garanti etme; "
-        "gerektiginde guncel kontrol notu ekle."
-    )
+    user_prompt = user_text
+    if rag_used:
+        user_prompt = (
+            f"{marker_prefix}"
+            f"Soru: {user_text}\n\n"
+            f"Baglam:\n{rag_context}\n\n"
+            "Yalnizca verilen baglama dayanarak cevap ver. "
+            "Sadece bu son soruya cevap ver; onceki konusma icerigini tekrar etme. "
+            "Baglamda acikca yoksa 'Bu bilgi baglamda yok' diye belirt ve uydurma yapma. "
+            "Kesin olmayan saat/ucret/sefer bilgilerini garanti etme; "
+            "gerektiginde guncel kontrol notu ekle."
+        )
 
-    if session_id:
-        messages = _chat_context_from_session(session_id, context_limit=40) + [{"role": "user", "content": rag_prompt}]
-    else:
+    # Context bleed'i engellemek icin bu endpoint'te varsayilan olarak sadece son soru kullanilir.
+    use_session_context = _as_bool(data.get("use_session_context", False), default=False)
+    if use_session_context and session_id and not rag_used:
+        messages = _chat_context_from_session(session_id, context_limit=6) + [{"role": "user", "content": user_prompt}]
+    elif use_session_context and not session_id and not rag_used:
         base_messages = provided_messages[:-1] if provided_messages else []
-        messages = base_messages + [{"role": "user", "content": rag_prompt}]
+        messages = base_messages + [{"role": "user", "content": user_prompt}]
+    else:
+        messages = [{"role": "user", "content": user_prompt}]
     messages = _inject_local_system_message(messages)
 
     model = data.get("model")
-    generation_options = _local_llm_generation_options(data)
+    generation_data = dict(data)
+    if "top_k" in generation_data and "llm_top_k" not in generation_data:
+        generation_data.pop("top_k", None)
+    if "llm_top_k" in generation_data:
+        generation_data["top_k"] = generation_data.get("llm_top_k")
+    generation_options = _local_llm_generation_options(generation_data)
     use_fallback = _as_bool(data.get("use_fallback", True), default=True)
 
     try:
+        if rag_used:
+            direct_answer = _try_direct_rag_structured_answer(user_text, rag_result)
+            if direct_answer:
+                assistant_text = _normalize_common_turkish_glitches(repair_text(direct_answer))
+                if session_id:
+                    save_chat_turn(
+                        session_id=session_id,
+                        user_text=user_text,
+                        assistant_text=assistant_text or "[Bos yanit]",
+                        model="rag-direct-structured",
+                        token_total=0,
+                        error_type="",
+                    )
+                payload = {
+                    "ok": True,
+                    "model": "rag-direct-structured",
+                    "text": assistant_text,
+                    "usage": {"total_tokens": 0},
+                    "id": None,
+                    "tried_models": ["rag-direct-structured"],
+                    "rag": {
+                        "used": True,
+                        "skip_reason": "",
+                        "min_similarity": rag_min_similarity,
+                        "top_similarity": rag_result.get("top_similarity"),
+                        "collection": rag_result.get("collection"),
+                        "top_k": rag_result.get("top_k"),
+                        "count": rag_result.get("count"),
+                        "sources": rag_result.get("sources", []),
+                    },
+                }
+                if include_chunks:
+                    payload["rag"]["chunks"] = rag_result.get("chunks", [])
+                return jsonify(payload)
+
+            assistant_text = _normalize_common_turkish_glitches(
+                repair_text(_build_extractive_rag_answer(user_text, rag_result))
+            )
+            if session_id:
+                save_chat_turn(
+                    session_id=session_id,
+                    user_text=user_text,
+                    assistant_text=assistant_text or "[Bos yanit]",
+                    model="rag-extractive",
+                    token_total=0,
+                    error_type="",
+                )
+            payload = {
+                "ok": True,
+                "model": "rag-extractive",
+                "text": assistant_text,
+                "usage": {"total_tokens": 0},
+                "id": None,
+                "tried_models": ["rag-extractive"],
+                "rag": {
+                    "used": True,
+                    "skip_reason": "",
+                    "min_similarity": rag_min_similarity,
+                    "top_similarity": rag_result.get("top_similarity"),
+                    "collection": rag_result.get("collection"),
+                    "top_k": rag_result.get("top_k"),
+                    "count": rag_result.get("count"),
+                    "sources": rag_result.get("sources", []),
+                },
+            }
+            if rag_marker:
+                payload["rag"]["marker_echo"] = rag_marker
+            if rag_debug:
+                payload["rag"]["debug"] = {
+                    "context_char_len": len(rag_context),
+                    "context_sha256": hashlib.sha256(rag_context.encode("utf-8")).hexdigest(),
+                    "chunk_count": len(rag_result.get("chunks", [])),
+                    "chunk_record_types": [
+                        str((c.get("record_type") or "")) for c in (rag_result.get("chunks", [])[:10])
+                    ],
+                }
+            if include_chunks:
+                payload["rag"]["chunks"] = rag_result.get("chunks", [])
+            return jsonify(payload)
+
         if use_fallback:
             result = local_llm_chat_completion_with_fallback(
                 messages=messages,
@@ -4124,7 +4765,7 @@ def api_local_llm_chat_rag():
             )
             result["tried_models"] = [result.get("model") or model or ""]
 
-        assistant_text = repair_text(result.get("text", ""))
+        assistant_text = _normalize_common_turkish_glitches(repair_text(result.get("text", "")))
 
         if session_id:
             save_chat_turn(
@@ -4144,6 +4785,10 @@ def api_local_llm_chat_rag():
             "id": result.get("id"),
             "tried_models": result.get("tried_models", []),
             "rag": {
+                "used": rag_used,
+                "skip_reason": rag_skip_reason,
+                "min_similarity": rag_min_similarity,
+                "top_similarity": rag_result.get("top_similarity"),
                 "collection": rag_result.get("collection"),
                 "top_k": rag_result.get("top_k"),
                 "count": rag_result.get("count"),
@@ -4806,14 +5451,28 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"[Transit] Baslangic yukleme hatasi: {e}")
 
+    # Port dinamik secimi (komut satiri parametresi veya env)
+    port = 5000
+    if len(sys.argv) > 1:
+        try:
+            port = int(sys.argv[-1])
+        except ValueError:
+            pass
+    env_port = os.getenv("PORT")
+    if env_port:
+        try:
+            port = int(env_port)
+        except ValueError:
+            pass
+
     print("=" * 50)
     print("  OpenTrip API Sunucusu Baslatiliyor...")
-    print("  http://localhost:5000")
+    print(f"  http://localhost:{port}")
     print("=" * 50)
     initialize_runtime()
     if _PRELOAD_POPULAR_REGIONS_ON_STARTUP:
         initialize_graph_preload()
-    app.run(debug=False, port=5000)
+    app.run(debug=False, port=port)
 
 # Management endpoints for BERT: warmup and place seeding
 @app.route("/api/nlp/warmup", methods=["GET", "POST"]) 
