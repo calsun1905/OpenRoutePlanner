@@ -258,8 +258,8 @@
         const maxJumpMeters = modeName === "ferry"
             ? 45000
             : (modeName === "rail"
-                ? 3200
-                : (modeName === "bus" ? 3800 : (modeName === "walk" ? 2500 : 4500)));
+                ? 6500
+                : (modeName === "bus" ? 5500 : (modeName === "walk" ? 2500 : 5000)));
 
         const chunks = [];
         let current = [normalized[0]];
@@ -317,6 +317,16 @@
         return stopCoords;
     }
 
+    function getCurrentSelectedPoints() {
+        if (typeof selectedPoints !== "undefined" && Array.isArray(selectedPoints)) {
+            return selectedPoints;
+        }
+        if (Array.isArray(window.selectedPoints)) {
+            return window.selectedPoints;
+        }
+        return [];
+    }
+
     function segmentLengthMeters(coords, mode = "") {
         const chunks = splitSegmentCoords(coords, mode);
         if (!chunks.length) return 0;
@@ -329,7 +339,8 @@
         return total;
     }
 
-    function drawSegmentLine(seg, coords) {
+    function drawSegmentLine(seg, coords, opts = {}) {
+        const transitOnlyView = !!opts.transitOnlyView;
         const chunks = splitSegmentCoords(coords, seg.mode);
         if (!chunks.length) return;
         if (seg.mode === "bus" || seg.mode === "rail" || seg.mode === "ferry") {
@@ -363,8 +374,8 @@
                 const line = L.polyline(latlngs, {
                     color: "#16a34a",
                     weight: 4,
-                    opacity: 0.9,
-                    dashArray: "2,8", // Dotted path for walking
+                    opacity: transitOnlyView ? 0.82 : 0.9,
+                    dashArray: transitOnlyView ? null : "2,8", // Transit gorunumunde daha net olsun
                 }).addTo(map);
                 transitRouteLayers.push(line);
             });
@@ -425,12 +436,20 @@
             return true;
         });
 
+        let firstDrawnPoint = null;
+        let lastDrawnPoint = null;
         drawableSegments.forEach(({ seg, displayCoords }) => {
-            drawSegmentLine(seg, displayCoords);
+            drawSegmentLine(seg, displayCoords, { transitOnlyView });
             const chunks = splitSegmentCoords(displayCoords, seg.mode);
             chunks.forEach((chunk) => {
                 chunk.forEach((c) => allBounds.push([c[0], c[1]]));
             });
+            if (chunks.length) {
+                const firstChunk = chunks[0];
+                const lastChunk = chunks[chunks.length - 1];
+                if (firstChunk.length && !firstDrawnPoint) firstDrawnPoint = firstChunk[0];
+                if (lastChunk.length) lastDrawnPoint = lastChunk[lastChunk.length - 1];
+            }
 
             // Transit modunda Google Maps benzeri sade gorunum:
             // sadece gidilecek segmentleri ciz, gereksiz adim marker'larini cizme.
@@ -482,6 +501,47 @@
                 drawStepMarker(end[0], end[1], "I", "step-alight", "İniş: " + (seg.to_stop || "İstasyon"));
             }
         });
+
+        // Cizim noktalari markerlara degmiyorsa ince baglanti cizgisi ekle.
+        const routePoints = getCurrentSelectedPoints();
+        if (routePoints.length >= 2) {
+            const originPoint = routePoints[0];
+            const destPoint = routePoints[routePoints.length - 1];
+            const connectorStyle = {
+                color: "#22c55e",
+                weight: 3,
+                opacity: 0.75,
+                dashArray: "4,7",
+            };
+            if (firstDrawnPoint && Array.isArray(originPoint) && originPoint.length >= 2) {
+                const d0 = haversineMeters(
+                    [Number(originPoint[0]), Number(originPoint[1])],
+                    [Number(firstDrawnPoint[0]), Number(firstDrawnPoint[1])],
+                );
+                if (Number.isFinite(d0) && d0 > 60) {
+                    const c0 = L.polyline([
+                        [Number(originPoint[0]), Number(originPoint[1])],
+                        [Number(firstDrawnPoint[0]), Number(firstDrawnPoint[1])],
+                    ], connectorStyle).addTo(map);
+                    transitRouteLayers.push(c0);
+                    allBounds.push([Number(originPoint[0]), Number(originPoint[1])]);
+                }
+            }
+            if (lastDrawnPoint && Array.isArray(destPoint) && destPoint.length >= 2) {
+                const d1 = haversineMeters(
+                    [Number(lastDrawnPoint[0]), Number(lastDrawnPoint[1])],
+                    [Number(destPoint[0]), Number(destPoint[1])],
+                );
+                if (Number.isFinite(d1) && d1 > 60) {
+                    const c1 = L.polyline([
+                        [Number(lastDrawnPoint[0]), Number(lastDrawnPoint[1])],
+                        [Number(destPoint[0]), Number(destPoint[1])],
+                    ], connectorStyle).addTo(map);
+                    transitRouteLayers.push(c1);
+                    allBounds.push([Number(destPoint[0]), Number(destPoint[1])]);
+                }
+            }
+        }
 
         if (allBounds.length >= 2) {
             map.fitBounds(allBounds, { padding: [40, 40], maxZoom: 16 });
