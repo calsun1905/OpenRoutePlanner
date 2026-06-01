@@ -1,0 +1,217 @@
+﻿\section{Yerel LLM ve RAG Mimarisi}
+
+Bu çalışmada LLM katmanı yalnızca bulut tabanlı bir sohbet servisi olarak değil, aynı zamanda yerel model çalıştırmayı destekleyen çok katmanlı bir mimari olarak tasarlanmıştır. Amaç, yanıt kalitesini artırırken sağlayıcı bağımlılığını azaltmak, düşük gecikmeli kullanım sağlamak ve İstanbul odaklı ulaşım bilgisinde daha kontrollü bir cevap üretim hattı oluşturmaktır.
+
+Backend katmanı OpenAI-uyumlu sözleşme ile çalışan yerel model sunucularına bağlanır. Bu sayede LM Studio, vLLM veya benzeri bir \textit{OpenAI-compatible} sunucuya aynı yöntemle istek gönderilebilir. Yerel model uç noktası \texttt{LOCAL\_LLM\_BASE\_URL} üzerinden tanımlanır; model listesi için \texttt{/models}, üretim için \texttt{/chat/completions} çağrıları kullanılır.
+
+Sistem, üç farklı LLM sağlayıcısını aynı mimari altında çalıştırır:
+\begin{enumerate}
+    \item OpenRouter,
+    \item Gemini,
+    \item Local (LM Studio/OpenAI-compatible).
+\end{enumerate}
+
+LLM endpoint ailesi aşağıdaki gibidir:
+\begin{enumerate}
+    \item \texttt{/api/llm/openrouter/*}
+    \item \texttt{/api/llm/gemini/*}
+    \item \texttt{/api/llm/local/*}
+    \item \texttt{/api/llm/local/chat/rag}
+    \item \texttt{/api/llm/rag/status}
+    \item \texttt{/api/llm/model-health}
+\end{enumerate}
+
+Sohbet sürekliliği için \texttt{chat\_sessions} ve \texttt{chat\_messages} tabloları kullanılır. Oturum oluşturma, geçmiş mesajları çekme ve arşivleme akışları ayrık endpointlerle sağlanır. Bu yaklaşım, sağlayıcı değişse bile konuşma bağlamının korunmasına olanak verir.
+
+\subsection{RAG Çalışma Biçimi}
+
+RAG akışı zorunlu değil, karar tabanlıdır. \texttt{rag\_mode} parametresi üç davranışı destekler:
+\begin{enumerate}
+    \item \texttt{auto}: Sorgu analizi ile gerektiğinde RAG,
+    \item \texttt{on/force}: Her sorguda zorunlu RAG,
+    \item \texttt{off}: RAG kapalı.
+\end{enumerate}
+
+\texttt{auto} modda hat kodu, durak, toplu taşıma ve şehir olgusu taşıyan sorgularda retrieval açılır; genel sohbette kapalı kalır. Böylece gereksiz bağlam yüklenmesi azaltılır.
+
+RAG servis katmanında ChromaDB ve \texttt{BAAI/bge-m3} embedding modeli kullanılır. Mimari kalite için yalnızca \texttt{top-k} getirmez; aynı zamanda alaka eşiği (\texttt{relevance threshold}) uygular. Ayrıca hat kodu geçen sorularda metadata üzerinden hat kodu filtresi uygulanır. Bu tasarım, yanlış hattan cevap üretme riskini düşürür.
+
+Sistem düşük alakalı bağlamda güvenlik koruması uygular; modelin ezbere kesin yargı üretmesi engellenir. Böylece ulaşım gibi yanlış yönlendirmenin maliyetli olabileceği sorularda daha temkinli bir cevap politikası elde edilir.
+
+\subsection{Fine-Tune Model Entegrasyonu}
+
+Yerel model tarafında fine-tune edilmiş model adı doğrudan istekle verilebilir. Birincil model hata verirse fallback model listesi sıralı şekilde denenir. Bu akış, tek model bağımlılığını azaltarak üretim kararlılığını artırır.
+
+Model dayanıklılığı \texttt{llm\_model\_health} tablosu ile izlenir. Ardışık hata sayısı eşik değerini aşan modeller belirli süre \textit{cooldown} durumuna alınır. Böylece aynı arızalı modele tekrar tekrar istek atılması engellenir.
+
+\section{BERT Katmanı: Sınırlar, Riskler ve İyileştirme Yönleri}
+
+Projenin doğal dil anlama katmanı BERT merkezlidir ve \texttt{dbmdz/bert-base-turkish-uncased} modeliyle çalışır. Bu katman sorgu tipini sınıflandırır, yer adaylarını çıkarır, benzerlik hesaplar ve parse kararını yapılandırılmış çıktıya dönüştürür.
+
+Güçlü yönler:
+\begin{enumerate}
+    \item \textit{Intent conflict matrix} ile niyet çakışmalarını çözme,
+    \item \textit{Hard-negative} korumaları ile \textit{smalltalk} yanlış sınıflandırmasını azaltma,
+    \item Türkçe ek yapısını dikkate alan span/suffix yardımı,
+    \item Parse trace ve audit kayıtları ile gözlemlenebilirlik.
+\end{enumerate}
+
+Bununla birlikte aşağıdaki sınırlar tezde açık şekilde belirtilmelidir:
+\begin{enumerate}
+    \item BERT erişilemezse parse endpoint'i \texttt{503} döner; bu kaliteyi korur fakat operasyonel esnekliği düşürür.
+    \item GPU zorlama politikası (ör. \texttt{ORP\_BERT\_FORCE\_GPU}, \texttt{ORP\_BERT\_STRICT\_GPU}) bazı ortamlarda başlatma riskine yol açabilir.
+    \item OSM-first davranışı doğruluğu artırırken gecikmeyi yükseltebilir; üretimde dikkatli profil seçimi gerekir.
+    \item \texttt{unknown} eşiği ile yanlış pozitif niyet arasında periyodik kalibrasyon ihtiyacı vardır.
+\end{enumerate}
+
+Bu riskleri azaltmak için proje içinde şu mekanizmalar bulunmaktadır:
+\begin{enumerate}
+    \item \texttt{/api/nlp/warmup} ile ısınma,
+    \item Runtime metrik logları,
+    \item \texttt{/api/nlp/audit/recent} ile denetim,
+    \item PII redaction ve korelasyon başlıkları,
+    \item Gold veri seti ile düzenli regresyon değerlendirmesi.
+\end{enumerate}
+
+\section{Transit Veri Kapsamı ve Entegre Ağlar}
+
+Transit katmanında birden fazla resmi kaynağın birleşik kullanımı tercih edilmiştir:
+\begin{enumerate}
+    \item İETT SOAP API,
+    \item Metro İstanbul API,
+    \item İBB GTFS (özellikle Marmaray ve shape senkronizasyonu).
+\end{enumerate}
+
+Mevcut veritabanı durumunda aşağıdaki büyüklükler gözlenmiştir:
+\begin{enumerate}
+    \item Durak sayısı: \textbf{15{,}145}
+    \item Hat sayısı: \textbf{803}
+    \item Hat--durak ilişki sayısı: \textbf{62{,}787}
+    \item Metro line kaydı: \textbf{19}
+    \item Metro station kaydı: \textbf{288}
+\end{enumerate}
+
+\subsection{Eklenen Raylı Hatlar ve İstasyon Sayıları}
+
+\begin{table}[h]
+\centering
+\caption{Sistemde aktif raylı hatlar ve istasyon sayıları}
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Hat} & \textbf{İstasyon Sayısı} \\
+\hline
+M1A & 18 \\
+M1B & 13 \\
+M2 & 16 \\
+M3 & 20 \\
+M4 & 23 \\
+M5 & 21 \\
+M6 & 4 \\
+M7 & 17 \\
+M8 & 13 \\
+M9 & 14 \\
+T1 & 31 \\
+T3 & 11 \\
+T4 & 22 \\
+T5 & 14 \\
+F1 & 2 \\
+F4 & 2 \\
+TF1 & 2 \\
+TF2 & 2 \\
+Marmaray (GTFS-MARMARAY) & 43 \\
+\hline
+\end{tabular}
+\end{table}
+
+Özellikle bu çalışmada sorunsal olarak öne çıkan hatlar (M1A/M1B, T1, Marmaray) veri katmanına açık biçimde eklenmiş ve aktif olarak kullanılmaktadır. Marmaray senkronizasyonu GTFS üzerinden ayrı bir kimlik (\texttt{GTFS-MARMARAY}) ile tutulmaktadır.
+
+Otobüs ve metrobüs tarafında sistem kod-temelli ayrıştırma yapmaktadır. Metrobüs için \texttt{34*} kod ailesi özel olarak ele alınır (ör. \texttt{34}, \texttt{34A}, \texttt{34AS}, \texttt{34BZ}, \texttt{34G}, \texttt{34T}, \texttt{34U}, \texttt{34Z}).
+
+\section{Multimodal Motorun Derinleştirilmiş Açıklaması}
+
+Multimodal katman, tek bir en kısa yol üretmek yerine kullanıcıya uygulanabilir alternatifler kümesi üretir. Bu amaçla yürüme, otobüs, metro, metrobüs ve vapur segmentleri birlikte değerlendirilir.
+
+Karar süreci şu adımlardan oluşur:
+\begin{enumerate}
+    \item Kullanıcı mod kısıtlarının normalize edilmesi,
+    \item Aday segmentlerin üretilmesi,
+    \item Aktarma ve erişim maliyetlerinin hesaplanması,
+    \item Mantıksız seçeneklerin filtrelenmesi,
+    \item Çeşitlilik ve kalite dengesine göre son listenin çıkarılması.
+\end{enumerate}
+
+Motorun güçlü yanı, yalnızca mesafe minimizasyonu yapmamasıdır. Aşağıdaki \textit{sanity} filtreleri aktif olarak kullanılır:
+\begin{enumerate}
+    \item Aynı yakada gereksiz vapur sapmalarını eleme,
+    \item Çok aktarmalı fakat düşük kazançlı seçenekleri eleme,
+    \item Transfer eşleşmelerinde fiziksel yakınlık şartı,
+    \item Yönü ters/düşük güvenli durak eşleşmelerini reddetme,
+    \item Su geçişlerinde izinli geçiş kuralları.
+\end{enumerate}
+
+Performans tarafında çok katmanlı önbellek mimarisi uygulanmıştır: transit lookup cache, segment cache, OSRM SQLite cache ve karşılaştırma cache. Ayrıca telemetry üretimi ile aşama süreleri, seçenek sayıları ve cache durumu gözlenebilir hale getirilmiştir.
+
+Bu yaklaşım İstanbul gibi karmaşık aktarma topolojisine sahip bir şehirde, yalnızca ``hesaplanabilir'' değil ``kullanılabilir'' rota önerileri üretmek açısından kritik katkı sağlar.
+
+\section{SFT Fine-Tune Süreci (Kullanılan Akış)}
+
+Bu projede fine-tune hattında kullanılan ana yöntem \textbf{SFT (Supervised Fine-Tuning)} olmuştur. Pipeline içinde DPO ve sonraki adımlar bulunmakla birlikte, uygulamada kullanılan model üretimi SFT odaklı ilerlemiştir.
+
+Temel model olarak \texttt{ytu-ce-cosmos/Turkish-Llama-8b-Instruct-v0.1} seçilmiştir. Eğitim tarafında QLoRA yaklaşımı kullanılarak bellek maliyeti düşürülmüştür.
+
+SFT süreci şu adımlarla uygulanır:
+\begin{enumerate}
+    \item Ham verinin JSONL formatında hazırlanması,
+    \item Veri temizleme ve kalite kapılarının uygulanması,
+    \item Train/validation/test ayrımı,
+    \item QLoRA + LoRA ile eğitim,
+    \item Adaptör çıktılarının kaydı,
+    \item Modelin local endpoint üzerinden uygulamaya bağlanması.
+\end{enumerate}
+
+Kalite kapılarında yalnızca biçimsel doğrulama yapılmamıştır; ayrıca içerik güvenliği ve kalite kontrolleri de uygulanmıştır:
+\begin{enumerate}
+    \item Uzunluk sınırları,
+    \item Turn yapısı doğrulaması,
+    \item Tekrar örüntüsü kontrolü,
+    \item Mojibake/artifact reddi,
+    \item Alan kapsamı anahtar kelime doğrulaması,
+    \item Toksik/profanity filtreleri.
+\end{enumerate}
+
+Bu yaklaşım sayesinde model, genel amaçlı Türkçe üretim davranışından İstanbul ulaşım/rota bağlamına daha uyumlu bir cevap üretim çizgisine çekilmiş ve backend üzerinden gerçek kullanıcı akışına entegre edilmiştir.
+
+\section{Tez İçi Yerleştirme Planı (Eklenmesi Gereken Yerler)}
+
+Bu bölüm, yukarıdaki içeriklerin tez içinde hangi başlıklara yerleştirilmesi gerektiğini netleştirmek için hazırlanmıştır. Mevcut tez şablonunda başlık numaraları farklıysa, önerilen içerikler eşdeğer bölüm başlığı altına taşınmalıdır.
+
+\subsection{Önerilen Bölüm Eşlemesi}
+
+\begin{enumerate}
+    \item \textbf{Yerel LLM ve RAG Mimarisi} metni, ``Materyal ve Yöntem'' altında sistem mimarisi veya yapay zeka katmanı bölümüne eklenmelidir.
+    \item \textbf{BERT Katmanı: Sınırlar, Riskler ve İyileştirme Yönleri} metni, ``Bulgular'' bölümünde NLP değerlendirme altına veya ``Sonuç ve Öneriler'' içinde sınırlılıklar altına eklenmelidir.
+    \item \textbf{Transit Veri Kapsamı ve Entegre Ağlar} metni, ``Materyal ve Yöntem'' içinde toplu taşıma/veri kaynakları alt başlığına eklenmelidir.
+    \item \textbf{Multimodal Motorun Derinleştirilmiş Açıklaması} metni, rota algoritmaları veya toplu taşıma karşılaştırma yöntemi kısmına eklenmelidir.
+    \item \textbf{SFT Fine-Tune Süreci} metni, yapay zeka/LLM geliştirme süreci başlığına veya ``Gelecek Çalışmalar'' yerine ``Uygulanan Yöntem'' içine eklenmelidir.
+\end{enumerate}
+
+\subsection{Eski İfadelerle Çakışma Kontrolü}
+
+Aşağıdaki eski ifadeler varsa güncellenmelidir:
+\begin{enumerate}
+    \item ``LM Studio/local LLM/RAG doğrulanamadı'' benzeri cümleler kaldırılmalı veya ``bu tezde uygulanan yapı'' ile uyumlu hale getirilmelidir.
+    \item ``Sadece OpenRouter/Gemini kullanıldı'' gibi ifadeler, local LLM ve RAG endpoint kapsamını içerecek şekilde genişletilmelidir.
+    \item Transit kısmında yalnızca genel hat anlatımı varsa, eklenen M1A--M9, T1--T5, F1/F4, TF1/TF2 ve Marmaray kapsamı ile güncellenmelidir.
+    \item BERT bölümünde yalnızca başarı metni varsa, gecikme--doğruluk dengesi ve operasyonel sınırlar da eklenmelidir.
+\end{enumerate}
+
+\subsection{Kopyala--Yapıştır Sırası (Pratik Uygulama)}
+
+Teze ekleme sırasında aşağıdaki sıra önerilir:
+\begin{enumerate}
+    \item Önce ``Yerel LLM ve RAG Mimarisi'' bölümü eklenir.
+    \item Ardından ``Transit Veri Kapsamı'' ve ``Multimodal'' bölümleri eklenir.
+    \item Sonra ``BERT Sınırlar ve Riskler'' bölümü eklenir.
+    \item En son ``SFT Fine-Tune Süreci'' bölümü eklenir.
+    \item Son adımda, çelişen eski cümleler temizlenir ve bölüm içi referanslar güncellenir.
+\end{enumerate}
