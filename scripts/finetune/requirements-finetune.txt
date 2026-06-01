@@ -1,0 +1,17 @@
+#
+# Fine-tune pipeline dependencies (SFT + DPO)
+# Keep this separate from app runtime requirements.
+#
+torch>=2.5.0
+transformers>=4.48.0,<4.60.0
+datasets>=2.21.0,<4.0.0
+accelerate>=1.1.0,<2.0.0
+peft>=0.13.0,<1.0.0
+trl>=0.12.0,<1.0.0
+bitsandbytes>=0.43.0
+evaluate>=0.4.3
+scikit-learn>=1.6.0
+pandas>=2.2.0
+sentencepiece>=0.2.0
+safetensors>=0.4.5
+huggingface-hub>=0.26.0
