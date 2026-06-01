@@ -139,7 +139,69 @@ body {
     letter-spacing: 0.5px;
 }
 
+.layout-controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+}
+
+.layout-btn {
+    appearance: none;
+    border: 1px solid rgba(29, 103, 216, 0.25);
+    background: rgba(255, 255, 255, 0.65);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.layout-btn:hover {
+    border-color: rgba(29, 103, 216, 0.5);
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.layout-btn:active {
+    transform: translateY(1px);
+}
+
+.panel-resizer {
+    position: fixed;
+    top: 0;
+    width: 10px;
+    height: 100vh;
+    z-index: 1200;
+    cursor: ew-resize;
+    background: transparent;
+}
+
+.panel-resizer::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 3px;
+    height: 56px;
+    border-radius: 999px;
+    background: rgba(29, 103, 216, 0.32);
+    transform: translate(-50%, -50%);
+    opacity: 0.32;
+    transition: opacity var(--transition-fast);
+}
+
+.panel-resizer:hover::after,
+body.resizing-layout .panel-resizer::after {
+    opacity: 0.9;
+}
+
 /* --- Right LLM Panel --- */
+.panel-resizer-sidebar {
+    left: var(--sidebar-width);
+    transform: translateX(-50%);
+}
+
 .right-chat-panel {
     position: fixed;
     top: 0;
@@ -157,6 +219,11 @@ body {
     transition: transform var(--transition-normal);
 }
 
+.panel-resizer-chat {
+    left: calc(100vw - var(--chat-panel-width));
+    transform: translateX(-50%);
+}
+
 .right-chat-header {
     margin-bottom: 10px;
     padding-bottom: 10px;
@@ -168,6 +235,17 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+}
+
+.right-chat-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.right-chat-header-actions .btn {
+    margin-top: 0;
+    width: auto;
 }
 
 .right-chat-header h2 {
@@ -219,6 +297,40 @@ body.chat-panel-collapsed .right-chat-expand-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+body.sidebar-on-right .sidebar {
+    left: auto;
+    right: var(--chat-panel-width);
+    border-right: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+body.sidebar-on-right .panel-resizer-sidebar {
+    left: calc(100vw - var(--chat-panel-width) - var(--sidebar-width));
+    transform: translateX(-50%);
+}
+
+body.sidebar-on-right.chat-panel-collapsed .panel-resizer-sidebar {
+    left: calc(100vw - var(--sidebar-width));
+    transform: translateX(-50%);
+}
+
+body.chat-panel-collapsed .panel-resizer-chat {
+    display: none;
+}
+
+body.sidebar-on-right #map {
+    left: 0;
+    right: calc(var(--chat-panel-width) + var(--sidebar-width));
+}
+
+body.sidebar-on-right.chat-panel-collapsed .sidebar {
+    right: 0;
+}
+
+body.sidebar-on-right.chat-panel-collapsed #map {
+    right: var(--sidebar-width);
 }
 
 /* --- Sections --- */
@@ -1030,6 +1142,14 @@ body.chat-panel-collapsed .right-chat-expand-btn {
         width: 100%;
         height: auto;
         max-height: 45vh;
+    }
+
+    .layout-controls {
+        display: none;
+    }
+
+    .panel-resizer {
+        display: none;
     }
 
     #map {

@@ -40,6 +40,9 @@
                 <h1>OpenTrip</h1>
             </div>
             <p class="tagline">Akıllı Rota Optimizasyonu</p>
+            <div class="layout-controls" id="layoutControls">
+                <button class="layout-btn" id="btnSidebarDockToggle" type="button">Saga Al</button>
+            </div>
         </div>
 
         <!-- Points List -->
@@ -479,6 +482,9 @@
         </div>
     </div>
 
+    <div class="panel-resizer panel-resizer-sidebar" id="sidebarResizer" aria-label="Sol panel genislik ayari"></div>
+    <div class="panel-resizer panel-resizer-chat" id="rightChatResizer" aria-label="Sag panel genislik ayari"></div>
+
     <!-- Map Container -->
     <div id="map"></div>
 
@@ -491,7 +497,9 @@
         <div class="right-chat-header">
             <div class="right-chat-header-top">
                 <h2>LLM Asistan</h2>
-                <button id="rightChatCollapse" class="btn btn-ghost btn-sm" type="button">Daralt</button>
+                <div class="right-chat-header-actions">
+                    <button id="rightChatCollapse" class="btn btn-ghost btn-sm" type="button">Daralt</button>
+                </div>
             </div>
             <p>OpenRouter, Gemini ve Local LLM ile hizli sohbet</p>
             <div class="right-chat-session-controls">
