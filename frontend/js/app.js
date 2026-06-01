@@ -106,8 +106,12 @@ const elMainLlmClear = document.getElementById("mainLlmClear");
 const elMainLlmSessionSelect = document.getElementById("mainLlmSessionSelect");
 const elMainLlmNewSession = document.getElementById("mainLlmNewSession");
 const elMainLlmArchiveSession = document.getElementById("mainLlmArchiveSession");
+const elSidebar = document.getElementById("sidebar");
+const elBtnSidebarDockToggle = document.getElementById("btnSidebarDockToggle");
+const elSidebarResizer = document.getElementById("sidebarResizer");
 const elRightChatPanel = document.getElementById("rightChatPanel");
 const elRightChatCollapse = document.getElementById("rightChatCollapse");
+const elRightChatResizer = document.getElementById("rightChatResizer");
 const elRightChatExpand = document.getElementById("rightChatExpand");
 const elBtnShowAlternatives = document.getElementById("btnShowAlternatives");
 const elAlternativesPanel = document.getElementById("alternativesPanel");
@@ -753,6 +757,144 @@ function showToast(message, type = "info") {
     }, 3000);
 }
 
+// ========== LAYOUT CONTROLS ==========
+const LAYOUT_PREFS_KEY = "orp_layout_prefs_v1";
+const SIDEBAR_WIDTH_DEFAULT = 352;
+const CHAT_WIDTH_DEFAULT = 336;
+const SIDEBAR_WIDTH_MIN = 300;
+const SIDEBAR_WIDTH_MAX = 620;
+const CHAT_WIDTH_MIN = 300;
+const CHAT_WIDTH_MAX = 560;
+
+let layoutPrefs = {
+    sidebarOnRight: false,
+    sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
+    chatWidth: CHAT_WIDTH_DEFAULT,
+};
+
+function isMobileViewport() {
+    return window.matchMedia("(max-width: 768px)").matches;
+}
+
+function loadLayoutPrefs() {
+    try {
+        const raw = localStorage.getItem(LAYOUT_PREFS_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        layoutPrefs.sidebarOnRight = Boolean(parsed?.sidebarOnRight);
+        const sidebarWidth = Number(parsed?.sidebarWidth);
+        const chatWidth = Number(parsed?.chatWidth);
+        if (Number.isFinite(sidebarWidth)) {
+            layoutPrefs.sidebarWidth = Math.max(SIDEBAR_WIDTH_MIN, Math.min(SIDEBAR_WIDTH_MAX, sidebarWidth));
+        }
+        if (Number.isFinite(chatWidth)) {
+            layoutPrefs.chatWidth = Math.max(CHAT_WIDTH_MIN, Math.min(CHAT_WIDTH_MAX, chatWidth));
+        }
+    } catch (_) {
+        // ignore bad local cache
+    }
+}
+
+function saveLayoutPrefs() {
+    try {
+        localStorage.setItem(LAYOUT_PREFS_KEY, JSON.stringify(layoutPrefs));
+    } catch (_) {
+        // ignore storage failures
+    }
+}
+
+function updateLayoutButtonLabels() {
+    if (elBtnSidebarDockToggle) {
+        elBtnSidebarDockToggle.textContent = layoutPrefs.sidebarOnRight ? "Sola Al" : "Saga Al";
+    }
+}
+
+function applyLayoutPrefs() {
+    updateLayoutButtonLabels();
+
+    if (!elSidebar) return;
+    if (isMobileViewport()) {
+        document.body.classList.remove("sidebar-on-right");
+        document.documentElement.style.removeProperty("--sidebar-width");
+        document.documentElement.style.removeProperty("--chat-panel-width");
+        setTimeout(() => map.invalidateSize(), 60);
+        return;
+    }
+
+    document.body.classList.toggle("sidebar-on-right", layoutPrefs.sidebarOnRight);
+    const sidebarWidth = Math.max(SIDEBAR_WIDTH_MIN, Math.min(SIDEBAR_WIDTH_MAX, Number(layoutPrefs.sidebarWidth) || SIDEBAR_WIDTH_DEFAULT));
+    const chatWidth = Math.max(CHAT_WIDTH_MIN, Math.min(CHAT_WIDTH_MAX, Number(layoutPrefs.chatWidth) || CHAT_WIDTH_DEFAULT));
+    layoutPrefs.sidebarWidth = sidebarWidth;
+    layoutPrefs.chatWidth = chatWidth;
+    document.documentElement.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
+    document.documentElement.style.setProperty("--chat-panel-width", `${chatWidth}px`);
+    setTimeout(() => map.invalidateSize(), 90);
+}
+
+function initLayoutResizers() {
+    function bindHorizontalResizer(resizerEl, getWidth, setWidth) {
+        if (!resizerEl) return;
+
+        let startX = 0;
+        let startWidth = 0;
+        let active = false;
+
+        const onMove = (event) => {
+            if (!active || isMobileViewport()) return;
+            const deltaX = event.clientX - startX;
+            const next = setWidth(startWidth, deltaX);
+            if (!Number.isFinite(next)) return;
+            applyLayoutPrefs();
+        };
+
+        const onUp = () => {
+            if (!active) return;
+            active = false;
+            document.body.classList.remove("resizing-layout");
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+            saveLayoutPrefs();
+            setTimeout(() => map.invalidateSize(), 120);
+        };
+
+        resizerEl.addEventListener("mousedown", (event) => {
+            if (isMobileViewport()) return;
+            event.preventDefault();
+            active = true;
+            startX = event.clientX;
+            startWidth = getWidth();
+            document.body.classList.add("resizing-layout");
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("mouseup", onUp);
+        });
+    }
+
+    bindHorizontalResizer(
+        elSidebarResizer,
+        () => Number(layoutPrefs.sidebarWidth) || SIDEBAR_WIDTH_DEFAULT,
+        (startWidth, deltaX) => {
+            const sign = layoutPrefs.sidebarOnRight ? -1 : 1;
+            layoutPrefs.sidebarWidth = Math.max(
+                SIDEBAR_WIDTH_MIN,
+                Math.min(SIDEBAR_WIDTH_MAX, startWidth + (deltaX * sign))
+            );
+            return layoutPrefs.sidebarWidth;
+        }
+    );
+
+    bindHorizontalResizer(
+        elRightChatResizer,
+        () => Number(layoutPrefs.chatWidth) || CHAT_WIDTH_DEFAULT,
+        (startWidth, deltaX) => {
+            layoutPrefs.chatWidth = Math.max(
+                CHAT_WIDTH_MIN,
+                Math.min(CHAT_WIDTH_MAX, startWidth - deltaX)
+            );
+            return layoutPrefs.chatWidth;
+        }
+    );
+}
+
 // ========== EVENT LISTENERS ==========
 elBtnClearAll.addEventListener("click", clearAllPoints);
 elBtnCalculate.addEventListener("click", calculateRoute);
@@ -788,6 +930,18 @@ elBtnCloseLocationModal.addEventListener("click", closeSaveLocationModal);
 elBtnCancelLocation.addEventListener("click", closeSaveLocationModal);
 elBtnConfirmSaveLocation.addEventListener("click", confirmSaveLocation);
 
+if (elBtnSidebarDockToggle) {
+    elBtnSidebarDockToggle.addEventListener("click", () => {
+        if (isMobileViewport()) {
+            showToast("Bu ozellik masaustu gorunumu icin aktif.", "info");
+            return;
+        }
+        layoutPrefs.sidebarOnRight = !layoutPrefs.sidebarOnRight;
+        applyLayoutPrefs();
+        saveLayoutPrefs();
+    });
+}
+
 // Icon selector behavior
 locationIconBtns.forEach(btn => {
     btn.addEventListener("click", function (e) {
@@ -813,6 +967,11 @@ document.querySelectorAll(".btn-poi").forEach((btn) => {
 
 // ğlk bildirim
 showToast("Haritaya tıklayarak başlayın! \u{1F5FA}\u{FE0F}", "info");
+
+loadLayoutPrefs();
+applyLayoutPrefs();
+initLayoutResizers();
+window.addEventListener("resize", applyLayoutPrefs);
 
 // Kaydedilmiş rotaları ve yerleri yükle
 loadSavedRoutes();
@@ -1790,6 +1949,7 @@ function mainLlmPanelSetOpen(open) {
     if (elRightChatExpand) {
         elRightChatExpand.style.display = open ? "none" : "";
     }
+    setTimeout(() => map.invalidateSize(), 120);
 }
 
 async function mainLlmCheckStatus() {
