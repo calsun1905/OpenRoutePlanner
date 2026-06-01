@@ -16,10 +16,7 @@ try:
 except Exception:  # pragma: no cover
     chromadb = None  # type: ignore[assignment]
 
-try:
-    from sentence_transformers import SentenceTransformer
-except Exception:  # pragma: no cover
-    SentenceTransformer = None  # type: ignore[assignment]
+_SENTENCE_TRANSFORMER_CLS = None
 
 
 _LOCK = threading.Lock()
@@ -78,7 +75,8 @@ def _max_context_chars() -> int:
 
 
 def is_rag_available() -> bool:
-    return _enabled() and chromadb is not None and SentenceTransformer is not None
+    # sentence-transformers/torch importu agir olabilir; startup'ta zorlamiyoruz.
+    return _enabled() and chromadb is not None
 
 
 def rag_status() -> dict[str, Any]:
@@ -106,14 +104,19 @@ def _get_client():
 
 
 def _get_embedder():
+    global _SENTENCE_TRANSFORMER_CLS
     global _EMBEDDER
     if _EMBEDDER is not None:
         return _EMBEDDER
-    if SentenceTransformer is None:
-        raise RuntimeError("sentence-transformers kurulumu eksik")
+    if _SENTENCE_TRANSFORMER_CLS is None:
+        try:
+            from sentence_transformers import SentenceTransformer as _SentenceTransformer
+            _SENTENCE_TRANSFORMER_CLS = _SentenceTransformer
+        except Exception as exc:
+            raise RuntimeError(f"sentence-transformers/torch import hatasi: {exc}") from exc
     with _LOCK:
         if _EMBEDDER is None:
-            _EMBEDDER = SentenceTransformer(_embed_model_name())
+            _EMBEDDER = _SENTENCE_TRANSFORMER_CLS(_embed_model_name())
     return _EMBEDDER
 
 
@@ -148,6 +151,7 @@ def rag_query(question: str, *, top_k: int | None = None, collection: str | None
 
     docs = (res.get("documents") or [[]])[0]
     metas = (res.get("metadatas") or [[]])[0]
+    dists = (res.get("distances") or [[]])[0]
 
     chunks: list[dict[str, Any]] = []
     sources: list[str] = []
@@ -157,6 +161,17 @@ def rag_query(question: str, *, top_k: int | None = None, collection: str | None
         text = str(doc or "").strip()
         meta = metas[idx] if idx < len(metas) and isinstance(metas[idx], dict) else {}
         src = str(meta.get("source_url", "") or "").strip()
+        raw_dist = dists[idx] if idx < len(dists) else None
+        distance = None
+        similarity = None
+        try:
+            if raw_dist is not None:
+                distance = float(raw_dist)
+                # Chroma cosine distance icin normalize embedding'de yaklasik benzerlik.
+                similarity = max(-1.0, min(1.0, 1.0 - distance))
+        except (TypeError, ValueError):
+            distance = None
+            similarity = None
         if src and src not in source_seen:
             source_seen.add(src)
             sources.append(src)
@@ -166,6 +181,8 @@ def rag_query(question: str, *, top_k: int | None = None, collection: str | None
             "source_url": src,
             "record_type": str(meta.get("record_type", "") or ""),
             "id": str(meta.get("id", "") or ""),
+            "distance": distance,
+            "similarity": similarity,
             "meta": meta,
         })
 
@@ -180,6 +197,17 @@ def rag_query(question: str, *, top_k: int | None = None, collection: str | None
     if len(context) > max_chars:
         context = context[:max_chars].rstrip() + "\n\n[...baglam kisaltildi...]"
 
+    top_distance = None
+    top_similarity = None
+    for ch in chunks:
+        val_dist = ch.get("distance")
+        val_sim = ch.get("similarity")
+        if isinstance(val_dist, (int, float)):
+            top_distance = float(val_dist)
+            if isinstance(val_sim, (int, float)):
+                top_similarity = float(val_sim)
+            break
+
     return {
         "question": user_q,
         "collection": coll_name,
@@ -188,5 +216,7 @@ def rag_query(question: str, *, top_k: int | None = None, collection: str | None
         "context": context,
         "sources": sources,
         "count": len(chunks),
+        "top_distance": top_distance,
+        "top_similarity": top_similarity,
     }
 
