@@ -1,0 +1,349 @@
+[app.py] Hava durumu servisi yÃƒÂ¼klendi
+[app.py] BERT NLP Engine yÃƒÂ¼klendi
+[app.py] BaÃ…Å¸latÃ„Â±lÃ„Â±yor: BERT warmup (background)...
+[BERT] Model yükleniyor: dbmdz/bert-base-turkish-uncased
+[BERT] İlk yükleme biraz zaman alabilir (~440 MB)...
+==================================================
+  IBB Transit Verileri Yukleniyor...
+==================================================
+[Transit] Tüm duraklar indiriliyor...
+[IBB API] HTTP 500: GetDurak_json
+[Transit] HATA: Durak verisi alınamadı!
+[Transit] Tüm hatlar indiriliyor...
+[IBB API] HTTP 500: GetHat_json
+[Transit] HATA: Hat verisi alınamadı!
+[Transit] route_stops verisi mevcut: 62787 kayit
+[Metro API] GET GetLines hatasi: 500 Server Error: Internal Server Error for url: https://api.ibb.gov.tr/MetroIstanbul/api/MetroMobile/V2/GetLines
+[Metro API] GET GetStations hatasi: 500 Server Error: Internal Server Error for url: https://api.ibb.gov.tr/MetroIstanbul/api/MetroMobile/V2/GetStations
+[BERT] Model yüklendi! (Device: cuda)
+[PlaceDB] local_places kaynagi eklendi: 45 yer
+[PlaceDB] Türkiye veritabanı yüklendi: Toplam 1783 yer
+[BERT NLP] Yer isimleri için embedding hesaplanıyor...
+[GTFS] Marmaray sync tamamlandi: line_id=9000, stations=43, links=43
+[Transit] Toplam sure: 3.4s
+[Transit] 0 durak, 0 hat, 62787 esleme, 0 metro hatti yuklendi, Marmaray link: 43
+==================================================
+  OpenTrip API Sunucusu Baslatiliyor...
+  http://localhost:5000
+==================================================
+[GraphPreload] Ãƒâ€“n yÃƒÂ¼kleniyor: Kadikoy, Istanbul, Turkey
+[GraphPreload] Ãƒâ€“n yÃƒÂ¼kleniyor: Besiktas, Istanbul, Turkey
+[GraphManager] Cache'den okunuyor: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\kadikoy_istanbul_turkey.graphml
+[GraphManager] Cache'den okunuyor: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\besiktas_istanbul_turkey.graphml
+[GraphPreload] Ãƒâ€“n yÃƒÂ¼kleniyor: Taksim, Istanbul, Turkey
+[GraphPreload] Ãƒâ€“n yÃƒÂ¼kleniyor: Sisli, Istanbul, Turkey
+[GraphManager] OSM'den indiriliyor: Taksim, Istanbul, Turkey
+[GraphPreload] Ãƒâ€“n yÃƒÂ¼kleniyor: Uskudar, Istanbul, Turkey
+[GraphPreload] Ãƒâ€“n yÃƒÂ¼kleniyor: Maslak, Istanbul, Turkey
+[GraphManager] Cache'den okunuyor: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\sisli_istanbul_turkey.graphml
+[GraphManager] Cache'den okunuyor: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\uskudar_istanbul_turkey.graphml
+[GraphPreload] Ãƒâ€“n yÃƒÂ¼kleniyor: Levent, Istanbul, Turkey
+[GraphManager] Cache'den okunuyor: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\maslak_istanbul_turkey.graphml
+[GraphPreload] Hata Taksim, Istanbul, Turkey: Nominatim did not geocode query 'Taksim, Istanbul, Turkey' to a geometry of type (Multi)Polygon.
+[GraphManager] Cache'den okunuyor: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\levent_istanbul_turkey.graphml
+[GraphPreload] YÃƒÂ¼klendi: Levent, Istanbul, Turkey
+[GraphPreload] YÃƒÂ¼klendi: Maslak, Istanbul, Turkey
+[GraphManager] Outdoor routing filtresi: 20 kapali/ozel kenar cikarildi
+[GraphPreload] YÃƒÂ¼klendi: Besiktas, Istanbul, Turkey
+[GraphManager] Outdoor routing filtresi: 168 kapali/ozel kenar cikarildi
+[GraphPreload] YÃƒÂ¼klendi: Sisli, Istanbul, Turkey
+[GraphManager] Outdoor routing filtresi: 136 kapali/ozel kenar cikarildi
+[GraphPreload] YÃƒÂ¼klendi: Kadikoy, Istanbul, Turkey
+[GraphManager] Outdoor routing filtresi: 128 kapali/ozel kenar cikarildi
+[GraphPreload] YÃƒÂ¼klendi: Uskudar, Istanbul, Turkey
+[GraphPreload] 6 bÃƒÂ¶lge ÃƒÂ¶n yÃƒÂ¼klendi
+ * Serving Flask app 'app'
+ * Debug mode: off
+[BERT NLP] 1783 yer ismi indexlendi!
+[BERT NLP] Engine hazır!
+[app.py] BERT warmup tamamlandÃ„Â±
+[API] Geocode: Kadikoy, Istanbul
+[GEOCODER] Arama baslatildi: Kadikoy, Istanbul
+[Geocoder] Nominatim API çağrısı: Kadikoy, Istanbul
+[GEOCODER] Bulundu: Kadıköy, İstanbul, Marmara Bölgesi, Türkiye -> (40.991295, 29.024563)
+[API] Geocode Sonuc: (40.991295, 29.024563)
+[API] Geocode: Kadikoy, Istanbul
+[GEOCODER] Arama baslatildi: Kadikoy, Istanbul
+[GEOCODER] Memory CACHE HIT: Kadikoy, Istanbul
+[API] Geocode Sonuc: (40.991295, 29.024563)
+[API] Get-route: 3 nokta, optimize=True, route_type=route_1
+[GraphManager] Graf indiriliyor: merkez=(41.0135, 29.0047), yaricap=5730m, max_pair=6098m
+[GraphManager] Cache'e kaydedildi: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\point_41.0135_29.0047_5730.graphml
+[GraphManager] Outdoor routing filtresi: 1126 kapali/ozel kenar cikarildi
+[ROUTE] TSP baslatildi: 3 nokta
+[ROUTE] TSP tamamlandi: [2, 1, 0]
+[ROUTE] Alternatif rota: origin=12493117264, dest=13433942461, n=3
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ALTERNATIF ROTALAR v3.0 (Via-Node)
+[RouteEngine] Origin: 12493117264 → Dest: 13433942461
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Rota 1 (en kısa): 5.64 km
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 2: Via-Node Rotaları Aranıyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] Via-Node: 6917 kavşak aday bulundu
+[RouteEngine] ⚠️  Via-node rota bulunamadı, penalty'ye geçiliyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 3: Penalty (Gövde-Only)
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Penalty rota #1: 5.83 km
+[RouteEngine] ✓ Penalty rota #2: 6.01 km
+[RouteEngine] ✓ Penalty rota #3: 6.40 km
+[RouteEngine] ✓ Penalty Rota 2: 5.83 km
+[RouteEngine] ✓ Penalty Rota 3: 6.01 km
+[RouteTelemetry] ════════════════════════════════════
+[RouteTelemetry] Generation Method: penalty
+[RouteTelemetry] Edge Connectivity: None
+[RouteTelemetry] Via-Node Found: 0
+[RouteTelemetry] Penalty Candidates: 3
+[RouteTelemetry] Unique Routes: 3
+[RouteTelemetry] Overlaps: ['4.1%', '6.8%', '0.0%']
+[RouteTelemetry] Total Time: 5.28s
+[RouteTelemetry] ════════════════════════════════════
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ TOPLAM 3 ROTA BULUNDU
+[RouteEngine] ════════════════════════════════════
+[ROUTE] 3 alternatif rota bulundu
+[ROUTE] Alternatif rota: origin=13433942461, dest=10083065580, n=3
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ALTERNATIF ROTALAR v3.0 (Via-Node)
+[RouteEngine] Origin: 13433942461 → Dest: 10083065580
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] HATA: Aralarında yol yok!
+[RouteEngine] Fallback Level 1 basarisiz
+[RouteEngine] 13433942461 -> 10083065580 arası yol bulunamadı!
+[RouteEngine] Segment bos: alt_route_seg_2
+[RouteEngine] build_alternative_routes: segment baglanamadi, rota iptal edildi
+[API] Get-route: 3 nokta, optimize=True, route_type=route_1
+[GraphManager] Graf indiriliyor: merkez=(40.9926, 29.0255), yaricap=1579m, max_pair=735m
+[GraphManager] Cache'e kaydedildi: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\point_40.9926_29.0255_1579.graphml
+[GraphManager] Outdoor routing filtresi: 112 kapali/ozel kenar cikarildi
+[ROUTE] TSP baslatildi: 3 nokta
+[ROUTE] TSP tamamlandi: [2, 1, 0]
+[ROUTE] Alternatif rota: origin=6191487948, dest=1940160448, n=3
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ALTERNATIF ROTALAR v3.0 (Via-Node)
+[RouteEngine] Origin: 6191487948 → Dest: 1940160448
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Rota 1 (en kısa): 0.52 km
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 2: Via-Node Rotaları Aranıyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] Via-Node: 199 kavşak aday bulundu
+[RouteEngine] ⚠️  Via-node rota bulunamadı, penalty'ye geçiliyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 3: Penalty (Gövde-Only)
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Penalty rota #1: 0.55 km
+[RouteEngine] ✓ Penalty rota #2: 0.57 km
+[RouteEngine] ✓ Penalty rota #3: 0.66 km
+[RouteEngine] ✓ Penalty Rota 2: 0.55 km
+[RouteEngine] ✓ Penalty Rota 3: 0.57 km
+[RouteTelemetry] ════════════════════════════════════
+[RouteTelemetry] Generation Method: penalty
+[RouteTelemetry] Edge Connectivity: None
+[RouteTelemetry] Via-Node Found: 0
+[RouteTelemetry] Penalty Candidates: 3
+[RouteTelemetry] Unique Routes: 3
+[RouteTelemetry] Overlaps: ['16.7%', '21.7%', '0.0%']
+[RouteTelemetry] Total Time: 0.10s
+[RouteTelemetry] ════════════════════════════════════
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ TOPLAM 3 ROTA BULUNDU
+[RouteEngine] ════════════════════════════════════
+[ROUTE] 3 alternatif rota bulundu
+[ROUTE] Alternatif rota: origin=1940160448, dest=2442360203, n=3
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ALTERNATIF ROTALAR v3.0 (Via-Node)
+[RouteEngine] Origin: 1940160448 → Dest: 2442360203
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Rota 1 (en kısa): 0.42 km
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 2: Via-Node Rotaları Aranıyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] Via-Node: 186 kavşak aday bulundu
+[RouteEngine] ⚠️  Via-node rota bulunamadı, penalty'ye geçiliyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 3: Penalty (Gövde-Only)
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Penalty rota #1: 0.53 km
+[RouteEngine] ✓ Penalty rota #2: 0.51 km
+[RouteEngine] ✓ Penalty rota #3: 0.73 km
+[RouteEngine] ✓ Penalty Rota 2: 0.53 km
+[RouteEngine] ✓ Penalty Rota 3: 0.51 km
+[RouteTelemetry] ════════════════════════════════════
+[RouteTelemetry] Generation Method: penalty
+[RouteTelemetry] Edge Connectivity: None
+[RouteTelemetry] Via-Node Found: 0
+[RouteTelemetry] Penalty Candidates: 3
+[RouteTelemetry] Unique Routes: 3
+[RouteTelemetry] Overlaps: ['0.0%', '33.3%', '0.0%']
+[RouteTelemetry] Total Time: 0.10s
+[RouteTelemetry] ════════════════════════════════════
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ TOPLAM 3 ROTA BULUNDU
+[RouteEngine] ════════════════════════════════════
+[ROUTE] 3 alternatif rota bulundu
+[API] Rota tamamlandi: 0.94km, 11dk
+[API] Get-alternative-routes: 3 nokta, optimize=True
+[GraphManager] Cache'den okunuyor: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\point_40.9926_29.0255_1579.graphml
+[GraphManager] Outdoor routing filtresi: 112 kapali/ozel kenar cikarildi
+[ROUTE] TSP baslatildi: 3 nokta
+[ROUTE] TSP tamamlandi: [2, 1, 0]
+[RouteEngine] [BATCH] Segment 1: (40.9951, 29.0224) -> (40.9923, 29.0255)
+[ROUTE] Alternatif rota: origin=6191487948, dest=1940160448, n=3
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ALTERNATIF ROTALAR v3.0 (Via-Node)
+[RouteEngine] Origin: 6191487948 → Dest: 1940160448
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Rota 1 (en kısa): 0.52 km
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 2: Via-Node Rotaları Aranıyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] Via-Node: 199 kavşak aday bulundu
+[RouteEngine] ⚠️  Via-node rota bulunamadı, penalty'ye geçiliyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 3: Penalty (Gövde-Only)
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Penalty rota #1: 0.55 km
+[RouteEngine] ✓ Penalty rota #2: 0.57 km
+[RouteEngine] ✓ Penalty rota #3: 0.66 km
+[RouteEngine] ✓ Penalty Rota 2: 0.55 km
+[RouteEngine] ✓ Penalty Rota 3: 0.57 km
+[RouteTelemetry] ════════════════════════════════════
+[RouteTelemetry] Generation Method: penalty
+[RouteTelemetry] Edge Connectivity: None
+[RouteTelemetry] Via-Node Found: 0
+[RouteTelemetry] Penalty Candidates: 3
+[RouteTelemetry] Unique Routes: 3
+[RouteTelemetry] Overlaps: ['16.7%', '21.7%', '0.0%']
+[RouteTelemetry] Total Time: 0.12s
+[RouteTelemetry] ════════════════════════════════════
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ TOPLAM 3 ROTA BULUNDU
+[RouteEngine] ════════════════════════════════════
+[ROUTE] 3 alternatif rota bulundu
+[RouteEngine] [BATCH] Segment 1 icin 3 alternatif bulundu
+[RouteEngine] [BATCH] Segment 2: (40.9923, 29.0255) -> (40.9905, 29.0287)
+[ROUTE] Alternatif rota: origin=1940160448, dest=2442360203, n=3
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ALTERNATIF ROTALAR v3.0 (Via-Node)
+[RouteEngine] Origin: 1940160448 → Dest: 2442360203
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Rota 1 (en kısa): 0.42 km
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 2: Via-Node Rotaları Aranıyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] Via-Node: 186 kavşak aday bulundu
+[RouteEngine] ⚠️  Via-node rota bulunamadı, penalty'ye geçiliyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 3: Penalty (Gövde-Only)
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Penalty rota #1: 0.53 km
+[RouteEngine] ✓ Penalty rota #2: 0.51 km
+[RouteEngine] ✓ Penalty rota #3: 0.73 km
+[RouteEngine] ✓ Penalty Rota 2: 0.53 km
+[RouteEngine] ✓ Penalty Rota 3: 0.51 km
+[RouteTelemetry] ════════════════════════════════════
+[RouteTelemetry] Generation Method: penalty
+[RouteTelemetry] Edge Connectivity: None
+[RouteTelemetry] Via-Node Found: 0
+[RouteTelemetry] Penalty Candidates: 3
+[RouteTelemetry] Unique Routes: 3
+[RouteTelemetry] Overlaps: ['0.0%', '33.3%', '0.0%']
+[RouteTelemetry] Total Time: 0.11s
+[RouteTelemetry] ════════════════════════════════════
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ TOPLAM 3 ROTA BULUNDU
+[RouteEngine] ════════════════════════════════════
+[ROUTE] 3 alternatif rota bulundu
+[RouteEngine] [BATCH] Segment 2 icin 3 alternatif bulundu
+[RouteEngine] [BATCH] === Rota 1 tam rota olusturuluyor ===
+[RouteEngine] [BATCH] Segment 1 icin secilen rota: 0, uzunluk=11
+[RouteEngine] [BATCH] Segment 2 icin secilen rota: 0, uzunluk=12
+[RouteEngine] [BATCH] Rota 1: 0.94 km, 11 dk
+[RouteEngine] [BATCH] === Rota 2 tam rota olusturuluyor ===
+[RouteEngine] [BATCH] Segment 1 icin secilen rota: 1, uzunluk=13
+[RouteEngine] [BATCH] Segment 2 icin secilen rota: 1, uzunluk=13
+[RouteEngine] [BATCH] Rota 2: 1.06 km, 13 dk
+[RouteEngine] [BATCH] === Rota 3 tam rota olusturuluyor ===
+[RouteEngine] [BATCH] Segment 1 icin secilen rota: 2, uzunluk=24
+[RouteEngine] [BATCH] Segment 2 icin secilen rota: 2, uzunluk=13
+[RouteEngine] [BATCH] Rota 3: 1.1 km, 13 dk
+[API] 3 alternatif rota
+[GraphManager] Cache'den okunuyor: C:\Users\Gaming\Desktop\projects\routeplanner\OpenRoutePlanner\backend\data\point_40.9926_29.0255_1579.graphml
+[GraphManager] Outdoor routing filtresi: 112 kapali/ozel kenar cikarildi
+[ROUTE] TSP baslatildi: 3 nokta
+[ROUTE] TSP tamamlandi: [2, 1, 0]
+[ROUTE] Alternatif rota: origin=6191487948, dest=1940160448, n=3
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ALTERNATIF ROTALAR v3.0 (Via-Node)
+[RouteEngine] Origin: 6191487948 → Dest: 1940160448
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Rota 1 (en kısa): 0.52 km
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 2: Via-Node Rotaları Aranıyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] Via-Node: 199 kavşak aday bulundu
+[RouteEngine] ⚠️  Via-node rota bulunamadı, penalty'ye geçiliyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 3: Penalty (Gövde-Only)
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Penalty rota #1: 0.55 km
+[RouteEngine] ✓ Penalty rota #2: 0.57 km
+[RouteEngine] ✓ Penalty rota #3: 0.66 km
+[RouteEngine] ✓ Penalty Rota 2: 0.55 km
+[RouteEngine] ✓ Penalty Rota 3: 0.57 km
+[RouteTelemetry] ════════════════════════════════════
+[RouteTelemetry] Generation Method: penalty
+[RouteTelemetry] Edge Connectivity: None
+[RouteTelemetry] Via-Node Found: 0
+[RouteTelemetry] Penalty Candidates: 3
+[RouteTelemetry] Unique Routes: 3
+[RouteTelemetry] Overlaps: ['16.7%', '21.7%', '0.0%']
+[RouteTelemetry] Total Time: 0.10s
+[RouteTelemetry] ════════════════════════════════════
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ TOPLAM 3 ROTA BULUNDU
+[RouteEngine] ════════════════════════════════════
+[ROUTE] 3 alternatif rota bulundu
+[ROUTE] Alternatif rota: origin=1940160448, dest=2442360203, n=3
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ALTERNATIF ROTALAR v3.0 (Via-Node)
+[RouteEngine] Origin: 1940160448 → Dest: 2442360203
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Rota 1 (en kısa): 0.42 km
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 2: Via-Node Rotaları Aranıyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] Via-Node: 186 kavşak aday bulundu
+[RouteEngine] ⚠️  Via-node rota bulunamadı, penalty'ye geçiliyor
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ADIM 3: Penalty (Gövde-Only)
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ Penalty rota #1: 0.53 km
+[RouteEngine] ✓ Penalty rota #2: 0.51 km
+[RouteEngine] ✓ Penalty rota #3: 0.73 km
+[RouteEngine] ✓ Penalty Rota 2: 0.53 km
+[RouteEngine] ✓ Penalty Rota 3: 0.51 km
+[RouteTelemetry] ════════════════════════════════════
+[RouteTelemetry] Generation Method: penalty
+[RouteTelemetry] Edge Connectivity: None
+[RouteTelemetry] Via-Node Found: 0
+[RouteTelemetry] Penalty Candidates: 3
+[RouteTelemetry] Unique Routes: 3
+[RouteTelemetry] Overlaps: ['0.0%', '33.3%', '0.0%']
+[RouteTelemetry] Total Time: 0.09s
+[RouteTelemetry] ════════════════════════════════════
+[RouteEngine] ════════════════════════════════════
+[RouteEngine] ✓ TOPLAM 3 ROTA BULUNDU
+[RouteEngine] ════════════════════════════════════
+[ROUTE] 3 alternatif rota bulundu
+[API] get-route-steps hata: name 'ROUTE_CONFIG' is not defined
+[LocationStorage] Lokasyon kaydedildi: 05d06818 - QA Spot (star)
+[LocationStorage] Lokasyon silindi: 05d06818
+[Weather] Current weather request: lat=40.9913, lon=29.0246
+[Weather] Current weather request: lat=40.9913, lon=29.0246
+[Weather] Current weather request: lat=40.9913, lon=29.0246
+[Weather] Current weather request: lat=40.9913, lon=29.0246
+[Weather] Current weather request: lat=40.9913, lon=29.0246

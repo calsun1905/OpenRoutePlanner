@@ -1,0 +1,107 @@
+[
+  {
+    "idx": 1,
+    "q": "m5 duraklar?n? sayar m?s?n?",
+    "model": "rag-direct-structured",
+    "rag": true,
+    "ans": "M5 hattinda toplam 24 durak var. 1. Üsküdar 2. Fıstıkağacı 3. Bağlarbaşı 4. Altunizade 5. Kısıklı 6. Bulgurlu 7. Ümraniye 8. Çarşı 9. Yamanevler 10. Çakmak 11. Ihlamurkuyu 12. Altınşehir 13. İmam Hatip Lisesi 14. Dudullu 15. Necip Fazıl 16. Çekmeköy 17. Meclis 18. Sarıgazi 19. Sancaktepe Şehir Hastanesi 20. Sancaktepe 21. Samandıra Merkez 22. Veysel Karani 23. Hasanpaşa 24. Sultanbeyli"
+  },
+  {
+    "idx": 2,
+    "q": "m4 hatt?nda ka? durak var?",
+    "model": "rag-direct-structured",
+    "rag": true,
+    "ans": "M4 hattinda toplam 23 durak var. 1. Kadıköy 2. Ayrılık Çeşmesi 3. Acıbadem 4. Ünalan 5. Göztepe 6. Yenisahra 7. Pegasus-Kozyatağı 8. Bostancı 9. Küçükyalı 10. Maltepe 11. Huzurevi 12. Gülsuyu 13. Esenkent 14. Hastane-Adliye 15. Soğanlık 16. Kartal 17. Yakacık-Adnan Kahveci 18. Pendik 19. Tavşantepe 20. Fevzi Çakmak-Hastane 21. Yayalar-Şeyhli 22. Kurtköy 23. Sabiha Gökçen Havalimanı"
+  },
+  {
+    "idx": 3,
+    "q": "samand?ra merkez m5 ?zerinde mi?",
+    "model": "rag-direct-structured",
+    "rag": true,
+    "ans": "Evet, samandira merkez M5 hattinin duraklari arasindadir."
+  },
+  {
+    "idx": 4,
+    "q": "sultanbeyli uzatmas? hangi metro hatt?nda?",
+    "model": "rag-direct-structured",
+    "rag": true,
+    "ans": "Bu soru icin baglamdaki en ilgili hat: M5."
+  },
+  {
+    "idx": 5,
+    "q": "marmaray hangi yakalar? ba?l?yor?",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamdan dogrudan bulunan bilgiler: 1. B1 Marmaray Hattı, Halkalı ile Gebze arasında İstanbul'un Avrupa ve Anadolu yakalarını Boğaz geçişiyle bağlayan banliy demiryolu hattıdır"
+  },
+  {
+    "idx": 6,
+    "q": "t1 hatt? turistik gezi i?in uygun mu?",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamdan dogrudan bulunan bilgiler: 1. Bölgeye T1 tramvayı ile Sultanahmet veya Gülhane durakları zerinden erişim planlanabilir 2. DURAK_LISTESI: T1 durakları sırasıyla: Kabataş, Fındıklı-Mimar Sinan Ü 3. GUZERGAH_AKTARMA: T1 hattı Kabataş, Eminönü, Sirkeci, Sultanahmet, Beyazıt, Aksaray, Zeytinburnu ve Bağcılar aksında çalışır 4. HAT_KIMLIK: T1 Kabataş-Bağcılar Tramvay Hattı, İstanbul'un tarihî yarımada ve batı aksındaki en yoğun tramvay hatlarından biridir"
+  },
+  {
+    "idx": 7,
+    "q": "metrob?s gece ?al???r m??",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamda bu soruyu dogrudan yanitlayacak acik bilgi yok."
+  },
+  {
+    "idx": 8,
+    "q": "istanbulkart olmadan metro kullanabilir miyim?",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamda bu soruyu dogrudan yanitlayacak acik bilgi yok."
+  },
+  {
+    "idx": 9,
+    "q": "kad?k?yden be?ikta?a en h?zl? toplu ta??ma nas?l olur?",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamdan dogrudan bulunan bilgiler: 1. Toplu taşımada sefer sıklığı, özel gün düzenlemeleri ve etkinlik kaynaklı yoğunluk gün içinde değişebilir 2. Hafta sonu, öğle saatleri ve tatil dönemlerinde giriş sırası, yaya yoğunluğu ve toplu taşıma bekleme süreleri artabilir"
+  },
+  {
+    "idx": 10,
+    "q": "karak?yden tophaneye y?r?mek mant?kl? m??",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamda bu soruyu dogrudan yanitlayacak acik bilgi yok."
+  },
+  {
+    "idx": 11,
+    "q": "pendikten istanbul havaliman?na toplu ta??ma ?ner",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamda bu soruyu dogrudan yanitlayacak acik bilgi yok."
+  },
+  {
+    "idx": 12,
+    "q": "?sk?darda eczane bulmak i?in ne yapmal?y?m?",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamda bu soruyu dogrudan yanitlayacak acik bilgi yok."
+  },
+  {
+    "idx": 13,
+    "q": "m5 ?zerinde imam hatip lisesi var m??",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamda bu soruyu dogrudan yanitlayacak acik bilgi yok."
+  },
+  {
+    "idx": 14,
+    "q": "m4 ?zerinde sabiha g?k?en havaliman? var m??",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamdan dogrudan bulunan bilgiler: 1. M4 durakları sırasıyla: Kadıköy, Ayrılık Çeşmesi, Acıbadem, Ünalan, Göztepe, Yenisahra, Pegasus-Kozyatağı, Bostancı, Küçükyalı, Maltepe, Huzurevi, Gülsuyu, Esenkent, Hastane-Adliye, Soğanlık, Kartal, Yakacık-Adnan Kahveci, Pendik, Tavşantepe, Fevzi Çakmak-Hastane, Yayalar-Şeyhli, Kurtköy, Sabiha Gökçen Havalimanı 2. DURAK_LISTESI: M4 durakları sırasıyla: Kadıköy, Ayrılık Çeşmesi, Acıbadem, Ünalan, Göztepe, Yenisahra, Pegasus-Kozyatağı, Bostancı, Küçükyalı, Maltepe, Huzurevi, Gülsuyu, Esenkent, Hastane-Adliye, Soğanlık, Kartal, Yakacık-Adnan Kahveci, Pendik, Tavşantepe, Fevzi Çakmak-Hastane, Yayalar-Şeyhli, Kurtköy, Sabiha Gökçen Havalimanı 3. GUZERGAH_AKTARMA: M4 hattı Kadıköy'den başlayıp Ayrılık Çeşmesi, Kozyatağı, Bostancı, Pendik ve Sabiha Gökçen Havalimanı yönüne uzanır 4. HAT_KIMLIK: M4 Kadıköy-Sabiha Gökçen Havalimanı Metro Hattı, Anadolu Yakası'nın ana doğu-batı metro hatlarından biridir"
+  },
+  {
+    "idx": 15,
+    "q": "b1 marmaray hatt? nedir?",
+    "model": "rag-extractive",
+    "rag": true,
+    "ans": "Baglamdan dogrudan bulunan bilgiler: 1. B1 Marmaray Hattı, Halkalı ile Gebze arasında İstanbul'un Avrupa ve Anadolu yakalarını Boğaz geçişiyle bağlayan banliy demiryolu hattıdır 2. Marmaray Halkalı, Bakırköy, Yenikapı, Sirkeci, Üsküdar, Ayrılık Çeşmesi, Söğütlüçeşme, Bostancı, Pendik ve Gebze aksında çalışır 3. Halkalı-Gebze / Ataköy-Pendik Marmaray Hattı hakkında birleşik RAG özeti 4. GUZERGAH_AKTARMA: Marmaray Halkalı, Bakırköy, Yenikapı, Sirkeci, Üsküdar, Ayrılık Çeşmesi, Söğütlüçeşme, Bostancı, Pendik ve Gebze aksında çalışır"
+  }
+]

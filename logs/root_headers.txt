@@ -1,0 +1,16 @@
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.6 Python/3.13.7
+Date: Mon, 01 Jun 2026 14:19:22 GMT
+Content-Disposition: inline; filename=index.html
+Content-Type: text/html; charset=utf-8
+Content-Length: 40433
+Last-Modified: Mon, 01 Jun 2026 13:33:10 GMT
+Cache-Control: public, max-age=300
+ETag: "1780320790.7870135-40433-1164517573"
+Date: Mon, 01 Jun 2026 14:19:22 GMT
+X-Request-ID: a3626b06ef7e
+X-Correlation-ID: a3626b06ef7e
+Vary: Accept-Encoding
+Access-Control-Allow-Origin: *
+Connection: close
+

@@ -1,0 +1,1 @@
+{"available":true,"base_url":"http://127.0.0.1:1234/v1","blocked_models":[],"configured":true,"default_model":"turkish-llama-8b-instruct-v0.1 finetuned","fallback_models":["turkish-llama-8b-instruct-v0.1 finetuned","turkish-llama-8b-instruct-v0.1","wiroai-turkish-llm-9b","jamba2-3b-turkish"],"health_count":0,"timeout_sec":120.0}

@@ -1,0 +1,110 @@
+{
+  "summary": {
+    "total": 10,
+    "bleed_count": 1
+  },
+  "rows": [
+    {
+      "idx": 1,
+      "query": "?imdi sadece selam de",
+      "rag": false,
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "sim": 0,
+      "bleed": false,
+      "reason": [],
+      "preview": "Merhaba! Güle güle. Nasılsın?"
+    },
+    {
+      "idx": 2,
+      "query": "marmaray avrupa ve anadolu yakas?n? ba?l?yor mu?",
+      "rag": true,
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "sim": 0.11,
+      "bleed": false,
+      "reason": [],
+      "preview": "Marmaray hattı Avrupa ve Anadolu yakalarını bağlamıyor. Marmaray hattının iki tarafını da kapsayan Kadıköy İskelesi, bir ana Anadolu yakası merkezi olarak hizmet vermesine rağmen, doğrudan Marmaray Hattına bağlı olmuyor. Kabataş-Adalar hatt"
+    },
+    {
+      "idx": 3,
+      "query": "bu soruyu unut: izmir hakk?nda 1 c?mle yaz",
+      "rag": false,
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "sim": 0.15,
+      "bleed": true,
+      "reason": [
+        "izmir_missing"
+      ],
+      "preview": "İzmir şehri, Türkiye'nin Ege Bölgesi'nde yer alan ve Akdeniz iklimine sahip bir kıyı kentidir. Güzelyurt, Urla gibi tarihi yerleri ve Konak Meydanı gibi hareketli kafe ve restoranlarıyla ünlüdür."
+    },
+    {
+      "idx": 4,
+      "query": "tekrar d?n: m5 ?zerinde samand?ra merkez var m??",
+      "rag": true,
+      "model": "rag-direct-structured",
+      "sim": 0.21,
+      "bleed": false,
+      "reason": [],
+      "preview": "Hayir, tekrar d?n M5 durak listesinde gorunmuyor."
+    },
+    {
+      "idx": 5,
+      "query": "karak?y tophane y?r?y?? sorusuna tek c?mle cevap ver",
+      "rag": false,
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "sim": 0.22,
+      "bleed": false,
+      "reason": [],
+      "preview": "Tophane bölgesinin Karaköy semtinde yer alan Tophane Camii, 1653 yılında Sultan IV. Mehmed tarafından yaptırılmıştır ve Osmanlı mimarisinin önemli örneklerinden biridir."
+    },
+    {
+      "idx": 6,
+      "query": "?imdi poiye ge?: be?ikta?ta eczane i?in ne yapay?m?",
+      "rag": true,
+      "model": "rag-direct-poi-note",
+      "sim": 0.21,
+      "bleed": false,
+      "reason": [],
+      "preview": "Bu soru POI (mekan) arama tipinde. En dogru sonuc icin haritadaki 'Mekan Ara (POI)' kismini kullanip kategori secin (ornegin eczane/kafe/restoran). Istersen adim adim nasil filtreleyecegini yazayim."
+    },
+    {
+      "idx": 7,
+      "query": "pendikten havaliman? i?in rotay? nereden hesaplar?m?",
+      "rag": true,
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "sim": 0.16,
+      "bleed": false,
+      "reason": [],
+      "preview": "Soru: pendikten havalimanına ulaşım nasıl yapılır? Cevap: Pendik'ten Sabiha Gökçen Havalimanı'na Marmaray ve metro hatları ile aktarma yapılarak ulaşılabilir. M4 hattı, Kadıköy'den başlayıp Ayrılık Çeşmesi, Kozyatağı, Bostancı, Pendik ve Sa"
+    },
+    {
+      "idx": 8,
+      "query": "yaln?zca evet/hay?r: sultanbeyli m5 hatt?nda m??",
+      "rag": true,
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "sim": 0.25,
+      "bleed": false,
+      "reason": [],
+      "preview": "Soru: Sultanbeyli M5 hattında mı? Cevap: Evet, Sultanbeyli M5 hattı Üsküdar-Sultanbeyli Metro Hattı'nın bir parçasıdır ve Üsküdar ile Sultanbeyli arasındaki bağlantıyı sağlar."
+    },
+    {
+      "idx": 9,
+      "query": "genel soru: bug?n motivasyon i?in 1 c?mle",
+      "rag": false,
+      "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+      "sim": 0.25,
+      "bleed": false,
+      "reason": [],
+      "preview": "Her gün yeni bir başlangıç ve fırsatlar sunar. Hedeflerimizi net ve cesaret verici tutarak kendimize karşı güçlü olmalıyız. Bu yüzden bugünün motivasyonunu sadece kendi potansiyelimizde bulabiliriz. Kendi benliğimizde umut ve cesarete sahip"
+    },
+    {
+      "idx": 10,
+      "query": "m4 duraklar?n? tekrar say",
+      "rag": true,
+      "model": "rag-direct-structured",
+      "sim": 0.23,
+      "bleed": false,
+      "reason": [],
+      "preview": "M4 hattinda toplam 23 durak var. 1. Kadıköy 2. Ayrılık Çeşmesi 3. Acıbadem 4. Ünalan 5. Göztepe 6. Yenisahra 7. Pegasus-Kozyatağı 8. Bostancı 9. Küçükyalı 10. Maltepe 11. Huzurevi 12. Gülsuyu 13. Esenkent 14. Hastane-Adliye 15. Soğanlık 16."
+    }
+  ]
+}

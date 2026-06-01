@@ -1,0 +1,107 @@
+[
+  {
+    "idx": 1,
+    "query": "selam nas?ls?n",
+    "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+    "rag": false,
+    "text": "İyi günler! Nasılsın? Ben her zaman yardım etmeye hazırım!"
+  },
+  {
+    "idx": 2,
+    "query": "m5 duraklar?n? sayar m?s?n?",
+    "model": "rag-direct-structured",
+    "rag": true,
+    "text": "M5 hattinda toplam 24 durak var. 1. Üsküdar 2. Fıstıkağacı 3. Bağlarbaşı 4. Altunizade 5. Kısıklı 6. Bulgurlu 7. Ümraniye 8. Çarşı 9. Yamanevler 10. Çakmak 11. Ihlamurkuyu 12. Altınşehir 13. İmam Hatip Lisesi 14. Dudullu"
+  },
+  {
+    "idx": 3,
+    "query": "m4 hatt?nda ka? durak var?",
+    "model": "rag-direct-structured",
+    "rag": true,
+    "text": "M4 hattinda toplam 23 durak var. 1. Kadıköy 2. Ayrılık Çeşmesi 3. Acıbadem 4. Ünalan 5. Göztepe 6. Yenisahra 7. Pegasus-Kozyatağı 8. Bostancı 9. Küçükyalı 10. Maltepe 11. Huzurevi 12. Gülsuyu 13. Esenkent 14. Hastane-Adl"
+  },
+  {
+    "idx": 4,
+    "query": "Kad?k?yden Be?ikta?a en h?zl? toplu ta??ma nas?l olur?",
+    "model": "rag-direct-route-note",
+    "rag": true,
+    "text": "Bu soru anlik rota hesaplamasi gerektirir. En dogru sonuc icin haritadaki 'Toplu Tasima Karsilastir' veya 'Rotayi Hesapla' ile hesaplama yapin. Istersen secili ulasim modlarina gore rota adimlarini birlikte yorumlayabili"
+  },
+  {
+    "idx": 5,
+    "query": "Sadece vapurla Kad?k?yden Emin?n?ne gidilir mi?",
+    "model": "rag-direct-route-note",
+    "rag": true,
+    "text": "Bu soru anlik rota hesaplamasi gerektirir. En dogru sonuc icin haritadaki 'Toplu Tasima Karsilastir' veya 'Rotayi Hesapla' ile hesaplama yapin. Istersen secili ulasim modlarina gore rota adimlarini birlikte yorumlayabili"
+  },
+  {
+    "idx": 6,
+    "query": "?stanbulkart olmadan metro kullanabilir miyim?",
+    "model": "rag-direct-istanbulkart-note",
+    "rag": true,
+    "text": "Istanbulkart kullanimi ve alternatif odeme yontemleri donemsel olarak degisebilir. En guvenli yaklasim: resmi tarife/duyuru sayfalarini kontrol edip seyahatten once dogrulamaktir. Kesin ucret veya kural bilgisi icin gunc"
+  },
+  {
+    "idx": 7,
+    "query": "Karak?yden Tophaneye y?r?mek mant?kl? m??",
+    "model": "rag-direct-route-note",
+    "rag": true,
+    "text": "Bu soru anlik rota hesaplamasi gerektirir. En dogru sonuc icin haritadaki 'Toplu Tasima Karsilastir' veya 'Rotayi Hesapla' ile hesaplama yapin. Istersen secili ulasim modlarina gore rota adimlarini birlikte yorumlayabili"
+  },
+  {
+    "idx": 8,
+    "query": "Marmaray hangi yakalar? ba?l?yor?",
+    "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+    "rag": true,
+    "text": "Marmaray hattı Halkalı ile Gebze arasında çalışmaktadır."
+  },
+  {
+    "idx": 9,
+    "query": "T1 hatt? turistik gezi i?in uygun mu?",
+    "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+    "rag": true,
+    "text": "T1 hattı, Sultanahmet veya Gülhane duraklarından Sultanahmet klasik tarih rotasına erişime yardımcı olur. Bu rota, İstanbul'un en yoğun tarihi yapılarını kısa sürede görmeye çalışan kullanıcılar için uygundur ve yürüyere"
+  },
+  {
+    "idx": 10,
+    "query": "?sk?darda eczane bulmak i?in ne yapmal?y?m?",
+    "model": "rag-direct-poi-note",
+    "rag": true,
+    "text": "Bu soru POI (mekan) arama tipinde. En dogru sonuc icin haritadaki 'Mekan Ara (POI)' kismini kullanip kategori secin (ornegin eczane/kafe/restoran). Istersen adim adim nasil filtreleyecegini yazayim."
+  },
+  {
+    "idx": 11,
+    "query": "Ankara hakk?nda k?sa bilgi ver",
+    "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+    "rag": false,
+    "text": "Ankara, Türkiye'nin başkenti ve en büyük şehri. Nüfusu 5 milyonun üzerinde olan Ankara, ülkenin siyasi, ekonomik ve kültürel merkezidir. Şehrin tarihi Selçuklu ve Osmanlı dönemlerine kadar uzanır. Ankara aynı zamanda öne"
+  },
+  {
+    "idx": 12,
+    "query": "Samand?ra Merkez M5 ?zerinde mi?",
+    "model": "rag-direct-structured",
+    "rag": true,
+    "text": "Evet, samandira Merkez M5 hattinin duraklari arasindadir."
+  },
+  {
+    "idx": 13,
+    "query": "Metrob?s gece ?al???r m??",
+    "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+    "rag": true,
+    "text": "Sefer saati hakkında bilgi bulunduğum yer yok. Seferlerin zamanı, sıklığı ve geçici düzenlemelerin resmi sefer tarifesi ve duyuru sayfasında güncellendiğini hatırlatıyorum. Lütfen bu bilgilere başvurunuz."
+  },
+  {
+    "idx": 14,
+    "query": "Pendikten ?stanbul Havaliman?na toplu ta??ma ?ner",
+    "model": "rag-direct-route-note",
+    "rag": true,
+    "text": "Bu soru anlik rota hesaplamasi gerektirir. En dogru sonuc icin haritadaki 'Toplu Tasima Karsilastir' veya 'Rotayi Hesapla' ile hesaplama yapin. Istersen secili ulasim modlarina gore rota adimlarini birlikte yorumlayabili"
+  },
+  {
+    "idx": 15,
+    "query": "Sultanbeyli uzatmas? hangi metro hatt?nda?",
+    "model": "turkish-llama-8b-instruct-v0.1 finetuned",
+    "rag": true,
+    "text": "Sultanbeyli metro hattında değil. Sultanbeyli, M5 hattının son durağıdır ve Üsküdar'dan Sultanbeyli'ye uzanan bir hat üzerinde yer alır. Sultanbeyli istasyonunda aktarma yapmadan önce Çekmeköy ve Samandıra duraklarına da"
+  }
+]

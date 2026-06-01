@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenTrip — Akıllı Rota Optimizasyonu</title>
+    <meta name="description"
+        content="Harita üzerinde seçtiğiniz noktaları TSP algoritması ile optimize ederek en kısa rotayı oluşturun.">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css?v=1.1.0">
+    <link rel="stylesheet" href="css/transit.css?v=1.0.1">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+
+<body>
+
+    <!-- Sidebar Panel -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                    <circle cx="12" cy="9" r="2.5" />
+                </svg>
+                <h1>OpenTrip</h1>
+            </div>
+            <p class="tagline">Akıllı Rota Optimizasyonu</p>
+        </div>
+
+        <!-- Points List -->
+        <div class="section">
+            <div class="section-header">
+                <h2>📍 Seçilen Noktalar</h2>
+                <span class="badge" id="pointCount">0</span>
+            </div>
+            <div id="pointsList" class="points-list">
+                <div class="empty-state">
+                    <p>Haritaya tıklayarak nokta ekleyin</p>
+                </div>
+            </div>
+            <div class="point-actions">
+                <button class="btn btn-danger" id="btnClearAll" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" />
+                    </svg>
+                    Tümünü Sil
+                </button>
+            </div>
+        </div>
+
+        <!-- Place Search (Geocoding) -->
+        <div class="section">
+            <h2>🔎 Yer İsmi ile Ara</h2>
+            <div class="search-box">
+                <input type="text" id="placeSearchInput" class="search-input"
+                    placeholder="Örn: Kadıköy Parkı, Taksim Meydanı..." autocomplete="off" />
+                <button class="btn-search" id="btnSearchPlace">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="M21 21l-4.35-4.35" />
+                    </svg>
+                </button>
+            </div>
+            <div id="searchResults" class="search-results" style="display: none;"></div>
+        </div>
+
+        <!-- AI Natural Language Search (BERT NLP) -->
+        <div class="section">
+            <h2>🤖 AI Asistan</h2>
+            <p class="hint-text" style="margin-bottom: 10px; font-size: 0.85rem; color: var(--text-muted);">
+                Doğal dilde rota tanımlayın. Örnek: "Kadıköy'den Beşiktaş'a rota çiz"
+            </p>
+            <div class="nlp-search-box">
+                <input type="text" id="nlpInput" class="search-input nlp-input"
+                    placeholder="Örn: Kadıköy'den Taksim'e gitmek istiyorum..." autocomplete="off" />
+                <button class="btn-nlp" id="btnNLP">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                        <path d="M2 17l10 5 10-5" />
+                        <path d="M2 12l10 5 10-5" />
+                    </svg>
+                    <span>Çözümle</span>
+                </button>
+            </div>
+            <div id="nlpResults" class="nlp-results" style="display: none;"></div>
+            <div id="nlpLoading" class="nlp-loading" style="display: none;">
+                <div class="spinner-small"></div>
+                <span>AI analiz ediyor...</span>
+            </div>
+        </div>
+
+        <!-- Route Action -->
+        <div class="section">
+            <button class="btn btn-primary btn-lg" id="btnCalculateRoute" disabled>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18l6-6-6-6" />
+                </svg>
+                Rotayı Hesapla
+            </button>
+            <button class="btn btn-secondary" id="btnShowAlternatives" disabled style="margin-top: 8px;">
+                🔀 Alternatif Rotalar
+            </button>
+            <button class="btn btn-secondary" id="btnShowTimeline" disabled style="margin-top: 8px;">
+                ⏰ Zaman Planla
+            </button>
+            <button class="btn btn-transit" id="btnCompareRoutes" disabled style="margin-top: 8px;">
+                🚌 Toplu Tasima Karsilastir
+            </button>
+        </div>
+
+        <div class="transit-mode-filter" id="transitModeFilter" style="margin-top: -6px; margin-bottom: 10px;">
+            <div class="transit-mode-filter-title">Ulasim modu secimi</div>
+            <div class="transit-mode-chips">
+                <label class="transit-mode-chip">
+                    <input type="checkbox" data-transit-mode="bus" checked>
+                    <span>Otobus</span>
+                </label>
+                <label class="transit-mode-chip">
+                    <input type="checkbox" data-transit-mode="metro" checked>
+                    <span>Metro</span>
+                </label>
+                <label class="transit-mode-chip">
+                    <input type="checkbox" data-transit-mode="metrobus" checked>
+                    <span>Metrobus</span>
+                </label>
+                <label class="transit-mode-chip">
+                    <input type="checkbox" data-transit-mode="ferry" checked>
+                    <span>Vapur</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Alternative Routes Panel (hidden initially) -->
+        <div class="section" id="alternativesPanel" style="display: none;">
+            <h2>🔀 Alternatif Rotalar</h2>
+            <div id="alternativesList" class="alternatives-list"></div>
+        </div>
+
+        <!-- Timeline Panel (hidden initially) -->
+        <div class="section" id="timelinePanel" style="display: none;">
+            <h2>⏰ Zaman Planlaması</h2>
+            <div class="timeline-settings">
+                <div class="form-group-inline">
+                    <label for="startTime">Başlangıç Saati:</label>
+                    <input type="time" id="startTime" class="time-input" value="09:00">
+                </div>
+                <div class="form-group-inline">
+                    <label for="visitDuration">Varsayılan Süre:</label>
+                    <input type="number" id="visitDuration" class="number-input" value="30" min="5" max="180" step="5">
+                    <span class="input-suffix">dk</span>
+                </div>
+                <button class="btn btn-primary btn-sm" id="btnGenerateTimeline">Zaman Çizelgesi Oluştur</button>
+            </div>
+            <div id="timelineDisplay" class="timeline-display" style="display: none;"></div>
+        </div>
+
+        <div class="section" id="multimodalPanel" style="display: none;">
+            <h2>🚌 Rota Secenekleri</h2>
+            <div id="multimodalResults" class="multimodal-results"></div>
+        </div>
+
+        <!-- Route Info (hidden initially) -->
+        <div class="section route-info" id="routeInfo" style="display: none;">
+            <h2>📊 Rota Detayları</h2>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Mesafe</span>
+                    <span class="stat-value" id="statDistance">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Yürüme Süresi</span>
+                    <span class="stat-value" id="statDuration">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Durak Sayısı</span>
+                    <span class="stat-value" id="statStops">—</span>
+                </div>
+            </div>
+            <button class="btn btn-success" id="btnSaveRoute" style="margin-bottom: 8px;">
+                💾 Rotayı Kaydet
+            </button>
+            <a href="#" target="_blank" class="btn btn-secondary" id="btnGoogleMaps" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+                </svg>
+                Google Maps'te Aç
+            </a>
+        </div>
+
+        <!-- Weather Simulator Panel (hidden initially) -->
+        <div class="weather-sim-panel" id="weatherSimulatorPanel" style="display: none;">
+            <div class="weather-sim-header">
+                <h3 class="weather-sim-title">☀️ Zaman & Hava Simülatörü</h3>
+            </div>
+            <p class="weather-sim-desc">
+                Yola çıkış saatinizi değiştirerek rota üzerindeki hava tahminlerini simüle edin:
+            </p>
+            <div class="weather-sim-slider-container">
+                <div style="display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 0.9rem; margin-bottom: 6px;">
+                    <span id="simulatorTimeDisplay" style="color: var(--accent-primary);">09:00</span>
+                    <span id="simulatorWeatherLabel" style="font-size: 0.82rem; color: var(--text-secondary); font-weight: 500;">Yükleniyor...</span>
+                </div>
+                <input type="range" id="weatherSimulatorSlider" min="0" max="23" value="9" class="weather-sim-slider">
+                <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); padding: 0 2px;">
+                    <span>00:00</span>
+                    <span>12:00</span>
+                    <span>23:00</span>
+                </div>
+            </div>
+            <div class="forecast-strip" id="simulatorForecastStrip">
+                <!-- Dynamic hourly forecast cards will be injected here -->
+            </div>
+        </div>
+
+        <!-- Turn-by-turn Panel (hidden initially) -->
+        <div class="section" id="turnByTurnPanel" style="display: none; margin-top: 12px;">
+            <h2>🧭 Adım Adım Yönlendirme</h2>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                <button class="btn btn-primary btn-sm" id="btnStartVoice">🔊 Sesli Başlat</button>
+                <button class="btn btn-ghost btn-sm" id="btnStopVoice">⏹ Durdur</button>
+                <div style="display:flex; gap:6px; align-items:center; margin-left:8px;">
+                    <label for="ttsRate" style="font-size:0.85rem; color:var(--text-muted);">Hız:</label>
+                    <input id="ttsRate" type="range" min="0.6" max="1.6" step="0.1" value="1" style="width:120px;">
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+                <label for="ttsVoice" style="font-size:0.85rem; color:var(--text-muted);">Ses:</label>
+                <select id="ttsVoice" style="flex:1; max-width:220px;"></select>
+                <label style="font-size:0.8rem; color:var(--text-muted); margin-left:6px;">Otomatik duraklama</label>
+                <input id="ttsAutoPause" type="checkbox" style="margin-left:4px;">
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                <button class="btn btn-success btn-sm" id="btnStartNav">▶ Başlat Navigasyon</button>
+                <button class="btn btn-warning btn-sm" id="btnPauseNav">⏸ Duraklat</button>
+                <button class="btn btn-ghost btn-sm" id="btnPrevStep">⟸ Geri</button>
+                <button class="btn btn-ghost btn-sm" id="btnNextStep">İleri ⟹</button>
+                <button class="btn btn-ghost btn-sm" id="btnSkipStep">⤴️ Atla</button>
+                <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+                    <label for="navModeSelect" style="font-size:0.85rem; color:var(--text-muted); margin-right:6px;">Konum modu:</label>
+                    <select id="navModeSelect" style="font-size:0.85rem;">
+                        <option value="map_center">Harita merkezi (Simülasyon)</option>
+                        <option value="gps">Gerçek konum (Geolocation)</option>
+                    </select>
+                </div>
+            </div>
+            <div id="turnByTurnList" class="turn-by-turn-list" style="max-height:260px; overflow:auto; padding-right:6px;">
+                <!-- Steps will be injected here -->
+            </div>
+        </div>
+
+        <!-- Place Selector & POI Search (yan yana) -->
+        <div class="section">
+            <h2>🗺 Bölge Seçimi</h2>
+            <select id="regionSelect" class="select-input">
+                <option value="">Bölge Seçin</option>
+            </select>
+            <select id="provinceSelect" class="select-input" style="margin-top: 8px;" disabled>
+                <option value="">Önce Bölge Seçin</option>
+            </select>
+            <select id="districtSelect" class="select-input" style="margin-top: 8px;" disabled>
+                <option value="">Önce İl Seçin</option>
+            </select>
+        </div>
+
+        <!-- POI Search -->
+        <div class="section">
+            <h2>🔍 Mekan Ara (POI)</h2>
+            <div class="poi-grid">
+<button class="btn btn-poi btn-poi-dynamic" data-category="kafe" title="Kafe">☕ Kafe</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="restoran" title="Restoran">🍽️ Restoran</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="fast food" title="Fast food">🍔 Fast food</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="bar" title="Bar">🍻 Bar</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="pub" title="Pub">🍺 Pub</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="dondurmacı" title="Dondurmacı">🍦 Dondurmacı</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kebapçı" title="Kebapçı">🥙 Kebapçı</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="balıkçı" title="Balıkçı">🐟 Balıkçı</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="market" title="Market">🛒 Market</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="bakkal" title="Bakkal">🏪 Bakkal</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="tekel" title="Tekel">🍾 Tekel</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="fırın" title="Fırın">🥖 Fırın</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="pastane" title="Pastane">🧁 Pastane</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kasap" title="Kasap">🥩 Kasap</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="manav" title="Manav">🍎 Manav</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="giyim" title="Giyim">👕 Giyim</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="butik" title="Butik">👗 Butik</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="ayakkabıcı" title="Ayakkabıcı">👞 Ayakkabıcı</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kozmetik" title="Kozmetik">💄 Kozmetik</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kuyumcu" title="Kuyumcu">💍 Kuyumcu</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="saatçi" title="Saatçi">⌚ Saatçi</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="çiçekçi" title="Çiçekçi">💐 Çiçekçi</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kitapçı" title="Kitapçı">📚 Kitapçı</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kırtasiye" title="Kırtasiye">✏️ Kırtasiye</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="oyuncakçı" title="Oyuncakçı">🧸 Oyuncakçı</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="elektronik" title="Elektronik">💻 Elektronik</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="telefoncu" title="Telefoncu">📱 Telefoncu</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="bilgisayarcı" title="Bilgisayarcı">💻 Bilgisayarcı</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="beyaz eşya" title="Beyaz eşya">🔌 Beyaz eşya</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="mobilya" title="Mobilya">🛋️ Mobilya</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="avm" title="Avm">🛍️ Avm</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="eczane" title="Eczane">💊 Eczane</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="pet shop" title="Pet shop">🐾 Pet shop</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="bisikletçi" title="Bisikletçi">🚲 Bisikletçi</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="nalbur" title="Nalbur">🛠️ Nalbur</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="yapı market" title="Yapı market">🏗️ Yapı market</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kuru temizleme" title="Kuru temizleme">👔 Kuru temizleme</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="terzi" title="Terzi">🧵 Terzi</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kuaför" title="Kuaför">✂️ Kuaför</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="güzellik salonu" title="Güzellik salonu">💅 Güzellik salonu</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="hastane" title="Hastane">🏥 Hastane</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="klinik" title="Klinik">🩺 Klinik</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="doktor" title="Doktor">🩺 Doktor</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="dişçi" title="Dişçi">🦷 Dişçi</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="veteriner" title="Veteriner">🐕 Veteriner</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kan merkezi" title="Kan merkezi">🩸 Kan merkezi</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="banka" title="Banka">🏦 Banka</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="atm" title="Atm">🏧 Atm</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="döviz" title="Döviz">💱 Döviz</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="postane" title="Postane">🏣 Postane</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="benzinlik" title="Benzinlik">⛽ Benzinlik</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="şarj" title="Şarj">🔌 Şarj</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="polis" title="Polis">🚓 Polis</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="itfaiye" title="Itfaiye">🚒 Itfaiye</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="belediye" title="Belediye">🏛️ Belediye</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="adliye" title="Adliye">⚖️ Adliye</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="tuvalet" title="Tuvalet">🚻 Tuvalet</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="duş" title="Duş">🚿 Duş</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="çeşme" title="Çeşme">🚰 Çeşme</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="çöp kutusu" title="Çöp kutusu">🗑️ Çöp kutusu</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="müze" title="Müze">🏛️ Müze</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="sanat galerisi" title="Sanat galerisi">🖼️ Sanat galerisi</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="otel" title="Otel">🏨 Otel</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="pansiyon" title="Pansiyon">🛏️ Pansiyon</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="hostel" title="Hostel">🛏️ Hostel</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kamp" title="Kamp">⛺ Kamp</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="karavan" title="Karavan">🚐 Karavan</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="hayvanat bahçesi" title="Hayvanat bahçesi">🦁 Hayvanat bahçesi</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="tema park" title="Tema park">🎢 Tema park</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="akvaryum" title="Akvaryum">🐟 Akvaryum</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="manzara" title="Manzara">🌄 Manzara</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="park" title="Park">🌳 Park</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="oyun parkı" title="Oyun parkı">🎠 Oyun parkı</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="doğa" title="Doğa">🏞️ Doğa</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="stadyum" title="Stadyum">⚽ Stadyum</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="spor salonu" title="Spor salonu">🏋️ Spor salonu</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="yüzme havuzu" title="Yüzme havuzu">🏊 Yüzme havuzu</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="plaj" title="Plaj">🏖️ Plaj</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="orman" title="Orman">🌲 Orman</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="piknik" title="Piknik">🍱 Piknik</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="sinema" title="Sinema">🎬 Sinema</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="tiyatro" title="Tiyatro">🎭 Tiyatro</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="gece kulübü" title="Gece kulübü">🪩 Gece kulübü</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="casino" title="Casino">🎰 Casino</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="tarihi yer" title="Tarihi yer">🏺 Tarihi yer</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kale" title="Kale">🏰 Kale</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="anıt" title="Anıt">🗽 Anıt</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="cami" title="Cami">🕌 Cami</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kilise" title="Kilise">⛪ Kilise</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="sinagog" title="Sinagog">🕍 Sinagog</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="mezarlık" title="Mezarlık">🪦 Mezarlık</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="okul" title="Okul">🏫 Okul</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="üniversite" title="Üniversite">🎓 Üniversite</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kolej" title="Kolej">🏫 Kolej</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="anaokulu" title="Anaokulu">🧸 Anaokulu</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="kütüphane" title="Kütüphane">📚 Kütüphane</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="sürücü kursu" title="Sürücü kursu">🚗 Sürücü kursu</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="durak" title="Durak">🚏 Durak</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="metro" title="Metro">🚇 Metro</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="tren istasyonu" title="Tren istasyonu">🚉 Tren istasyonu</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="tramvay" title="Tramvay">🚋 Tramvay</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="havalimanı" title="Havalimanı">✈️ Havalimanı</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="otogar" title="Otogar">🚌 Otogar</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="taksi durağı" title="Taksi durağı">🚕 Taksi durağı</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="vapur" title="Vapur">⛴️ Vapur</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="liman" title="Liman">⚓ Liman</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="otopark" title="Otopark">🅿️ Otopark</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="katlı otopark" title="Katlı otopark">🅿️ Katlı otopark</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="şelale" title="Şelale">🌊 Şelale</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="göl" title="Göl">🦆 Göl</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="nehir" title="Nehir">🚣 Nehir</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="dağ" title="Dağ">⛰️ Dağ</button>
+<button class="btn btn-poi btn-poi-dynamic" data-category="mağara" title="Mağara">🦇 Mağara</button>
+            </div>
+            <div class="poi-actions">
+                <button class="btn btn-ghost" id="btnRefreshPois" title="Son POI sorgusunu canli olarak yenile">POI Yenile</button>
+                <button class="btn btn-ghost" id="btnClearPois" style="display: none;">POI'leri Temizle</button>
+            </div>
+            <div id="poiMetaInfo" class="poi-meta-info">Henüz POI sorgusu yapılmadı.</div>
+        </div>
+
+        <!-- Saved Locations Section (Kayıtlı Yerler) -->
+        <div class="section">
+            <div class="section-header">
+                <h2>📍 Kayıtlı Yerlerim</h2>
+                <div class="header-actions">
+                    <button class="btn-icon" id="btnToggleSavedLocations" title="Haritada Gizle/Göster">
+                        <svg id="iconLocationVisible" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                    </button>
+                    <button class="btn-icon" id="btnRefreshLocations" title="Yenile">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="savedLocationsList" class="saved-locations-list">
+                <div class="empty-state">
+                    <p>Henüz kayıtlı yeriniz yok</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Saved Routes Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>💾 Kaydedilen Rotalar</h2>
+                <button class="btn-icon" id="btnRefreshRoutes" title="Yenile">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2" />
+                    </svg>
+                </button>
+            </div>
+            <div id="savedRoutesList" class="saved-routes-list">
+                <div class="empty-state">
+                    <p>Henüz kaydedilmiş rota yok</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <h2>🚌 Toplu Ulasim</h2>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="chkShowStops">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div id="transitPanel" style="display: none;">
+                <div class="search-box" style="margin-bottom: 8px;">
+                    <input type="text" id="transitSearchInput" class="search-input" placeholder="Durak veya hat ara..." autocomplete="off" />
+                    <button class="btn-search" id="btnSearchTransit">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="M21 21l-4.35-4.35" />
+                        </svg>
+                    </button>
+                </div>
+                <div id="transitSearchResults" class="transit-results" style="display:none;"></div>
+                <div id="nearbyStopsList" class="nearby-stops-list">
+                    <div class="empty-state"><p>Haritayi hareket ettirin, yakin duraklar gorunecek</p></div>
+                </div>
+                <div class="transit-stats" id="transitStats" style="display:none;"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="sidebar-footer">
+            <p>Graph Theory • TSP • Dijkstra</p>
+            <p class="version">v1.0 — Bitirme Projesi</p>
+        </div>
+    </div>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <button id="rightChatExpand" class="right-chat-expand-btn" type="button" aria-label="Sohbet panelini ac">
+        Sohbeti Ac
+    </button>
+
+    <!-- Right LLM Agent Panel -->
+    <aside class="right-chat-panel" id="rightChatPanel">
+        <div class="right-chat-header">
+            <div class="right-chat-header-top">
+                <h2>LLM Asistan</h2>
+                <button id="rightChatCollapse" class="btn btn-ghost btn-sm" type="button">Daralt</button>
+            </div>
+            <p>OpenRouter, Gemini ve Local LLM ile hizli sohbet</p>
+            <div class="right-chat-session-controls">
+                <button id="mainLlmNewSession" class="btn btn-primary btn-sm" type="button">Yeni Oturum</button>
+                <select id="mainLlmSessionSelect" class="search-input"></select>
+                <button id="mainLlmArchiveSession" class="btn btn-ghost btn-sm" type="button">Oturumu Arsivle</button>
+            </div>
+        </div>
+        <div class="llm-chat-box" id="mainLlmBox">
+            <div class="llm-control-group">
+                <div class="llm-control-title">Saglayici</div>
+                <div class="llm-provider-switch">
+                    <label><input type="radio" name="mainLlmProvider" value="openrouter" checked><span>OpenRouter</span></label>
+                    <label><input type="radio" name="mainLlmProvider" value="gemini"><span>Gemini</span></label>
+                    <label><input type="radio" name="mainLlmProvider" value="local"><span>Local</span></label>
+                </div>
+            </div>
+            <div class="llm-control-group">
+                <div class="llm-control-title">Model Secimi</div>
+            </div>
+            <div class="llm-manual-controls llm-model-controls">
+                <select id="mainLlmModelSelect" disabled>
+                    <option value="">Otomatik (onerilen)</option>
+                </select>
+            </div>
+            <div class="llm-status-line llm-active-line">
+                <span id="mainLlmActiveModel">Aktif model: -</span>
+            </div>
+            <div id="mainLlmChatLog" class="llm-chat-log"></div>
+            <div class="llm-composer">
+                <textarea id="mainLlmInput" class="llm-input" placeholder="Mesajini yaz..."></textarea>
+                <div class="llm-actions">
+                    <button class="btn btn-ghost" id="mainLlmClear">Temizle</button>
+                    <button class="btn btn-primary" id="mainLlmSend">Gonder</button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Weather Widget -->
+    <div id="weatherWidget" class="weather-widget" style="display: none;">
+        <div class="weather-widget-content">
+            <span id="weatherWidgetEmoji" class="weather-emoji">🌍</span>
+            <div class="weather-info">
+                <span id="weatherWidgetTemp" class="weather-temp">—</span>
+                <span id="weatherWidgetDesc" class="weather-desc">Yükleniyor...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Weather Banner -->
+    <div id="weatherBanner" class="weather-banner"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p id="loadingText">Rota hesaplanıyor...</p>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Save Route Modal -->
+    <div id="saveRouteModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💾 Rotayı Kaydet</h2>
+                <button class="modal-close" id="btnCloseSaveModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="routeName">Rota Adı *</label>
+                    <input type="text" id="routeName" class="form-input" placeholder="Örn: Kadıköy Turu" required>
+                </div>
+                <div class="form-group">
+                    <label for="routeDescription">Açıklama</label>
+                    <textarea id="routeDescription" class="form-textarea" rows="3"
+                        placeholder="Bu rota hakkında notlar..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="routeTags">Etiketler (virgülle ayırın)</label>
+                    <input type="text" id="routeTags" class="form-input" placeholder="tarihi, kültürel, romantik">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="btnCancelSave">İptal</button>
+                <button class="btn btn-primary" id="btnConfirmSave">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Location Modal -->
+    <div id="saveLocationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📍 Konumu Kaydet</h2>
+                <button class="modal-close" id="btnCloseLocationModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="locationName">Konum Adı *</label>
+                    <input type="text" id="locationName" class="form-input" placeholder="Örn: Ev, İş, Berk'in Evi"
+                        required autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label>Simgesi *</label>
+                    <div class="icon-selector" id="locationIconSelector">
+                        <button class="icon-btn active" data-icon="marker" title="Konum">📍</button>
+                        <button class="icon-btn" data-icon="home" title="Ev">🏠</button>
+                        <button class="icon-btn" data-icon="work" title="İş">💼</button>
+                        <button class="icon-btn" data-icon="school" title="Okul">🎓</button>
+                        <button class="icon-btn" data-icon="gym" title="Spor">🏋</button>
+                        <button class="icon-btn" data-icon="market" title="Market">🛒</button>
+                        <button class="icon-btn" data-icon="star" title="Favori">⭐</button>
+                        <button class="icon-btn" data-icon="coffee" title="Kafe">☕</button>
+                        <button class="icon-btn" data-icon="restaurant" title="Restoran">🍽</button>
+                        <button class="icon-btn" data-icon="heart" title="Özel">❤</button>
+                        <button class="icon-btn" data-icon="hospital" title="Sağlık">🏥</button>
+                        <button class="icon-btn" data-icon="park" title="Park">🌳</button>
+                        <button class="icon-btn" data-icon="museum" title="Müze">🏛</button>
+                        <button class="icon-btn" data-icon="plane" title="Seyahat">✈</button>
+                        <button class="icon-btn" data-icon="car" title="Araç">🚗</button>
+                        <button class="icon-btn" data-icon="bike" title="Bisiklet">🚲</button>
+                        <button class="icon-btn" data-icon="beach" title="Plaj">🏖</button>
+                        <button class="icon-btn" data-icon="mountain" title="Dağ">⛰</button>
+                        <button class="icon-btn" data-icon="bank" title="Banka">🏦</button>
+                        <button class="icon-btn" data-icon="gas" title="Benzinlik">⛽</button>
+                        <button class="icon-btn" data-icon="pharmacy" title="Eczane">💊</button>
+                    </div>
+                </div>
+
+                <!-- Gizli koordinat verileri -->
+                <input type="hidden" id="locationLat">
+                <input type="hidden" id="locationLon">
+                <input type="hidden" id="locationAddress">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="btnCancelLocation">İptal</button>
+                <button class="btn btn-primary" id="btnConfirmSaveLocation">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+    <!-- App JS -->
+    <script src="js/app.js?v=1.1.0"></script>
+    <script src="js/transit.js?v=1.0.1"></script>
+</body>
+
+</html>
+

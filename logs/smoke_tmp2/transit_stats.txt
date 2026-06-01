@@ -1,0 +1,1 @@
+{"data_fresh":false,"districts":0,"last_download":0,"metro_lines":1,"metro_stations":43,"routes":0,"stops":0}

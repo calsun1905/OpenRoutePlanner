@@ -1,0 +1,1 @@
+{"id":"chatcmpl-l6o1m7a0y2twdf7hf0ph","model":"turkish-llama-8b-instruct-v0.1 finetuned","ok":true,"text":"Selam! Ben de haz\u0131r\u0131m. Ne hakk\u0131nda konu\u015fmak istiyorsun?","tried_models":["turkish-llama-8b-instruct-v0.1 finetuned"],"usage":{"completion_tokens":18,"completion_tokens_details":{"reasoning_tokens":0},"prompt_tokens":19,"total_tokens":37}}
