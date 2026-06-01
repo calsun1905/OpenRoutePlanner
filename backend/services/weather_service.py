@@ -1,0 +1,1538 @@
+"""
+weather_service.py - OpenMeteo API entegrasyonu
+
+Güncel hava durumu, saatlik forecast ve rota boyunca hava kontrolü.
+Cache mekanizması ile performans optimizasyonu.
+
+Author: OpenRoutePlanner
+Created: 2026-03-10
+"""
+
+import time
+import requests
+from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timezone, timedelta
+
+# Local imports
+import logging
+from weather_utils import (
+    validate_coordinates,
+    validate_hours,
+    parse_weather_code,
+    get_weather_emoji,
+    build_cache_key,
+    get_weather_alert,
+    get_weather_advice,
+    summarize_weather_data
+)
+
+# =============================================================================
+# Constants
+# =============================================================================
+
+OPENMETEO_BASE_URL = "https://api.open-meteo.com/v1/forecast"
+CACHE_TTL_SECONDS = 900  # 15 dakika
+REQUEST_TIMEOUT = 10  # saniye
+MAX_RETRIES = 2  # ilk deneme + 2 tekrar = toplam 3 deneme
+RETRY_BACKOFF_BASE_SECONDS = 0.4
+RETRY_BACKOFF_MAX_SECONDS = 2.0
+
+# Current weather variables
+CURRENT_WEATHER_PARAMS = [
+    "temperature_2m",
+    "relative_humidity_2m",
+    "apparent_temperature",
+    "precipitation",
+    "rain",
+    "showers",
+    "snowfall",
+    "weather_code",
+    "cloud_cover",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "wind_gusts_10m"
+]
+
+# Hourly weather variables
+HOURLY_WEATHER_PARAMS = [
+    "temperature_2m",
+    "precipitation",
+    "precipitation_probability",
+    "weather_code",
+    "wind_speed_10m",
+    "wind_gusts_10m"
+]
+
+# =============================================================================
+# Logger Setup
+# =============================================================================
+
+logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Global Cache
+# =============================================================================
+
+_weather_cache: Dict[str, dict] = {}
+
+# =============================================================================
+# Exception Classes
+# =============================================================================
+
+class WeatherServiceError(Exception):
+    """Base exception for weather service"""
+    pass
+
+
+class InvalidCoordinatesError(WeatherServiceError):
+    """Invalid coordinates provided"""
+    pass
+
+
+class NetworkError(WeatherServiceError):
+    """Network error occurred"""
+    pass
+
+
+class RateLimitError(WeatherServiceError):
+    """Rate limit exceeded"""
+    pass
+
+
+class ParseError(WeatherServiceError):
+    """Failed to parse API response"""
+    pass
+
+
+# =============================================================================
+# Cache Functions
+# =============================================================================
+
+def _get_from_cache(key: str) -> Optional[dict]:
+    """
+    Memory cache'ten veri cekme.
+
+    AÇIKLAMA:
+    Bu ozel (private) fonksiyon, global _weather_cache sozlugundan veri cekmek
+    icin kullanilir. Verinin TTL (time-to-live) suresi gecmis mi kontrol eder,
+    gectiyse cache'i temizler. Bu fonksiyon sadece modul icerisinden cagrilir.
+
+    Ornekler:
+    - Cache var ve gecerli ise: {"data": {...}, "timestamp": ..., "cache_hit": True}
+    - Cache yok veya gecmis ise: None
+
+    NASIL CALISIR:
+    1. Verilen anahtar cache'te var mi kontrol eder
+    2. Varsa, zaman damgasini kontrol eder (TTL 900 saniye = 15 dakika)
+    3. Gecerli ise cache_hit=True ile veriyi doner
+    4. Gecmis ise cache'ten siler ve None doner
+    5. Cache'te yoksa None doner
+
+    KULLANIM ALANI:
+    Hava durumu isteklerinde API cagrisi yapmadan once cache kontrolu
+    yapmak icin kullanilir. API yukunu azaltir.
+
+    Args:
+        key: Cache anahtari
+
+    Returns:
+        dict or None: Cache verisi veya None (miss)
+    """
+    global _weather_cache
+
+    if key in _weather_cache:
+        cached_data = _weather_cache[key]
+
+        # TTL kontrolu
+        if _is_cache_valid(cached_data.get("timestamp", 0)):
+            logger.debug(f"Cache hit for key: {key}")
+            cached_data["cache_hit"] = True
+            return cached_data
+        else:
+            # Expired cache'i sil
+            del _weather_cache[key]
+            logger.debug(f"Cache expired for key: {key}")
+
+    logger.debug(f"Cache miss for key: {key}")
+    return None
+
+
+def _save_to_cache(key: str, data: dict) -> None:
+    """
+    Memory cache'e veri kaydetme.
+
+    AÇIKLAMA:
+    Bu ozel (private) fonksiyon, API'den gelen hava durumu verisini global
+    _weather_cache sozlugune kaydetmek icin kullanilir. Kaydederken zaman
+    damgasini da ekler, boylece TTL kontrolu yapilabilir.
+
+    Ornekler:
+    - _save_to_cache("current:41.0082:28.9784", {"temp": 20, ...})
+      -> Cache'e yeni kayit ekler
+
+    NASIL CALISIR:
+    1. Su anki zaman damgasini alir (time.time())
+    2. timestamp, data ve cache_hit=False iceren bir cache_entry olusturur
+    3. Bu entry'yi _weather_cache sozlugune ekler
+    4. Debug log yazar
+
+    KULLANIM ALANI:
+    API'den yeni veri cekildikten sonra bu veriyi cache'e kaydetmek
+    icin kullanilir. Sonraki isteklerde ayni veriyi API'ye gitmeden doner.
+
+    Args:
+        key: Cache anahtari
+        data: Kaydedilecek veri
+    """
+    global _weather_cache
+
+    cache_entry = {
+        "timestamp": time.time(),
+        "data": data,
+        "cache_hit": False
+    }
+
+    _weather_cache[key] = cache_entry
+    logger.debug(f"Saved to cache: {key}")
+
+
+def _is_cache_valid(timestamp: float) -> bool:
+    """
+    Cache gecerlilik kontrolu.
+
+    AÇIKLAMA:
+    Bu ozel (private) fonksiyon, verilen zaman damgasinin hala gecerli
+    olup olmadigini kontrol eder. Cache TTL'si 900 saniye (15 dakika)
+    olarak ayarlanmistir. Zaman damgasi su anki zamandan 900 saniye daha
+    eski ise cache gecersiz sayilir.
+
+    Ornekler:
+    - Su anki zaman = 1000, timestamp = 900 -> True (gecerli, 100 saniye icinde)
+    - Su anki zaman = 2000, timestamp = 1000 -> False (gecersiz, 1000 saniye gecmis)
+
+    NASIL CALISIR:
+    1. Su anki zaman damgasini alir (time.time())
+    2. Su anki zamandan timestamp'i cikarir
+    3. Fark 900 saniyeden kucukse True, yoksa False doner
+
+    KULLANIM ALANI:
+    Cache entry'lerinin TTL kontrolunu yapmak icin kullanilir.
+    _get_from_cache fonksiyonu tarafindan cagrilir.
+
+    Args:
+        timestamp: Cache zaman damgasi
+
+    Returns:
+        bool: True if cache is still valid
+    """
+    current_time = time.time()
+    return (current_time - timestamp) < CACHE_TTL_SECONDS
+
+
+def clear_cache() -> int:
+    """
+    Tum cache'i temizler.
+
+    AÇIKLAMA:
+    Bu fonksiyon, global _weather_cache sozlugunu tamamen temizler.
+    Tum kayitlari siler ve temizlenen kayit sayisini doner.
+    Genellikle test veya bakim amaclariyla kullanilir.
+
+    Ornekler:
+    - Cache'te 10 kayit varken clear_cache() -> 10 doner, cache bosalir
+    - Bos cache'te clear_cache() -> 0 doner
+
+    NASIL CALISIR:
+    1. Su anki cache boyutunu alir
+    2. _weather_cache.clear() ile tumunu siler
+    3. Bilgi log yazar ve temizlenen sayiyi doner
+
+    KULLANIM ALANI:
+    Testlerde, debug'da veya manuel cache invalidate
+    isteklerinde kullanilir. Ayrica /api/weather/clear-cache
+    endpoint'i tarafindan cagrilir.
+
+    Returns:
+        int: Temizlenen cache entry sayisi
+    """
+    global _weather_cache
+    count = len(_weather_cache)
+    _weather_cache.clear()
+    logger.info(f"Cleared {count} cache entries")
+    return count
+
+
+def get_cache_stats() -> dict:
+    """
+    Cache istatistiklerini dondurur.
+
+    AÇIKLAMA:
+    Bu fonksiyon, mevcut cache durumunu ozetleyen istatistikler doner.
+    Toplam kayit sayisi, gecerli kayit sayisi, gecmis kayit sayisi ve
+    TTL suresi gibi bilgileri icerir.
+
+    Ornekler:
+    - get_cache_stats()
+      -> {"total_entries": 5, "valid_entries": 3, "expired_entries": 2,
+          "ttl_seconds": 900}
+
+    NASIL CALISIR:
+    1. Su anki cache boyutunu alir
+    2. Her entry icin TTL kontrolu yapar
+    3. Gecerli ve gecmis kayit sayilarini hesaplar
+    4. Tum istatistikleri sozluk olarak doner
+
+    KULLANIM ALANI:
+    Cache performansini izlemek, debug etmek ve monitor etmek
+    icin kullanilir. /api/weather/status endpoint'i tarafindan
+    donulen bilginin bir parcasidir.
+
+    Returns:
+        dict: Cache istatistikleri
+    """
+    global _weather_cache
+
+    valid_count = sum(
+        1 for entry in _weather_cache.values()
+        if _is_cache_valid(entry.get("timestamp", 0))
+    )
+
+    return {
+        "total_entries": len(_weather_cache),
+        "valid_entries": valid_count,
+        "expired_entries": len(_weather_cache) - valid_count,
+        "ttl_seconds": CACHE_TTL_SECONDS
+    }
+
+
+# =============================================================================
+# API Request Functions
+# =============================================================================
+
+def _fetch_from_openmeteo(url: str) -> dict:
+    """
+    OpenMeteo API'sinden veri cekme.
+
+    AÇIKLAMA:
+    Bu ozel (private) fonksiyon, OpenMeteo API'sine HTTP GET istegi gonderir
+    ve response'u doner. Hata durumlarini yakalar ve ozel exception'lar
+    firlatir. Response suresini de log'lar.
+
+    Ornekler:
+    - _fetch_from_openmeteo("https://api.open-meteo.com/v1/forecast?...")
+      -> JSON response doner veya exception firlatir
+
+    NASIL CALISIR:
+    1. URL'i log'lar ve baslangic zamanini kaydeder
+    2. requests.get() ile API'ye istek atar (10 saniye timeout)
+    3. Response suresini hesaplar ve log'lar
+    4. Status code 429 ise RateLimitError firlatir
+    5. Status code 200 degilse NetworkError veya ParseError firlatir
+    6. JSON olarak response'u doner
+
+    HATA DURUMLARI:
+    - Timeout (10 saniye) -> NetworkError
+    - Baglanti hatasi -> NetworkError
+    - Rate limit (429) -> RateLimitError
+    - Server hatasi (5xx) -> NetworkError
+    - Client hatasi (4xx) -> ParseError
+    - JSON parse hatasi -> ParseError
+
+    KULLANIM ALANI:
+    get_current_weather ve get_hourly_forecast fonksiyonlari
+    tarafindan API'ye istek atmak icin kullanilir.
+
+    Args:
+        url: API URL
+
+    Returns:
+        dict: API response
+
+    Raises:
+        NetworkError: Baglanti hatasi
+        RateLimitError: Rate limit asimi
+        ParseError: Response parse hatasi
+    """
+    attempts = MAX_RETRIES + 1
+    last_error = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            logger.info(
+                "Fetching from OpenMeteo (attempt %s/%s): %s",
+                attempt, attempts, url
+            )
+            start_time = time.time()
+            response = requests.get(url, timeout=REQUEST_TIMEOUT)
+            response_time_ms = (time.time() - start_time) * 1000
+            logger.info(
+                "OpenMeteo response received: status=%s, response_time_ms=%s",
+                response.status_code, round(response_time_ms, 2)
+            )
+
+            # Rate limit: backoff ile tekrar dene, son denemede hata ver.
+            if response.status_code == 429:
+                last_error = RateLimitError("OpenMeteo rate limit exceeded")
+                if attempt < attempts:
+                    _sleep_with_backoff(attempt)
+                    continue
+                raise last_error
+
+            # 5xx: gecici say, tekrar dene.
+            if response.status_code >= 500:
+                last_error = NetworkError(f"OpenMeteo API error: {response.status_code}")
+                if attempt < attempts:
+                    _sleep_with_backoff(attempt)
+                    continue
+                raise last_error
+
+            # 4xx (429 haric): tekrar denemeden parse/client hatasi don.
+            if response.status_code != 200:
+                raise ParseError(f"OpenMeteo API error: {response.status_code}")
+
+            return response.json()
+
+        except requests.exceptions.Timeout:
+            last_error = NetworkError("Request timeout")
+            if attempt < attempts:
+                _sleep_with_backoff(attempt)
+                continue
+        except requests.exceptions.ConnectionError:
+            last_error = NetworkError("Connection error")
+            if attempt < attempts:
+                _sleep_with_backoff(attempt)
+                continue
+        except requests.exceptions.RequestException as e:
+            last_error = NetworkError(f"Request failed: {str(e)}")
+            if attempt < attempts:
+                _sleep_with_backoff(attempt)
+                continue
+        except ValueError as e:
+            raise ParseError(f"Failed to parse JSON: {str(e)}")
+
+        # Son denemede raise etmek icin dongu sonuna dusebiliriz.
+        if attempt == attempts and last_error is not None:
+            raise last_error
+
+    if last_error is not None:
+        raise last_error
+    raise NetworkError("Unknown network error")
+
+
+def _sleep_with_backoff(attempt: int) -> None:
+    """
+    Retry denemeleri arasinda exponential backoff uygular.
+    """
+    delay = min(
+        RETRY_BACKOFF_MAX_SECONDS,
+        RETRY_BACKOFF_BASE_SECONDS * (2 ** max(attempt - 1, 0)),
+    )
+    logger.warning(
+        "OpenMeteo request retry scheduled: delay_seconds=%s, attempt=%s",
+        round(delay, 2),
+        attempt,
+    )
+    time.sleep(delay)
+
+
+def _build_url_current(lat: float, lon: float) -> str:
+    """
+    Güncel hava durumu URL'i olusturur.
+
+    AÇIKLAMA:
+    Bu ozel (private) fonksiyon, OpenMeteo API'sinde guncel hava durumu
+    cekmek icin gerekli URL'i olusturur. URL, enlem, boylam ve istenen
+    hava durumu parametrelerini icerir.
+
+    Ornekler:
+    - _build_url_current(41.0082, 28.9784)
+      -> "https://api.open-meteo.com/v1/forecast?latitude=41.0082&longitude=28.9784
+         &current=temperature_2m,relative_humidity_2m,...&timezone=auto"
+
+    NASIL CALISIR:
+    1. Latitude ve longitude parametrelerini ekler
+    2. CURRENT_WEATHER_PARAMS listesindeki tum parametreleri ekler
+    3. Timezone=auto ekler (otomatik zaman dilimi)
+    4. Tam URL'i doner
+
+    KULLANIM ALANI:
+    get_current_weather fonksiyonu tarafindan API URL'i olusturmak
+    icin kullanilir.
+
+    Args:
+        lat: Enlem
+        lon: Boylam
+
+    Returns:
+        str: OpenMeteo API URL
+    """
+    params = f"latitude={lat}&longitude={lon}"
+    params += f"&current={','.join(CURRENT_WEATHER_PARAMS)}"
+    params += "&timezone=auto"
+
+    return f"{OPENMETEO_BASE_URL}?{params}"
+
+
+def _build_url_hourly(lat: float, lon: float, hours: int = 24, timezone_name: str = "auto") -> str:
+    """
+    Saatlik forecast URL'i olusturur.
+
+    AÇIKLAMA:
+    Bu ozel (private) fonksiyon, OpenMeteo API'sinde saatlik forecast cekmek
+    icin gerekli URL'i olusturur. URL, enlem, boylam, forecast saati ve
+    istenen hava durumu parametrelerini icerir.
+
+    Ornekler:
+    - _build_url_hourly(41.0082, 28.9784, 48)
+      -> "https://api.open-meteo.com/v1/forecast?latitude=41.0082&longitude=28.9784
+         &hourly=temperature_2m,precipitation,...&forecast_hours=48&timezone=auto"
+
+    NASIL CALISIR:
+    1. Latitude ve longitude parametrelerini ekler
+    2. HOURLY_WEATHER_PARAMS listesindeki tum parametreleri ekler
+    3. Forecast hours parametresini ekler (varsayilan 24)
+    4. Timezone=auto ekler
+    5. Tam URL'i doner
+
+    KULLANIM ALANI:
+    get_hourly_forecast fonksiyonu tarafindan API URL'i olusturmak
+    icin kullanilir.
+
+    Args:
+        lat: Enlem
+        lon: Boylam
+        hours: Forecast saati
+
+    Returns:
+        str: OpenMeteo API URL
+    """
+    params = f"latitude={lat}&longitude={lon}"
+    params += f"&hourly={','.join(HOURLY_WEATHER_PARAMS)}"
+    params += f"&forecast_hours={hours}"
+    params += f"&timezone={timezone_name}"
+
+    return f"{OPENMETEO_BASE_URL}?{params}"
+
+
+# =============================================================================
+# Data Parsing Functions
+# =============================================================================
+
+def _parse_current_weather(response: dict) -> dict:
+    """
+    OpenMeteo current weather response'unu parse eder.
+
+    AÇIKLAMA:
+    Bu ozel (private) fonksiyon, OpenMeteo API'sinden donen JSON response'u
+    uygulamamizin ic formatina donusturur. Ham API verisini alir, weather
+    code'unu aciklar, timestamp'i formatlar ve Turkce aciklamalar ekler.
+
+    Ornekler:
+    - Input: {"current": {"temperature_2m": 15.5, "weather_code": 0, ...}, ...}
+    - Output: {"timestamp": "2026-03-10T09:00:00Z", "temperature": 15.5,
+              "weather_tr": "Acik gokyuzu", "weather_emoji": "☀️", ...}
+
+    NASIL CALISIR:
+    1. Response'ta "current" alaninin oldugunu kontrol eder, yoksa hata firlatir
+    2. Weather code'u parse_weather_code ile aciklar
+    3. Timestamp'i ISO 8601 formatina donusturur (zaman dilimi ile)
+    4. Tum hava durumu parametrelerini alir ve duzenli bir sozluk olusturur:
+       - Sicakliklar (temperature, apparent_temperature)
+       - Nem ve yagis (humidity, precipitation, rain, showers, snowfall)
+       - Hava durumu bilgisi (weather_code, description, tr, emoji)
+       - Bulut ve ruzgar (cloud_cover, wind_speed, wind_direction, wind_gusts)
+
+    KULLANIM ALANI:
+    get_current_weather fonksiyonu tarafindan API response'unu
+    uygulamamizin formatina donusturmek icin kullanilir.
+
+    Args:
+        response: API response
+
+    Returns:
+        dict: Parsed hava durumu verisi
+    """
+    if "current" not in response:
+        raise ParseError("Missing 'current' field in response")
+
+    current = response["current"]
+    units = response.get("current_units", {})
+
+    # Weather code parse
+    weather_code = current.get("weather_code", 0)
+    parsed_code = parse_weather_code(weather_code)
+
+    # OpenMeteo returns time as ISO 8601 string (e.g. "2026-03-10T09:00"), not Unix timestamp
+    time_val = current.get("time", "")
+    try:
+        if isinstance(time_val, (int, float)):
+            timestamp_str = datetime.fromtimestamp(time_val, tz=timezone.utc).isoformat()
+        elif isinstance(time_val, str) and time_val:
+            # ISO format: parse and ensure timezone
+            dt = datetime.fromisoformat(time_val.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            timestamp_str = dt.isoformat()
+        else:
+            timestamp_str = ""
+    except (ValueError, TypeError):
+        timestamp_str = str(time_val) if time_val else ""
+
+    return {
+        "timestamp": timestamp_str,
+        "temperature": current.get("temperature_2m", 0),
+        "apparent_temperature": current.get("apparent_temperature", 0),
+        "humidity": current.get("relative_humidity_2m", 0),
+        "precipitation": current.get("precipitation", 0),
+        "rain": current.get("rain", 0),
+        "showers": current.get("showers", 0),
+        "snowfall": current.get("snowfall", 0),
+        "weather_code": weather_code,
+        "weather_description": parsed_code.get("description", "Unknown"),
+        "weather_tr": parsed_code.get("tr", "Bilinmiyor"),
+        "weather_emoji": get_weather_emoji(weather_code),
+        "cloud_cover": current.get("cloud_cover", 0),
+        "wind_speed": current.get("wind_speed_10m", 0),
+        "wind_direction": current.get("wind_direction_10m", 0),
+        "wind_gusts": current.get("wind_gusts_10m", 0)
+    }
+
+
+def _parse_hourly_forecast(response: dict) -> dict:
+    """
+    OpenMeteo hourly forecast response'unu parse eder.
+
+    AÇIKLAMA:
+    Bu ozel (private) fonksiyon, OpenMeteo API'sinden donen saatlik forecast
+    JSON response'unu uygulamamizin ic formatina donusturur. Saatlik veriler
+    liste (array) formatinda gelir ve her bir indeks bir saate karsilik gelir.
+
+    Ornekler:
+    - Input: {"hourly": {"time": ["2026-03-10T09:00", "2026-03-10T10:00", ...],
+                        "temperature_2m": [15.5, 16.2, ...], ...}, ...}
+    - Output: {"time": ["2026-03-10T09:00", "2026-03-10T10:00", ...],
+               "temperature": [15.5, 16.2, ...], ...}
+
+    NASIL CALISIR:
+    1. Response'ta "hourly" alaninin oldugunu kontrol eder, yoksa hata firlatir
+    2. Hourly verilerinden istenen parametreleri cikarir:
+       - time: Zaman damgalari listesi
+       - temperature: Sicakliklar listesi
+       - precipitation: Yagis miktari listesi
+       - precipitation_probability: Yagis olasiligi listesi
+       - weather_code: Hava durumu kodlari listesi
+       - wind_speed: Ruzgar hizi listesi
+       - wind_gusts: Ruzgar gust listesi
+    3. Tum listeleri iceren bir sozluk doner
+
+    KULLANIM ALANI:
+    get_hourly_forecast fonksiyonu tarafindan API response'unu
+    uygulamamizin formatina donusturmek icin kullanilir.
+
+    Args:
+        response: API response
+
+    Returns:
+        dict: Parsed forecast verisi
+    """
+    if "hourly" not in response:
+        raise ParseError("Missing 'hourly' field in response")
+
+    hourly = response["hourly"]
+
+    return {
+        "time": hourly.get("time", []),
+        "temperature": hourly.get("temperature_2m", []),
+        "precipitation": hourly.get("precipitation", []),
+        "precipitation_probability": hourly.get("precipitation_probability", []),
+        "weather_code": hourly.get("weather_code", []),
+        "wind_speed": hourly.get("wind_speed_10m", []),
+        "wind_gusts": hourly.get("wind_gusts_10m", [])
+    }
+
+
+# =============================================================================
+# Main Service Functions
+# =============================================================================
+
+def get_current_weather(lat: float, lon: float, use_cache: bool = True) -> dict:
+    """
+    Belirli bir konum için güncel hava durumunu getirir.
+
+    AÇIKLAMA:
+    Bu genel (public) fonksiyon, verilen enlem ve boylam icin guncel hava
+    durumunu getirir. Oncelikle cache kontrolu yapar, veri cache'te yoksa
+    OpenMeteo API'sine istek atar. Sonucu standart bir formatta doner.
+
+    Ornekler:
+    - get_current_weather(41.0082, 28.9784)
+      -> {"success": True, "data": {"location": {...}, "current": {...},
+          "cache_hit": False}}
+    - get_current_weather(41.0082, 28.9784) # Ikinci cagri
+      -> {"success": True, "data": {...}, "cache_hit": True} # Cache'ten doner
+    - get_current_weather(91, 0) -> InvalidCoordinatesError firlatir
+
+    NASIL CALISIR:
+    1. Koordinatlari valid eder (-90 <= lat <= 90, -180 <= lon <= 180)
+    2. Cache anahtari olusturur (orn: "current:41.0082:28.9784")
+    3. use_cache=True ise cache'te veri var mi kontrol eder
+    4. Cache'te varsa dogrudan doner (cache_hit=True)
+    5. Cache'te yoksa OpenMeteo API'sine istek atar
+    6. API response'unu parse eder
+    7. Sonucu cache'e kaydeder ve doner
+
+    RESPONSE FORMATI:
+    {
+        "success": true,
+        "data": {
+            "location": {"lat": 41.0082, "lon": 28.9784, "timezone": "Europe/Istanbul"},
+            "current": {
+                "timestamp": "2026-03-10T09:00:00Z",
+                "temperature": 15.5,
+                "weather_tr": "Acik gokyuzu",
+                "weather_emoji": "☀️",
+                ...
+            },
+            "cache_hit": false
+        }
+    }
+
+    KULLANIM ALANI:
+    Flask endpoint'leri (/api/weather) tarafindan kullaniciya hava
+    durumu gostermek icin cagrilir. Ayrica rota planlamada da
+    kullanilir.
+
+    Args:
+        lat: Enlem (-90 ile 90 arasi)
+        lon: Boylam (-180 ile 180 arasi)
+        use_cache: Cache kullanilsin mi (varsayilan True)
+
+    Returns:
+        dict: Basari durumu ve hava durumu verisi
+
+    Raises:
+        InvalidCoordinatesError: Gecersiz koordinatlar
+        NetworkError: API baglanti hatasi
+    """
+    # Validation
+    if not validate_coordinates(lat, lon):
+        raise InvalidCoordinatesError(
+            f"Invalid coordinates: lat={lat}, lon={lon}"
+        )
+
+    # Cache kontrolu
+    cache_key = build_cache_key("current", lat, lon)
+    if use_cache:
+        cached = _get_from_cache(cache_key)
+        if cached:
+            cached["data"]["cache_hit"] = True
+            return {
+                "success": True,
+                "data": cached["data"]
+            }
+
+    try:
+        # API'den veri cek
+        url = _build_url_current(lat, lon)
+        response = _fetch_from_openmeteo(url)
+
+        # Parse response
+        current_weather = _parse_current_weather(response)
+
+        # Response yapisi
+        result = {
+            "location": {
+                "lat": round(lat, 4),
+                "lon": round(lon, 4),
+                "timezone": response.get("timezone", "GMT")
+            },
+            "current": current_weather,
+            "cache_hit": False
+        }
+
+        # Cache'e kaydet
+        if use_cache:
+            _save_to_cache(cache_key, result)
+
+        logger.info(
+            "Current weather fetched: lat=%s, lon=%s, temp=%s, weather_code=%s",
+            lat, lon, current_weather.get("temperature"),
+            current_weather.get("weather_code")
+        )
+
+        return {
+            "success": True,
+            "data": result
+        }
+
+    except (NetworkError, RateLimitError, ParseError) as e:
+        logger.error(f"Failed to fetch current weather: {str(e)}")
+        raise
+
+
+def get_hourly_forecast(
+    lat: float,
+    lon: float,
+    hours: int = 24,
+    use_cache: bool = True,
+    timezone_name: str = "auto"
+) -> dict:
+    """
+    Belirli bir konum için saatlik forecast getirir.
+
+    AÇIKLAMA:
+    Bu genel (public) fonksiyon, verilen enlem ve boylam icin saatlik hava
+    durumu forecast'i getirir. Ileriye yonelik 1-168 saat (1-7 gun) arasi
+    forecast alinabilir. get_current_weather gibi once cache kontrolu yapar.
+
+    Ornekler:
+    - get_hourly_forecast(41.0082, 28.9784, 24)
+      -> {"success": True, "data": {"location": {...}, "hourly": {...},
+          "cache_hit": False}}
+    - get_hourly_forecast(41.0082, 28.9784, 48)
+      -> 48 saatlik forecast doner
+    - get_hourly_forecast(41.0082, 28.9784, 200) -> ValueError (max 168 saat)
+
+    NASIL CALISIR:
+    1. Koordinatlari valid eder
+    2. Saat sayisini valid eder (1-168 arasi)
+    3. Cache anahtari olusturur (orn: "hourly:41.0082:28.9784:24")
+    4. use_cache=True ise cache'te veri var mi kontrol eder
+    5. Cache'te varsa dogrudan doner
+    6. Cache'te yoksa OpenMeteo API'sine istek atar
+    7. API response'unu parse eder
+    8. Sonucu cache'e kaydeder ve doner
+
+    RESPONSE FORMATI:
+    {
+        "success": true,
+        "data": {
+            "location": {"lat": 41.0082, "lon": 28.9784, "timezone": "Europe/Istanbul"},
+            "hourly": {
+                "time": ["2026-03-10T09:00", "2026-03-10T10:00", ...],  // 24 saat
+                "temperature": [15.5, 16.2, ...],
+                "precipitation": [0.0, 0.1, ...],
+                "precipitation_probability": [0, 5, ...],
+                "weather_code": [0, 0, ...],
+                "wind_speed": [12.5, 14.0, ...],
+                "wind_gusts": [18.0, 20.0, ...]
+            },
+            "cache_hit": false
+        }
+    }
+
+    KULLANIM ALANI:
+    Flask endpoint'leri (/api/weather/forecast) tarafindan kullaniciya
+    ileriye yonelik hava durumu gostermek icin cagrilir. Ayrica rota
+    planlamada seyahat suresinceki hava durumunu gostermek icin de kullanilir.
+
+    Args:
+        lat: Enlem
+        lon: Boylam
+        hours: Forecast saati (1-168 arasi, varsayilan 24)
+        use_cache: Cache kullanilsin mi (varsayilan True)
+        timezone_name: OpenMeteo timezone parametresi (varsayilan "auto")
+
+    Returns:
+        dict: Basari durumu ve forecast verisi
+
+    Raises:
+        InvalidCoordinatesError: Gecersiz koordinatlar
+        ValueError: Gecersiz saat sayisi
+    """
+    # Validation
+    if not validate_coordinates(lat, lon):
+        raise InvalidCoordinatesError(
+            f"Invalid coordinates: lat={lat}, lon={lon}"
+        )
+
+    if not validate_hours(hours):
+        raise ValueError(f"Invalid hours: {hours} (must be 1-168)")
+
+    timezone_name = str(timezone_name or "auto").strip() or "auto"
+
+    # Cache kontrolu
+    cache_key = build_cache_key("hourly", lat, lon, hours=hours, timezone=timezone_name)
+    if use_cache:
+        cached = _get_from_cache(cache_key)
+        if cached:
+            cached["data"]["cache_hit"] = True
+            return {
+                "success": True,
+                "data": cached["data"]
+            }
+
+    try:
+        # API'den veri cek
+        url = _build_url_hourly(lat, lon, hours, timezone_name=timezone_name)
+        response = _fetch_from_openmeteo(url)
+
+        # Parse response
+        hourly_forecast = _parse_hourly_forecast(response)
+
+        # Response yapisi
+        result = {
+            "location": {
+                "lat": round(lat, 4),
+                "lon": round(lon, 4),
+                "timezone": response.get("timezone", "GMT")
+            },
+            "hourly": hourly_forecast,
+            "cache_hit": False
+        }
+
+        # Cache'e kaydet
+        if use_cache:
+            _save_to_cache(cache_key, result)
+
+        logger.info(
+            "Hourly forecast fetched: lat=%s, lon=%s, hours=%s, timezone=%s",
+            lat, lon, hours, timezone_name
+        )
+
+        return {
+            "success": True,
+            "data": result
+        }
+
+    except (NetworkError, RateLimitError, ParseError) as e:
+        logger.error(f"Failed to fetch hourly forecast: {str(e)}")
+        raise
+
+
+def get_weather_at_time(
+    lat: float,
+    lon: float,
+    target_time_str: str,
+    use_cache: bool = True
+) -> Optional[dict]:
+    """
+    Belirli bir tarih/saat için saatlik forecast'ten hava durumu döner.
+
+    target_time_str: ISO 8601 datetime ("2026-03-10T09:00:00") veya saat ("09:00")
+    """
+    if not validate_coordinates(lat, lon):
+        return None
+
+    try:
+        if "T" in target_time_str:
+            target_dt = datetime.fromisoformat(target_time_str.replace("Z", "")).replace(tzinfo=None)
+        else:
+            ts = target_time_str if len(target_time_str) > 5 else f"{target_time_str}:00"
+            today = datetime.now().strftime("%Y-%m-%d")
+            target_dt = datetime.fromisoformat(f"{today}T{ts}")
+    except (ValueError, TypeError):
+        logger.warning(f"get_weather_at_time: geçersiz zaman formatı: {target_time_str!r}")
+        return None
+
+    try:
+        forecast_result = get_hourly_forecast(lat, lon, hours=48, use_cache=use_cache)
+        if not forecast_result.get("success"):
+            return None
+
+        hourly = forecast_result["data"]["hourly"]
+        times = hourly.get("time", [])
+        if not times:
+            return None
+
+        # En yakın saati bul
+        best_idx = 0
+        best_diff = float("inf")
+        for i, t in enumerate(times):
+            try:
+                dt = datetime.fromisoformat(t.replace("Z", "")).replace(tzinfo=None)
+                diff = abs((dt - target_dt).total_seconds())
+                if diff < best_diff:
+                    best_diff = diff
+                    best_idx = i
+            except (ValueError, TypeError):
+                continue
+
+        wc_list = hourly.get("weather_code", [])
+        temp_list = hourly.get("temperature", [])
+        precip_list = hourly.get("precipitation", [])
+        precip_prob_list = hourly.get("precipitation_probability", [])
+        wind_list = hourly.get("wind_speed", [])
+
+        weather_code = wc_list[best_idx] if best_idx < len(wc_list) else 0
+        parsed = parse_weather_code(weather_code)
+
+        data = {
+            "forecast_time": times[best_idx] if best_idx < len(times) else None,
+            "temperature": temp_list[best_idx] if best_idx < len(temp_list) else None,
+            "precipitation": precip_list[best_idx] if best_idx < len(precip_list) else None,
+            "precipitation_probability": precip_prob_list[best_idx] if best_idx < len(precip_prob_list) else None,
+            "weather_code": weather_code,
+            "weather_description": parsed.get("description", "Unknown"),
+            "weather_tr": parsed.get("tr", "Bilinmiyor"),
+            "weather_emoji": get_weather_emoji(weather_code),
+            "wind_speed": wind_list[best_idx] if best_idx < len(wind_list) else None,
+        }
+        data["advice"] = get_weather_advice(data, context_time=data.get("forecast_time"))
+        return data
+    except Exception as e:
+        logger.warning(f"get_weather_at_time başarısız ({lat},{lon}) {target_time_str!r}: {e}")
+        return None
+
+
+def _parse_context_time(context_time: Optional[str]) -> Optional[datetime]:
+    """HH:MM veya ISO zaman bilgisini datetime'a çevirir (naive)."""
+    if not context_time:
+        return None
+
+    raw = str(context_time).strip()
+    if not raw:
+        return None
+
+    try:
+        if "T" in raw:
+            return datetime.fromisoformat(raw.replace("Z", "")).replace(tzinfo=None)
+        today = datetime.now().strftime("%Y-%m-%d")
+        ts = raw if len(raw) > 5 else f"{raw}:00"
+        return datetime.fromisoformat(f"{today}T{ts}")
+    except (ValueError, TypeError):
+        return None
+
+
+def _precip_level(percent: float) -> str:
+    """Yağış olasılığı yüzdesini düşük/orta/yüksek seviyesine çevirir."""
+    p = float(percent or 0)
+    if p >= 60:
+        return "yüksek"
+    if p >= 30:
+        return "orta"
+    return "düşük"
+
+
+def _build_critical_advice(best: Dict[str, Any], window_start: Optional[str], window_end: Optional[str]) -> str:
+    """Önümüzdeki 2 saat için tek satırlık kritik öneri metni üretir."""
+    hhmm = best.get("time", "--:--")
+    precip_prob = int(round(float(best.get("precipitation_probability", 0) or 0)))
+    weather_code = int(best.get("weather_code", 0) or 0)
+    wind_speed = int(round(float(best.get("wind_speed", 0) or 0)))
+    level = _precip_level(precip_prob)
+
+    if weather_code >= 95:
+        core = f"{hhmm} civarı fırtına bekleniyor. Mümkünse rotayı erteleyin."
+    elif weather_code in [71, 73, 75, 77, 85, 86]:
+        core = f"{hhmm} civarı kar olasılığı var. Kaygan zemine dikkat edin."
+    elif precip_prob >= 30:
+        core = f"{hhmm} civarı yağış ihtimali %{precip_prob} ({level}). Şemsiye/yağmurluk almayı unutmayın."
+    elif wind_speed >= 35:
+        core = f"{hhmm} civarı rüzgar kuvvetli ({wind_speed} km/s). Açık alanlarda dikkatli olun."
+    else:
+        core = f"{hhmm} civarı yağış ihtimali düşük (%{precip_prob})."
+
+    if window_start and window_end:
+        return f"Önümüzdeki 2 saat ({window_start}-{window_end}): {core}"
+    return f"Önümüzdeki 2 saat: {core}"
+
+
+def get_two_hour_risk_window(
+    lat: float,
+    lon: float,
+    context_time: Optional[str] = None,
+    use_cache: bool = True
+) -> Optional[Dict[str, Any]]:
+    """
+    Önümüzdeki 2 saat için yağış olasılığı odaklı pencere analizi üretir.
+
+    Returns:
+        {
+          "window_start": "HH:MM",
+          "window_end": "HH:MM",
+          "best_time": "HH:MM",
+          "precipitation_probability": int,
+          "precipitation_level": "düşük|orta|yüksek",
+          "critical_advice": str
+        }
+    """
+    if not validate_coordinates(lat, lon):
+        return None
+
+    try:
+        forecast_result = get_hourly_forecast(lat, lon, hours=6, use_cache=use_cache)
+        if not forecast_result.get("success"):
+            return None
+
+        hourly = forecast_result["data"]["hourly"]
+        times = hourly.get("time", [])
+        if not times:
+            return None
+
+        base_dt = _parse_context_time(context_time) or datetime.now().replace(minute=0, second=0, microsecond=0)
+        end_dt = base_dt + timedelta(hours=2)
+
+        entries: List[Dict[str, Any]] = []
+        all_entries: List[Dict[str, Any]] = []
+        wc_list = hourly.get("weather_code", [])
+        pp_list = hourly.get("precipitation_probability", [])
+        pr_list = hourly.get("precipitation", [])
+        ws_list = hourly.get("wind_speed", [])
+        wg_list = hourly.get("wind_gusts", [])
+
+        for i, t in enumerate(times):
+            try:
+                dt = datetime.fromisoformat(str(t).replace("Z", "")).replace(tzinfo=None)
+            except (ValueError, TypeError):
+                continue
+
+            code = wc_list[i] if i < len(wc_list) else 0
+            pp = pp_list[i] if i < len(pp_list) else 0
+            pr = pr_list[i] if i < len(pr_list) else 0
+            ws = ws_list[i] if i < len(ws_list) else 0
+            wg = wg_list[i] if i < len(wg_list) else 0
+
+            row = {
+                "dt": dt,
+                "time": dt.strftime("%H:%M"),
+                "weather_code": code,
+                "precipitation_probability": pp,
+                "precipitation": pr,
+                "wind_speed": ws,
+                "wind_gusts": wg,
+                "rank": float(pp or 0),
+            }
+            all_entries.append(row)
+
+            if base_dt <= dt <= end_dt:
+                entries.append(row)
+
+        if not entries and all_entries:
+            now_dt = datetime.now().replace(tzinfo=None)
+            fallback = [e for e in all_entries if e["dt"] >= now_dt]
+            if not fallback:
+                fallback = all_entries
+            entries = fallback[:3]
+
+        if not entries:
+            return None
+
+        best = max(entries, key=lambda x: x["rank"])
+        precip_prob = int(round(float(best.get("precipitation_probability", 0) or 0)))
+        level = _precip_level(precip_prob)
+        window_start = entries[0]["time"]
+        window_end = entries[-1]["time"]
+
+        return {
+            "window_start": window_start,
+            "window_end": window_end,
+            "best_time": best["time"],
+            "precipitation_probability": precip_prob,
+            "precipitation_level": level,
+            "critical_advice": _build_critical_advice(best, window_start, window_end),
+        }
+    except Exception as e:
+        logger.warning(f"get_two_hour_risk_window başarısız ({lat},{lon}) {context_time!r}: {e}")
+        return None
+
+
+def check_route_weather(
+    points: List[Dict],
+    start_time: Optional[str] = None,
+    segment_distances: Optional[List[float]] = None,
+    transport_mode: str = "walking"
+) -> dict:
+    """
+    Rota boyunca hava durumunu kontrol eder.
+
+    AÇIKLAMA:
+    Bu genel (public) fonksiyon, verilen rota noktalari (waypoints) icin
+    guncel hava durumunu kontrol eder. Her nokta icin hava durumunu cekar,
+    uyari olusturur ve genel bir durum degerlendirmesi yapar. Rota
+    planlamada kullaniciya hava kosullari hakkinda bilgi vermek icin
+    kullanilir.
+
+    Ornekler:
+    - check_route_weather([{"lat": 41.0082, "lon": 28.9784, "name": "Kadikoy"},
+                          {"lat": 41.0422, "lon": 29.0067, "name": "Besiktas"}])
+      -> {
+          "success": True,
+          "data": {
+              "route_weather": [
+                  {"point": "Kadikoy", "lat": 41.0082, "lon": 28.9784,
+                   "weather": {"temperature": 15, ...}},
+                  ...
+              ],
+              "warnings": [],
+              "overall_conditions": "clear"
+          }
+      }
+
+    NASIL CALISIR:
+    1. En az bir nokta verilip verilmedigini kontrol eder
+    2. Her nokta icin:
+       a. Koordinatlari cikarir (hem lat/lon hem latitude/longitude destekler)
+       b. Koordinat eksikse hata mesaji ekler ve bir sonrakine gecer
+       c. get_current_weather ile hava durumunu cekar
+       d. Hava durumunu analiz eder ve uyari olusturur
+       e. Sonucu route_weather listesine ekler
+    3. Tum noktalar icin genel durum degerlendirmesi yapar
+    4. Tum sonuclari doner
+
+    GENEL DURUM KATEGORILERI:
+    - clear: Acik gokyuzu (kod 0-3)
+    - foggy: Sisli (kod 45-48)
+    - rainy: Yagmurlu (kod 51-67, 80-82)
+    - snowy: Karli (kod 71-77, 85-86)
+    - stormy: Firtinali (kod 95-99)
+    - unknown: Bilinmiyor
+
+    KULLANIM ALANI:
+    Flask endpoint'leri (/api/weather/check-route) tarafindan rota
+    planlamada kullaniciya hava durumu bilgisini gostermek icin cagrilir.
+    Ayrica rota hesaplama modulleri tarafindan da kullanilabilir.
+
+    Args:
+        points: Nokta listesi [{"lat": float, "lon": float, "name": str}, ...]
+        start_time: Baslangic zamani (ISO 8601 format, opsiyonel, Faz 2'de kullanilacak)
+
+    Returns:
+        dict: Basari durumu ve rota hava durumu bilgileri
+    """
+    if not points or len(points) < 1:
+        raise ValueError("At least one point is required")
+
+    route_weather = []
+    warnings = []
+    route_max_precip_prob = -1
+    route_precipitation_level = "düşük"
+    route_critical_advice = None
+
+    # Forecast modu: start_time ISO datetime formatında (tarih + saat içeriyor)
+    _speeds_kmh = {"walking": 5.0, "cycling": 15.0, "driving": 30.0}
+    _speed = _speeds_kmh.get(transport_mode, 5.0)
+    _use_forecast = False
+    _arrival_dt = None
+    if start_time and "T" in start_time:
+        try:
+            _arrival_dt = datetime.fromisoformat(start_time.replace("Z", "")).replace(tzinfo=None)
+            _use_forecast = True
+        except (ValueError, TypeError):
+            pass
+
+    for i, point in enumerate(points):
+        # Support both "lat"/"lon" and "latitude"/"longitude" (common API conventions)
+        lat = point.get("lat") if point.get("lat") is not None else point.get("latitude")
+        lon = point.get("lon") if point.get("lon") is not None else point.get("longitude")
+        name = point.get("name", point.get("label", "Bilinmeyen"))
+
+        if lat is None or lon is None:
+            logger.warning(f"Skipping point {name}: missing lat/lon coordinates")
+            route_weather.append({
+                "point": name,
+                "lat": lat,
+                "lon": lon,
+                "weather": None,
+                "error": "Koordinat eksik (lat/lon veya latitude/longitude gerekli)"
+            })
+            continue
+
+        try:
+            if _use_forecast and _arrival_dt is not None:
+                current = get_weather_at_time(lat, lon, _arrival_dt.isoformat())
+            else:
+                result = get_current_weather(lat, lon)
+                current = result["data"]["current"]
+
+            # Uyari kontrolu
+            alert = get_weather_alert(current or {})
+            if alert:
+                warnings.append(f"{name}: {alert}")
+
+            # Akıllı tavsiyeler
+            context_time = _arrival_dt.isoformat() if (_use_forecast and _arrival_dt is not None) else (current or {}).get("timestamp")
+            advice = get_weather_advice(current or {}, context_time=context_time, point_name=name)
+
+            risk_window_2h = get_two_hour_risk_window(lat, lon, context_time=context_time)
+            precip_prob_2h = (risk_window_2h or {}).get("precipitation_probability", 0)
+            precip_level_2h = (risk_window_2h or {}).get("precipitation_level", "düşük")
+
+            # Kullanıcıya yalnızca anlamlı eşiklerde (>= %30) kritik öneri göster
+            raw_critical_advice = (risk_window_2h or {}).get("critical_advice")
+            critical_advice = raw_critical_advice if precip_prob_2h >= 30 else None
+
+            if precip_prob_2h > route_max_precip_prob:
+                route_max_precip_prob = precip_prob_2h
+                route_precipitation_level = precip_level_2h
+
+            if risk_window_2h and critical_advice and precip_prob_2h >= route_max_precip_prob:
+                route_critical_advice = f"{name}: {critical_advice}"
+
+            if risk_window_2h and precip_level_2h in ["orta", "yüksek"] and critical_advice:
+                warnings.append(f"{name}: {critical_advice}")
+
+            route_weather.append({
+                "point": name,
+                "lat": lat,
+                "lon": lon,
+                "weather": current,
+                "advice": advice,
+                "risk_window_2h": risk_window_2h,
+                "precipitation_probability_2h": precip_prob_2h,
+                "precipitation_level_2h": precip_level_2h,
+                "critical_advice": critical_advice
+            })
+
+        except Exception as e:
+            logger.warning(f"Failed to get weather for {name}: {str(e)}")
+            route_weather.append({
+                "point": name,
+                "lat": lat,
+                "lon": lon,
+                "weather": None,
+                "error": str(e)
+            })
+
+        # Bir sonraki nokta için tahmini varış zamanını güncelle
+        if _use_forecast and _arrival_dt is not None and segment_distances and i < len(segment_distances):
+            travel_minutes = int((segment_distances[i] / _speed) * 60)
+            _arrival_dt += timedelta(minutes=travel_minutes)
+
+    # Genel durum degerlendirmesi
+    overall_conditions = _evaluate_overall_conditions(route_weather)
+
+    return {
+        "success": True,
+        "data": {
+            "route_weather": route_weather,
+            "warnings": warnings,
+            "overall_conditions": overall_conditions,
+            "precipitation_level_2h": route_precipitation_level,
+            "max_precipitation_probability_2h": max(route_max_precip_prob, 0),
+            "critical_advice": route_critical_advice
+        }
+    }
+
+
+def _evaluate_overall_conditions(route_weather: List[dict]) -> str:
+    """
+    Rota genelindeki hava durumunu degerlendirir.
+
+    AÇIKLAMA:
+    Bu ozel (private) fonksiyon, rota boyunca tum noktalarin hava durumunu
+    analiz eder ve genel bir durum kategorisi doner. "En kotu durum"
+    mantigiyla calisir - yani rota icinde herhangi bir noktada firtina
+    varsa genel durum "stormy" doner. Bu, kullaniciya rota boyunca karsilasacagi
+    en kotu hava kosulunu haber vermek icin yapilir.
+
+    Ornekler:
+    - _evaluate_overall_conditions([{"weather": {"weather_code": 0}}, ...])
+      -> "clear" (tum noktalar acik)
+    - _evaluate_overall_conditions([{"weather": {"weather_code": 0}},
+                                     {"weather": {"weather_code": 61}}])
+      -> "rainy" (bir noktada yagmur var)
+    - _evaluate_overall_conditions([{"weather": {"weather_code": 95}}])
+      -> "stormy" (firtina)
+
+    NASIL CALISIR:
+    1. Rota hava durumu listesi bos ise "unknown" doner
+    2. Her noktanin weather_code'unu toplar
+    3. Hic kod yoksa "unknown" doner
+    4. En yuksek kodu bulur (max)
+    5. Max koda gore kategori doner:
+       - 0-3: clear (Acik)
+       - 45-48: foggy (Sisli)
+       - 51-82: rainy (Yagmurlu)
+       - 71-86: snowy (Karli) - not: kod 71-86 hem yagmur hem kar icerir
+       - 95-99: stormy (Firtinali)
+
+    KULLANIM ALANI:
+    check_route_weather fonksiyonu tarafindan rota genelindeki hava
+    durumunu ozetlemek icin kullanilir. Frontend'de rota bilgisi
+    gosterirken kullanilabilir.
+
+    Args:
+        route_weather: Rota hava durumu listesi
+
+    Returns:
+        str: Genel durum (clear, foggy, rainy, snowy, stormy, unknown)
+    """
+    if not route_weather:
+        return "unknown"
+
+    # Hava kodlarini topla
+    weather_codes = []
+    for item in route_weather:
+        if item.get("weather"):
+            code = item["weather"].get("weather_code", 0)
+            weather_codes.append(code)
+
+    if not weather_codes:
+        return "unknown"
+
+    # En kotu durum belirle (WMO kod sirasina gore)
+    max_code = max(weather_codes)
+
+    # Durum kategorizasyonu - oncelik: storm > snow > rain > fog > clear
+    if max_code >= 95:
+        return "stormy"
+    elif max_code >= 85 or (71 <= max_code <= 77):
+        return "snowy"
+    elif max_code >= 51:
+        return "rainy"
+    elif max_code >= 45:
+        return "foggy"
+    else:
+        return "clear"
+
+
+# =============================================================================
+# Batch Functions
+# =============================================================================
+
+def get_multiple_locations_weather(
+    locations: List[Tuple[float, float]]
+) -> List[dict]:
+    """
+    Birden fazla konum için hava durumu getirir.
+
+    AÇIKLAMA:
+    Bu fonksiyon, birden fazla konum icin ayni anda hava durumu getirir.
+    Her konum icin get_current_weather cagirir ve sonuclari liste olarak doner.
+    Hata durumunda bir konum hata verirse digerlerini getirmeye devam eder
+    (fault-tolerant). Batch islemler icin kullanilir.
+
+    Ornekler:
+    - get_multiple_locations_weather([(41.0082, 28.9784), (41.0422, 29.0067)])
+      -> [
+          {"success": True, "data": {"location": {...}, "current": {...}, ...}},
+          {"success": True, "data": {"location": {...}, "current": {...}, ...}}
+        ]
+
+    NASIL CALISIR:
+    1. Bos bir results listesi olusturur
+    2. Her (lat, lon) tuple'i icin:
+       a. get_current_weather(lat, lon) cagirir
+       b. Basariysa sonucu listeye ekler
+       c. Hata olusursa hata mesaji iceren bir entry ekler
+    3. Tum sonuclari doner
+
+    KULLANIM ALANI:
+    Ayni anda birden fazla konumun hava durumunu getirmek icin
+    kullanilir. Ozelikle coklu rota noktalari veya favori konumlar
+    icin hava durumu gosterirken kullanisli.
+
+    Args:
+        locations: (lat, lon) tuple listesi
+
+    Returns:
+        list: Hava durumu verileri listesi (basarili veya hatali)
+    """
+    results = []
+
+    for lat, lon in locations:
+        try:
+            result = get_current_weather(lat, lon)
+            results.append(result)
+        except Exception as e:
+            logger.warning(f"Failed for {lat}, {lon}: {str(e)}")
+            results.append({
+                "success": False,
+                "error": str(e),
+                "lat": lat,
+                "lon": lon
+            })
+
+    return results
+
+
+# =============================================================================
+# Utility Functions
+# =============================================================================
+
+def get_service_status() -> dict:
+    """
+    Hava durumu servisi durumunu dondurur.
+
+    AÇIKLAMA:
+    Bu fonksiyon, hava durumu servisinin mevcut durumunu ozetleyen bilgiler
+    doner. Servis adi, durumu, cache istatistikleri ve konfigurasyon bilgilerini
+    icerir. Monitoring ve debug amacli kullanilir.
+
+    Ornekler:
+    - get_service_status()
+      -> {
+          "service": "weather_service",
+          "status": "operational",
+          "cache_stats": {
+              "total_entries": 5,
+              "valid_entries": 3,
+              "expired_entries": 2,
+              "ttl_seconds": 900
+          },
+          "config": {
+              "cache_ttl_seconds": 900,
+              "request_timeout": 10,
+              "api_url": "https://api.open-meteo.com/v1/forecast"
+          }
+      }
+
+    NASIL CALISIR:
+    1. Servis adini ve durumunu belirler (her zaman "operational")
+    2. get_cache_stats() ile cache istatistiklerini alir
+    3. Konfigurasyon bilgilerini toplar:
+       - Cache TTL (saniye)
+       - Request timeout (saniye)
+       - OpenMeteo API URL
+    4. Tum bilgileri sozluk olarak doner
+
+    KULLANIM ALANI:
+    /api/weather/status endpoint'i tarafindan kullaniciya ve
+    monitoring sistemlerine servis durumu bilgisini gostermek icin
+    kullanilir. Ayrica debug ve performans izleme icin de kullanilabilir.
+
+    Returns:
+        dict: Servis durumu bilgileri
+    """
+    return {
+        "service": "weather_service",
+        "status": "operational",
+        "cache_stats": get_cache_stats(),
+        "config": {
+            "cache_ttl_seconds": CACHE_TTL_SECONDS,
+            "request_timeout": REQUEST_TIMEOUT,
+            "max_retries": MAX_RETRIES,
+            "retry_backoff_base_seconds": RETRY_BACKOFF_BASE_SECONDS,
+            "api_url": OPENMETEO_BASE_URL
+        }
+    }
+
+
+def health_check() -> bool:
+    """
+    Servis saglik kontrolu.
+
+    AÇIKLAMA:
+    Bu fonksiyon, hava durumu servisinin saglikli olup olmadigini kontrol
+    eder. Bunu yapmak icin Istanbul icin (bilinen gecerli koordinatlar)
+    gerçek bir API istegi yapar ve sonucu kontrol eder. Basariyla tamamlanirs
+    True, herhangi bir hata olusursa False doner.
+
+    Ornekler:
+    - health_check() -> True (servis saglikli)
+    - health_check() -> False (API baglanti hatasi, timeout, vb.)
+
+    NASIL CALISIR:
+    1. Istanbul koordinatlari ile get_current_weather cagirir
+    2. use_cache=False parametresi ile cache'i atlar (gercek API testi)
+    3. Sonucun "success": True icerip icermedigini kontrol eder
+    4. Herhangi bir exception olusursa yakalar ve False doner
+    5. Hatayi log'lar
+
+    KULLANIM ALANI:
+    /api/weather/health endpoint'i tarafindan monitoring sistemleri,
+    load balancer'lar ve deployment scriptleri tarafindan servisin
+    calistigini kontrol etmek icin kullanilir. Ayrica Docker
+    HEALTHCHECK direktifi olarak da kullanilabilir.
+
+    Returns:
+        bool: True if service is healthy, False otherwise
+    """
+    try:
+        # Test call with minimal data
+        result = get_current_weather(41.0082, 28.9784, use_cache=False)
+        return result.get("success", False)
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return False
