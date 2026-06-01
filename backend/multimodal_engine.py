@@ -1531,12 +1531,22 @@ def _build_walk_leg(
         return cached
 
     major_water_straight = _is_major_water_crossing_straight(from_lat, from_lon, to_lat, to_lon)
-    short_fallback_ok = allow_fallback_if_short and straight_m <= fallback_max_m and not major_water_straight
+    short_fallback_ok = (
+        allow_fallback_if_short
+        and straight_m <= fallback_max_m
+        and (not major_water_straight or fallback_max_m >= 1500.0)
+    )
 
     coords = _get_walk_road_coords(from_lat, from_lon, to_lat, to_lon)
+    if (not coords or len(coords) < 2) and short_fallback_ok:
+        coords = [[from_lat, from_lon], [to_lat, to_lon]]
     is_fallback = _looks_like_straight_fallback(coords, from_lat, from_lon, to_lat, to_lon)
     if not _is_allowed_water_crossing_walk(from_lat, from_lon, to_lat, to_lon, coords, is_fallback=is_fallback):
-        return None
+        if short_fallback_ok:
+            coords = [[from_lat, from_lon], [to_lat, to_lon]]
+            is_fallback = True
+        else:
+            return None
     road_m = _path_distance_m(coords)
 
     if is_fallback:
@@ -2374,6 +2384,41 @@ def _build_metro_graph_data() -> Tuple[Dict[int, Dict], Dict[int, Dict], Dict[in
                 graph[a_id].append((b_id, dist, 0, "transfer"))
                 graph[b_id].append((a_id, dist, 0, "transfer"))
 
+    # GTFS/IBB verisinde bazi aktarma istasyonlarinin adi bozuk karakterlerle
+    # gelebiliyor. Ayni fiziksel noktadaki farkli hatlari yine de bagla.
+    station_ids = list(station_map.keys())
+    existing_transfer_pairs = {
+        (min(a_id, to_id), max(a_id, to_id))
+        for a_id, edges in graph.items()
+        for to_id, _, _, kind in edges
+        if kind == "transfer"
+    }
+    for i in range(len(station_ids)):
+        a_id = int(station_ids[i])
+        a_lines = station_lines.get(a_id, set())
+        if not a_lines:
+            continue
+        a = station_map.get(a_id)
+        if not a:
+            continue
+        for j in range(i + 1, len(station_ids)):
+            b_id = int(station_ids[j])
+            b_lines = station_lines.get(b_id, set())
+            if not b_lines or a_lines & b_lines:
+                continue
+            pair_key = (min(a_id, b_id), max(a_id, b_id))
+            if pair_key in existing_transfer_pairs:
+                continue
+            b = station_map.get(b_id)
+            if not b:
+                continue
+            dist = _haversine_distance(float(a["lat"]), float(a["lon"]), float(b["lat"]), float(b["lon"]))
+            if dist > 350.0:
+                continue
+            graph[a_id].append((b_id, dist, 0, "transfer"))
+            graph[b_id].append((a_id, dist, 0, "transfer"))
+            existing_transfer_pairs.add(pair_key)
+
     # Marmaray omurga entegrasyonu (IBB Metro API'de bazi senaryolarda eksik kaldigi icin).
     # Bu baglar yaka gecisindeki metro onerilerini destekler.
     VIRTUAL_MARMARAY_LINE_ID = -100
@@ -2751,7 +2796,9 @@ def _build_graph_metro_option(
                     float(to_station.get("lat")),
                     float(to_station.get("lon")),
                     max_distance_m=900,
-                    allow_fallback_if_short=False,
+                    allow_fallback_if_short=True,
+                    fallback_max_m=450,
+                    max_ratio=20.0,
                 )
                 if not transfer_seg:
                     return None
@@ -2772,100 +2819,77 @@ def _build_graph_metro_option(
         edge_kind = str(seg.get("edge_kind") or "rail")
 
         station_ids = seg.get("station_ids", [])
-        
-        # Gerçek tünel güzergahı koordinatlarını al (GTFS shapes veya fallback)
+
+        station_fallback: List[List[float]] = []
+        for sid in station_ids:
+            st = station_map.get(int(sid))
+            if not st:
+                continue
+            lat = st.get("lat")
+            lon = st.get("lon")
+            if lat is None or lon is None:
+                continue
+            pt = [float(lat), float(lon)]
+            if not station_fallback or station_fallback[-1] != pt:
+                station_fallback.append(pt)
+
+        # Oncelik shape: ancak istasyon kapsama kalitesi dusukse (yanlis/manual shape)
+        # kayik kisa parca cizmek yerine guvenilir istasyon koordinatlarina don.
         shape_coords = get_metro_line_shape(line_name)
-        
-        if shape_coords and len(shape_coords) >= 2 and len(station_ids) >= 2:
-            # İlk ve son istasyonun shape üzerindeki pozisyonlarını bul
+        rail_coords: List[List[float]] = []
+
+        if shape_coords and len(shape_coords) >= 2 and len(station_fallback) >= 2:
             start_st = station_map.get(int(station_ids[0]), {})
             end_st = station_map.get(int(station_ids[-1]), {})
-            
-            if not start_st or not end_st:
-                # İstasyon verisi yok, station koordinatlarını kullan
-                rail_coords = [[float(station_map.get(int(sid), {}).get("lat", 0)),
-                               float(station_map.get(int(sid), {}).get("lon", 0))]
-                              for sid in station_ids if station_map.get(int(sid))]
-            else:
+            snapped_indices: List[int] = []
+
+            if start_st and end_st:
                 start_lat, start_lon = float(start_st["lat"]), float(start_st["lon"])
                 end_lat, end_lon = float(end_st["lat"]), float(end_st["lon"])
-                
-                # Başlangıç ve bitiş istasyonlarına en yakın shape indekslerini bul
-                best_start_idx = -1
-                best_start_dist = float('inf')
-                best_end_idx = -1
-                best_end_dist = float('inf')
-                
-                for idx, (shape_lat, shape_lon) in enumerate(shape_coords):
+
+                best_start_dist = float("inf")
+                best_end_dist = float("inf")
+                for shape_lat, shape_lon in shape_coords:
                     dist_start = _haversine_distance(start_lat, start_lon, shape_lat, shape_lon)
                     dist_end = _haversine_distance(end_lat, end_lon, shape_lat, shape_lon)
-                    
                     if dist_start < best_start_dist:
                         best_start_dist = dist_start
-                        best_start_idx = idx
                     if dist_end < best_end_dist:
                         best_end_dist = dist_end
-                        best_end_idx = idx
-                
-                # Akıllı İstasyon Snapping: Mesafe 800 metreden uzaksa shape kullanma, direkt koordinatları kullan
-                if best_start_dist > 800.0 or best_end_dist > 800.0:
-                    rail_coords = [[float(station_map.get(int(sid), {}).get("lat", 0)),
-                                   float(station_map.get(int(sid), {}).get("lon", 0))]
-                                  for sid in station_ids if station_map.get(int(sid))]
-                    snapped_indices = []
-                else:
-                    # Tüm istasyonları en yakın shape noktalarına snap et (sırayla)
-                    snapped_indices = []
+
+                if best_start_dist <= 650.0 and best_end_dist <= 650.0:
                     for sid in station_ids:
                         st = station_map.get(int(sid))
                         if not st:
                             continue
                         st_lat, st_lon = float(st["lat"]), float(st["lon"])
-                        
                         best_idx = -1
-                        best_dist = float('inf')
+                        best_dist = float("inf")
                         for idx, (shape_lat, shape_lon) in enumerate(shape_coords):
                             dist = _haversine_distance(st_lat, st_lon, shape_lat, shape_lon)
                             if dist < best_dist:
                                 best_dist = dist
                                 best_idx = idx
-                        # İstasyonun shape noktasına olan mesafesi 800 metreden azsa snap et
-                        if best_idx >= 0 and best_dist <= 800.0:
+                        if best_idx >= 0 and best_dist <= 650.0:
                             snapped_indices.append(best_idx)
-                
-                # Eğer snap edilmiş istasyonlar M2 gibi tek yönlü bir hatta aitse,
-                # sadece aradaki tüm shape noktalarını döndür (tünel çizgisi için)
-                if snapped_indices and len(snapped_indices) >= 2:
-                    # Yonu ilk ve son istasyon snap indeksleri belirler.
-                    first_st_idx = int(snapped_indices[0])
-                    last_st_idx = int(snapped_indices[-1])
 
-                    if first_st_idx <= last_st_idx:
-                        rail_coords = [
-                            [float(shape_coords[i][0]), float(shape_coords[i][1])]
-                            for i in range(first_st_idx, last_st_idx + 1)
-                        ]
-                    else:
-                        # Python range son degeri disladigi icin last_st_idx - 1 kullanilir.
-                        rail_coords = [
-                            [float(shape_coords[i][0]), float(shape_coords[i][1])]
-                            for i in range(first_st_idx, last_st_idx - 1, -1)
-                        ]
+            snap_coverage = (len(snapped_indices) / float(max(1, len(station_fallback))))
+            if len(snapped_indices) >= 2 and snap_coverage >= 0.60:
+                first_st_idx = int(snapped_indices[0])
+                last_st_idx = int(snapped_indices[-1])
+                if first_st_idx <= last_st_idx:
+                    rail_coords = [
+                        [float(shape_coords[i][0]), float(shape_coords[i][1])]
+                        for i in range(first_st_idx, last_st_idx + 1)
+                    ]
                 else:
-                    # Yeterli istasyon yok, sadece start-end arasını al
-                    if best_start_idx < best_end_idx:
-                        rail_coords = [[float(shape_coords[i][0]), float(shape_coords[i][1])] 
-                                       for i in range(best_start_idx, best_end_idx + 1)]
-                    else:
-                        rail_coords = [[float(shape_coords[i][0]), float(shape_coords[i][1])] 
-                                       for i in range(best_end_idx, best_start_idx + 1)][::-1]
-        else:
-            # Shape yok, istasyon koordinatlarını doğrudan kullan
-            rail_coords = []
-            for sid in station_ids:
-                st = station_map.get(int(sid))
-                if st:
-                    rail_coords.append([float(st["lat"]), float(st["lon"])])
+                    rail_coords = [
+                        [float(shape_coords[i][0]), float(shape_coords[i][1])]
+                        for i in range(first_st_idx, last_st_idx - 1, -1)
+                    ]
+
+        if len(rail_coords) < 2:
+            rail_coords = station_fallback
         # Shape snap kotu/eksik kalirsa istasyon koordinatlarindan minimum
         # guvenilir segmenti geri kur.
         if len(rail_coords) < 2 and len(station_ids) >= 2:
@@ -4258,7 +4282,7 @@ def find_transit_routes(
         ferry_diverse = _diversify_transit_options(ferry_options, max_options=max_results)
         _telemetry_set_count("ferry_options", len(ferry_options))
         _telemetry_set_count("final_transit_options", len(ferry_diverse))
-        return [walking_option] + ferry_diverse
+        return ferry_diverse
 
     # Artan yaricaplarla dene
     transit_options = []
@@ -4731,7 +4755,7 @@ def find_transit_routes(
             continue
         transit.append(opt)
     merged = _diversify_transit_options(transit, max_options=max_transit_options)
-    result = [walking] + merged
+    result = merged
     _telemetry_add_ms("final_filter_diversify_ms", _time.perf_counter() - stage_start)
     _telemetry_set_count("final_transit_candidates", len(transit))
     _telemetry_set_count("final_transit_options", len(merged))
@@ -4782,7 +4806,26 @@ def compare_routes(
     stage_ms["find_transit_routes_ms"] = round((_time.perf_counter() - t0) * 1000, 2)
 
     t0 = _time.perf_counter()
-    walking = options[0]
+    walking = next((o for o in options if o.get("type") == "walking"), None)
+    if walking is None:
+        direct_walk_m, direct_walk_min, walking_road_coords = _direct_walk_metrics(
+            origin_lat, origin_lon, dest_lat, dest_lon
+        )
+        walking = {
+            "type": "walking",
+            "icon": "walking",
+            "name": "Yuruyus",
+            "description": f"Direkt yurume ({round(direct_walk_m)}m)",
+            "total_time_min": round(direct_walk_min, 1),
+            "total_distance_m": round(direct_walk_m),
+            "segments": [{
+                "mode": "walk",
+                "description": "Direkt yurume",
+                "distance_m": round(direct_walk_m),
+                "duration_min": round(direct_walk_min, 1),
+                "coords": walking_road_coords,
+            }],
+        }
     transit = sorted(
         [o for o in options if o["type"] == "transit"],
         key=lambda x: float(x.get("total_time_min", 10**9))
@@ -4791,17 +4834,11 @@ def compare_routes(
 
     # Oneri
     t0 = _time.perf_counter()
-    recommended = "walking"
-    reason = "Yuruyus en hizli secenek"
-
+    recommended = "transit" if transit else "none"
     if transit:
-        best_transit = transit[0]
-        if best_transit["total_time_min"] < walking["total_time_min"]:
-            recommended = "transit"
-            saved = round(walking["total_time_min"] - best_transit["total_time_min"], 1)
-            reason = f"Toplu tasima {saved} dk daha hizli"
-        else:
-            reason = "Yuruyus daha hizli veya benzer surede"
+        reason = "Secili ulasim modlarina gore toplu tasima rotasi"
+    else:
+        reason = "Secili ulasim modlariyla rota bulunamadi"
     stage_ms["recommendation_ms"] = round((_time.perf_counter() - t0) * 1000, 2)
 
     # Yakin hatlari bilgi olarak ekle (direkt baglanti olmasa bile)
@@ -4812,12 +4849,12 @@ def compare_routes(
     stage_ms["total_ms"] = round((_time.perf_counter() - compare_start) * 1000, 2)
     telemetry["compare_cache_hit"] = False
     telemetry["option_counts"] = {
-        "total_options": len(options),
+        "total_options": len(transit),
         "transit_options": len(transit),
     }
 
     output = {
-        "options": options,
+        "options": transit,
         "walking": walking,
         "transit_options": transit,
         "recommended": recommended,

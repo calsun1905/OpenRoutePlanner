@@ -204,8 +204,9 @@ class _FakeOsrmSession:
 
 def _reset_osrm_sqlite_test_state(me, monkeypatch, tmp_path):
     monkeypatch.setattr(me, "_OSRM_SQLITE_CACHE_DB", str(tmp_path / "osrm_cache.db"))
-    monkeypatch.setattr(me, "_OSRM_SQLITE_SCHEMA_READY", False)
+    monkeypatch.setattr(me, "_OSRM_SQLITE_SCHEMA_READY", {})
     monkeypatch.setattr(me, "_OSRM_SQLITE_CACHE_ENABLED", True)
+    monkeypatch.setattr(me, "_OSRM_SQLITE_SHARDING_ENABLED", False)
     monkeypatch.setattr(me, "_OSRM_SQLITE_CACHE_TTL_SEC", 3600.0)
     monkeypatch.setattr(me, "_OSRM_SQLITE_CACHE_MAX_ROWS", 100)
     me._OSRM_ROUTE_CACHE.clear()
