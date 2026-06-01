@@ -1087,6 +1087,12 @@ FERRY_TERMINAL_DISPLAY = {
     "feshane": "Feshane / Sutluce",
 }
 
+FERRY_TERMINAL_FALLBACK = {
+    # IBB/GTFS birlesik istasyon setinde Besiktas terminali her zaman bulunmayabiliyor.
+    # Bu durumda vapur baglantisini koparmamak icin Kabatas'i operasyonel fallback kabul et.
+    "besiktas": "kabatas",
+}
+
 
 def _ferry_display_name(raw_name: str) -> str:
     name = str(raw_name or "").strip()
@@ -1095,6 +1101,11 @@ def _ferry_display_name(raw_name: str) -> str:
     norm = _normalized_station_name(name)
     canonical = FERRY_TERMINAL_ALIASES.get(norm, norm)
     return FERRY_TERMINAL_DISPLAY.get(canonical, name)
+
+
+def _resolve_ferry_terminal_key(key: str) -> str:
+    terminal_key = str(key or "").strip().lower()
+    return FERRY_TERMINAL_FALLBACK.get(terminal_key, terminal_key)
 
 USER_TRANSIT_MODES = {"bus", "metro", "metrobus", "ferry"}
 DEFAULT_TRANSFER_MAX_M = 220.0
@@ -2469,8 +2480,10 @@ def _build_metro_graph_data() -> Tuple[Dict[int, Dict], Dict[int, Dict], Dict[in
         }
 
     for left_name, right_name in FERRY_TERMINAL_LINKS:
-        left_ids = station_name_ids.get(left_name, [])
-        right_ids = station_name_ids.get(right_name, [])
+        left_key = _resolve_ferry_terminal_key(left_name)
+        right_key = _resolve_ferry_terminal_key(right_name)
+        left_ids = station_name_ids.get(left_key, [])
+        right_ids = station_name_ids.get(right_key, [])
         if not left_ids or not right_ids:
             continue
         for a_id in left_ids:
@@ -2496,6 +2509,7 @@ def _shortest_metro_path(
     final_dest_lat: Optional[float] = None,
     final_dest_lon: Optional[float] = None,
     allow_ferry: bool = True,
+    require_ferry: bool = False,
 ) -> Optional[Dict]:
     """
     Cok aktarmali metro aginda en iyi yolu bulur (Dijkstra).
@@ -2511,29 +2525,29 @@ def _shortest_metro_path(
     origin_by_id = {int(o["id"]): o for o in origin_candidates}
     dest_by_id = {int(d["id"]): d for d in dest_candidates}
 
-    # State: (cost, station_id, current_line_id, transfer_count)
-    pq: List[Tuple[float, int, int, int]] = []
-    best: Dict[Tuple[int, int, int], float] = {}
-    parent: Dict[Tuple[int, int, int], Tuple[Tuple[int, int, int], Tuple[int, float, int, str]]] = {}
+    # State: (cost, station_id, current_line_id, transfer_count, used_ferry)
+    pq: List[Tuple[float, int, int, int, int]] = []
+    best: Dict[Tuple[int, int, int, int], float] = {}
+    parent: Dict[Tuple[int, int, int, int], Tuple[Tuple[int, int, int, int], Tuple[int, float, int, str]]] = {}
 
     for o in origin_candidates:
         sid = int(o["id"])
         walk_to = _walking_time_minutes(float(o.get("distance_m", 0)))
-        state = (sid, 0, 0)  # station, current_line, transfer_count
+        state = (sid, 0, 0, 0)  # station, current_line, transfer_count, used_ferry
         best[state] = walk_to
-        heapq.heappush(pq, (walk_to, sid, 0, 0))
+        heapq.heappush(pq, (walk_to, sid, 0, 0, 0))
 
     best_goal_state = None
     best_goal_cost = float("inf")
-    goal_walk_seg_by_state: Dict[Tuple[int, int, int], Dict[str, object]] = {}
+    goal_walk_seg_by_state: Dict[Tuple[int, int, int, int], Dict[str, object]] = {}
 
     while pq:
-        cost, sid, current_line, transfer_count = heapq.heappop(pq)
-        state = (sid, current_line, transfer_count)
+        cost, sid, current_line, transfer_count, used_ferry = heapq.heappop(pq)
+        state = (sid, current_line, transfer_count, used_ferry)
         if cost > best.get(state, float("inf")):
             continue
 
-        if sid in dest_ids:
+        if sid in dest_ids and (not require_ferry or used_ferry == 1):
             walk_seg = None
             if final_dest_lat is not None and final_dest_lon is not None:
                 st = station_map.get(sid)
@@ -2570,10 +2584,12 @@ def _shortest_metro_path(
             next_transfer = transfer_count
             add_cost = 0.0
             next_line = current_line
+            next_used_ferry = used_ferry
 
             if edge_kind in {"rail", "ferry"}:
                 if edge_kind == "ferry":
                     ride_min = _ferry_travel_time_minutes(dist_m / 1000.0)
+                    next_used_ferry = 1
                 else:
                     ride_min = _metro_travel_time_minutes(dist_m / 1000.0)
                 if ride_min <= 0:
@@ -2593,15 +2609,16 @@ def _shortest_metro_path(
                     next_transfer += 1
                 next_line = 0
 
-            if next_transfer > 3:
+            max_transfer_limit = 5 if require_ferry else 3
+            if next_transfer > max_transfer_limit:
                 continue
 
             next_cost = cost + add_cost
-            next_state = (to_sid, next_line, next_transfer)
+            next_state = (to_sid, next_line, next_transfer, next_used_ferry)
             if next_cost + 1e-6 < best.get(next_state, float("inf")):
                 best[next_state] = next_cost
                 parent[next_state] = (state, (to_sid, dist_m, line_id, edge_kind))
-                heapq.heappush(pq, (next_cost, to_sid, next_line, next_transfer))
+                heapq.heappush(pq, (next_cost, to_sid, next_line, next_transfer, next_used_ferry))
 
     if best_goal_state is None:
         return None
@@ -2670,6 +2687,7 @@ def _build_graph_metro_option(
     dest_lon: float,
     direct_walk_min: float,
     direct_walk_m: float,
+    force_ferry: bool = False,
 ) -> Optional[Dict]:
     search_radii = [1200, 2200, 3500, 5200, 7000]
     best_path_info: Optional[Dict] = None
@@ -2688,6 +2706,10 @@ def _build_graph_metro_option(
         raw_dest = _cached_get_metro_stations_in_area(dest_lat, dest_lon, radius)
         access_cap = 2000 if direct_walk_m < 20000 else 2600
         max_access_m = min(access_cap, max(800, int(radius * 0.50)))
+        if force_ferry:
+            # Vapur zorlamali aramada aday havuzunu daraltma:
+            # iskeleye baglanan hatlari kacirmamak icin ulasim capini genis tut.
+            max_access_m = max(max_access_m, 2600)
         origin_candidates = [dict(s) for s in raw_origin if float(s.get("distance_m", 10**9)) <= max_access_m][:12]
         dest_candidates = [dict(s) for s in raw_dest if float(s.get("distance_m", 10**9)) <= max_access_m][:12]
         if not origin_candidates or not dest_candidates:
@@ -2711,6 +2733,7 @@ def _build_graph_metro_option(
             final_dest_lat=dest_lat,
             final_dest_lon=dest_lon,
             allow_ferry=True,
+            require_ferry=force_ferry,
         )
         if any_path:
             path_variants.append(any_path)
@@ -2795,14 +2818,20 @@ def _build_graph_metro_option(
                     float(from_station.get("lon")),
                     float(to_station.get("lat")),
                     float(to_station.get("lon")),
-                    max_distance_m=900,
+                    max_distance_m=2200,
                     allow_fallback_if_short=True,
-                    fallback_max_m=450,
+                    fallback_max_m=1600,
                     max_ratio=20.0,
                 )
-                if not transfer_seg:
-                    return None
-                transfer_coords = transfer_seg.get("coords") or []
+                if transfer_seg:
+                    transfer_coords = transfer_seg.get("coords") or []
+                else:
+                    # Ozellikle vapur/metro gecislerinde yaya agi eksik gelebiliyor.
+                    # Secenegi tamamen dusurmek yerine cizim fallback'i kullan.
+                    transfer_coords = [
+                        [float(from_station.get("lat")), float(from_station.get("lon"))],
+                        [float(to_station.get("lat")), float(to_station.get("lon"))],
+                    ]
             segments.append({
                 "mode": "walk",
                 "description": f"Aktarma yuru: {to_station.get('description') or to_station.get('name') or 'Transfer'}",
@@ -2957,6 +2986,8 @@ def _build_graph_metro_option(
     route_labels = [r for r in route_labels if r]
     has_ferry_leg = any(s.get("mode") == "ferry" for s in segments)
     has_rail_leg = any(s.get("mode") == "rail" for s in segments)
+    if force_ferry and not has_ferry_leg:
+        return None
     if has_ferry_leg and same_side:
         saved_min = float(direct_walk_min) - float(total_time_min)
         detour_ratio = float(total_distance_m) / max(1.0, float(direct_walk_m))
@@ -3021,7 +3052,7 @@ def _build_ferry_only_options(
         return str(st.get("description") or st.get("name") or "Iskele")
 
     def _near_ferry_terminals(lat: float, lon: float) -> List[Dict]:
-        candidates = _cached_get_metro_stations_in_area(lat, lon, 4500)
+        candidates = _cached_get_metro_stations_in_area(lat, lon, 9000)
         out = []
         for c in candidates:
             nm = _normalized_station_name(str(c.get("description") or c.get("name") or ""))
@@ -3040,13 +3071,18 @@ def _build_ferry_only_options(
 
     allowed_pairs = set()
     for a, b in FERRY_TERMINAL_LINKS:
-        allowed_pairs.add((a, b))
-        allowed_pairs.add((b, a))
+        a_key = _resolve_ferry_terminal_key(a)
+        b_key = _resolve_ferry_terminal_key(b)
+        allowed_pairs.add((a_key, b_key))
+        allowed_pairs.add((b_key, a_key))
 
     seen = set()
     for o in origins:
         for d in dests:
-            pair = (str(o["terminal_key"]), str(d["terminal_key"]))
+            pair = (
+                _resolve_ferry_terminal_key(str(o["terminal_key"])),
+                _resolve_ferry_terminal_key(str(d["terminal_key"])),
+            )
             if pair not in allowed_pairs:
                 continue
             if pair in seen:
@@ -3056,17 +3092,17 @@ def _build_ferry_only_options(
             walk_to = _build_walk_leg(
                 origin_lat, origin_lon,
                 float(o["lat"]), float(o["lon"]),
-                max_distance_m=1800,
+                max_distance_m=5000,
                 allow_fallback_if_short=True,
-                fallback_max_m=1200,
+                fallback_max_m=3200,
                 max_ratio=8.0,
             )
             walk_from = _build_walk_leg(
                 float(d["lat"]), float(d["lon"]),
                 dest_lat, dest_lon,
-                max_distance_m=2200,
+                max_distance_m=6000,
                 allow_fallback_if_short=True,
-                fallback_max_m=1400,
+                fallback_max_m=3800,
                 max_ratio=8.0,
             )
             if not walk_to or not walk_from:
@@ -3077,7 +3113,7 @@ def _build_ferry_only_options(
             total_time = float(walk_to["duration_min"]) + 6.0 + ferry_time + float(walk_from["duration_min"])
 
             # Yurumeye gore anlamsiz secenekleri ele.
-            if total_time > max(direct_walk_min * 1.7, 90):
+            if total_time > max(direct_walk_min * 2.4, 180):
                 continue
 
             origin_label = _ferry_terminal_name(o)
@@ -4690,6 +4726,26 @@ def find_transit_routes(
             metro_options = [graph_metro]
         _telemetry_add_ms("graph_metro_fallback_ms", _time.perf_counter() - stage_start)
         _telemetry_set_count("graph_metro_options", len(metro_options))
+
+    # Kullanici ferry seciyse ve listede vapur iceren bir rota yoksa
+    # graph motorundan "ferry zorunlu" bir alternatif dene.
+    if "ferry" in allowed_user_modes and not any(
+        any(str(seg.get("mode") or "").lower() == "ferry" for seg in (opt.get("segments") or []))
+        for opt in metro_options
+    ):
+        stage_start = _time.perf_counter()
+        forced_ferry = _build_graph_metro_option(
+            origin_lat=origin_lat,
+            origin_lon=origin_lon,
+            dest_lat=dest_lat,
+            dest_lon=dest_lon,
+            direct_walk_min=direct_walk_min,
+            direct_walk_m=direct_walk_m,
+            force_ferry=True,
+        )
+        if forced_ferry:
+            metro_options.append(forced_ferry)
+        _telemetry_add_ms("graph_forced_ferry_ms", _time.perf_counter() - stage_start)
 
     stage_start = _time.perf_counter()
     mixed_options = _build_bus_metro_mixed_options(
