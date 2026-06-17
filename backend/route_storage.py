@@ -35,6 +35,11 @@ def _row_to_route(row) -> Dict:
     except (json.JSONDecodeError, TypeError):
         tags = []
 
+    try:
+        route_payload = json.loads(row["route_payload"]) if row["route_payload"] else None
+    except (json.JSONDecodeError, TypeError, KeyError):
+        route_payload = None
+
     return {
         "id": row["id"],
         "name": row["name"],
@@ -44,6 +49,7 @@ def _row_to_route(row) -> Dict:
         "distance_km": row["distance_km"],
         "duration_minutes": row["duration_minutes"],
         "route_type": row["route_type"] or "route_1",
+        "route_payload": route_payload,
         "tags": tags,
         "favorite": bool(row["favorite"]),
         "times_used": row["times_used"] or 0,
@@ -78,8 +84,8 @@ def _migrate_from_json_if_needed() -> None:
             """
             INSERT OR IGNORE INTO routes
             (id, name, description, points, route_coords, distance_km, duration_minutes,
-             route_type, tags, favorite, times_used, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             route_type, route_payload, tags, favorite, times_used, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 route.get("id", str(uuid.uuid4())[:8]),
@@ -90,6 +96,7 @@ def _migrate_from_json_if_needed() -> None:
                 route.get("distance_km", 0),
                 route.get("duration_minutes", 0),
                 route.get("route_type", "route_1"),
+                json.dumps(route.get("route_payload"), ensure_ascii=False) if route.get("route_payload") else None,
                 json.dumps(route.get("tags", [])),
                 1 if route.get("favorite") else 0,
                 route.get("times_used", 0),
@@ -163,7 +170,8 @@ def save_route(
     duration_minutes: int,
     route_type: str = "route_1",
     description: str = "",
-    tags: List[str] = None
+    tags: List[str] = None,
+    route_payload: Optional[Dict] = None,
 ) -> Dict:
     """Yeni bir rota kaydeder."""
     ensure_db()
@@ -179,8 +187,8 @@ def save_route(
         """
         INSERT INTO routes
         (id, name, description, points, route_coords, distance_km, duration_minutes,
-         route_type, tags, favorite, times_used, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
+         route_type, route_payload, tags, favorite, times_used, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
         """,
         (
             route_id,
@@ -191,6 +199,7 @@ def save_route(
             distance_km,
             duration_minutes,
             route_type,
+            json.dumps(route_payload, ensure_ascii=False) if route_payload else None,
             json.dumps(tags or []),
             now,
             now,
@@ -209,6 +218,7 @@ def save_route(
         "distance_km": distance_km,
         "duration_minutes": duration_minutes,
         "route_type": route_type,
+        "route_payload": route_payload,
         "tags": tags or [],
         "created_at": now,
         "updated_at": now,
@@ -308,7 +318,7 @@ def update_route(route_id: str, updates: Dict) -> Optional[Dict]:
 
     # Güncellenebilir alanlar
     allowed = {"name", "description", "points", "route_coords", "distance_km",
-               "duration_minutes", "route_type", "tags", "favorite"}
+               "duration_minutes", "route_type", "route_payload", "tags", "favorite"}
     updates = updates or {}
     updates = {k: v for k, v in updates.items() if k in allowed}
 
@@ -322,6 +332,8 @@ def update_route(route_id: str, updates: Dict) -> Optional[Dict]:
         updates["points"] = json.dumps(updates["points"])
     if "route_coords" in updates:
         updates["route_coords"] = json.dumps(simplify_coords(updates["route_coords"]))
+    if "route_payload" in updates:
+        updates["route_payload"] = json.dumps(updates["route_payload"], ensure_ascii=False) if updates["route_payload"] else None
     if "tags" in updates:
         updates["tags"] = json.dumps(updates["tags"])
     if "favorite" in updates:

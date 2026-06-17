@@ -31,6 +31,37 @@ SEED_PLACES = [
     ("Mecidiyeköy", "Mecidiyeköy, Şişli, İstanbul, Türkiye", 41.0695, 28.9756, "semt", "mecidiyekoy"),
     ("Kozyatağı", "Kozyatağı, Kadıköy, İstanbul, Türkiye", 40.9689, 29.0778, "semt", "kozyatagi"),
     ("Bostancı", "Bostancı, Kadıköy, İstanbul, Türkiye", 40.9650, 29.0783, "semt", "bostanci"),
+    # İstanbul resmi ilçeleri
+    ("Adalar", "Adalar, İstanbul, Türkiye", 40.8748, 29.1294, "ilce", "adalar princes islands"),
+    ("Arnavutköy", "Arnavutköy, İstanbul, Türkiye", 41.1842, 28.7407, "ilce", "arnavutkoy arnavutköy"),
+    ("Ataşehir", "Ataşehir, İstanbul, Türkiye", 40.9833, 29.1278, "ilce", "atasehir ataşehir"),
+    ("Avcılar", "Avcılar, İstanbul, Türkiye", 40.9792, 28.7214, "ilce", "avcilar avcılar"),
+    ("Bağcılar", "Bağcılar, İstanbul, Türkiye", 41.0390, 28.8567, "ilce", "bagcilar bağcılar"),
+    ("Bahçelievler", "Bahçelievler, İstanbul, Türkiye", 40.9975, 28.8506, "ilce", "bahcelievler bahçelievler"),
+    ("Başakşehir", "Başakşehir, İstanbul, Türkiye", 41.0931, 28.8028, "ilce", "basaksehir başakşehir"),
+    ("Bayrampaşa", "Bayrampaşa, İstanbul, Türkiye", 41.0467, 28.9006, "ilce", "bayrampasa bayrampaşa"),
+    ("Beykoz", "Beykoz, İstanbul, Türkiye", 41.1239, 29.1083, "ilce", "beykoz"),
+    ("Beylikdüzü", "Beylikdüzü, İstanbul, Türkiye", 41.0017, 28.6419, "ilce", "beylikduzu beylikdüzü"),
+    ("Büyükçekmece", "Büyükçekmece, İstanbul, Türkiye", 41.0207, 28.5850, "ilce", "buyukcekmece büyükçekmece"),
+    ("Çatalca", "Çatalca, İstanbul, Türkiye", 41.1432, 28.4615, "ilce", "catalca çatalca"),
+    ("Çekmeköy", "Çekmeköy, İstanbul, Türkiye", 41.0350, 29.1786, "ilce", "cekmekoy çekmeköy"),
+    ("Esenler", "Esenler, İstanbul, Türkiye", 41.0435, 28.8760, "ilce", "esenler"),
+    ("Esenyurt", "Esenyurt, İstanbul, Türkiye", 41.0343, 28.6801, "ilce", "esenyurt"),
+    ("Eyüpsultan", "Eyüpsultan, İstanbul, Türkiye", 41.0478, 28.9339, "ilce", "eyupsultan eyüpsultan eyup eyüp"),
+    ("Gaziosmanpaşa", "Gaziosmanpaşa, İstanbul, Türkiye", 41.0575, 28.9157, "ilce", "gaziosmanpasa gaziosmanpaşa"),
+    ("Güngören", "Güngören, İstanbul, Türkiye", 41.0220, 28.8721, "ilce", "gungoren güngören"),
+    ("Kağıthane", "Kağıthane, İstanbul, Türkiye", 41.0850, 28.9725, "ilce", "kagithane kağıthane"),
+    ("Küçükçekmece", "Küçükçekmece, İstanbul, Türkiye", 40.9919, 28.7717, "ilce", "kucukcekmece küçükçekmece"),
+    ("Pendik", "Pendik, İstanbul, Türkiye", 40.8794, 29.2581, "ilce", "pendik"),
+    ("Sancaktepe", "Sancaktepe, İstanbul, Türkiye", 41.0024, 29.2319, "ilce", "sancaktepe"),
+    ("Sarıyer", "Sarıyer, İstanbul, Türkiye", 41.1663, 29.0502, "ilce", "sariyer sarıyer"),
+    ("Silivri", "Silivri, İstanbul, Türkiye", 41.0732, 28.2479, "ilce", "silivri"),
+    ("Sultanbeyli", "Sultanbeyli, İstanbul, Türkiye", 40.9607, 29.2707, "ilce", "sultanbeyli"),
+    ("Sultangazi", "Sultangazi, İstanbul, Türkiye", 41.1065, 28.8684, "ilce", "sultangazi"),
+    ("Şile", "Şile, İstanbul, Türkiye", 41.1754, 29.6133, "ilce", "sile şile"),
+    ("Tuzla", "Tuzla, İstanbul, Türkiye", 40.8164, 29.3009, "ilce", "tuzla"),
+    ("Ümraniye", "Ümraniye, İstanbul, Türkiye", 41.0164, 29.1248, "ilce", "umraniye ümraniye"),
+    ("Zeytinburnu", "Zeytinburnu, İstanbul, Türkiye", 40.9940, 28.9047, "ilce", "zeytinburnu"),
     ("Kapalıçarşı", "Kapalıçarşı, Fatih, İstanbul, Türkiye", 41.0106, 28.9680, "landmark", "kapalicarsi grand bazaar"),
     # Ankara
     ("Kızılay", "Kızılay, Çankaya, Ankara, Türkiye", 39.9212, 32.8597, "semt", "kizilay kızılay"),
@@ -64,17 +95,18 @@ SEED_PLACES = [
 ]
 
 
-def _seed_if_empty() -> None:
-    """local_places tablosu boşsa başlangıç verilerini ekler."""
+def _ensure_seed_places() -> None:
+    """Eksik başlangıç yerlerini local_places tablosuna ekler."""
     ensure_db()
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM local_places")
-    if cursor.fetchone()[0] > 0:
-        conn.close()
-        return
-
+    cursor.execute("SELECT name FROM local_places WHERE name IS NOT NULL")
+    existing_names = {str(row["name"]).strip().casefold() for row in cursor.fetchall()}
+    inserted = 0
     for name, display_name, lat, lon, place_type, search_terms in SEED_PLACES:
+        name_key = name.strip().casefold()
+        if name_key in existing_names:
+            continue
         cursor.execute(
             """
             INSERT INTO local_places (name, display_name, lat, lon, place_type, search_terms)
@@ -82,9 +114,12 @@ def _seed_if_empty() -> None:
             """,
             (name, display_name, lat, lon, place_type, search_terms),
         )
+        existing_names.add(name_key)
+        inserted += 1
     conn.commit()
     conn.close()
-    print(f"[LocalPlaces] {len(SEED_PLACES)} yer eklendi.")
+    if inserted > 0:
+        print(f"[LocalPlaces] {inserted} eksik seed yer eklendi.")
 
 
 def lookup(place_name: str) -> Optional[dict]:
@@ -95,21 +130,19 @@ def lookup(place_name: str) -> Optional[dict]:
     Returns:
         dict: {"lat", "lon", "display_name", "address"} veya None
     """
-    _seed_if_empty()
+    _ensure_seed_places()
 
     if not place_name or len(place_name.strip()) < 2:
         return None
 
     query = place_name.strip().lower()
+    query_key = place_name.strip().casefold()
     conn = get_connection()
     cursor = conn.cursor()
 
     # Önce tam eşleşme (name)
-    cursor.execute(
-        "SELECT name, display_name, lat, lon FROM local_places WHERE LOWER(name) = ? LIMIT 1",
-        (query,),
-    )
-    row = cursor.fetchone()
+    cursor.execute("SELECT name, display_name, lat, lon FROM local_places WHERE name IS NOT NULL")
+    row = next((item for item in cursor.fetchall() if str(item["name"]).strip().casefold() == query_key), None)
 
     # Tam eşleşme yoksa search_terms veya name içinde ara
     if not row:
@@ -157,11 +190,11 @@ def save_dynamic_place(
 
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT id FROM local_places WHERE LOWER(name) = ? LIMIT 1",
-        (normalized_name.lower(),),
+    cursor.execute("SELECT name FROM local_places WHERE name IS NOT NULL")
+    exists = any(
+        str(row["name"]).strip().casefold() == normalized_name.casefold()
+        for row in cursor.fetchall()
     )
-    exists = cursor.fetchone()
 
     if exists:
         conn.close()
@@ -210,7 +243,7 @@ def get_all_local_place_names(limit: int = 2000, include_dynamic: bool = True) -
         limit: Maksimum kayıt sayısı
         include_dynamic: False ise place_type='osm_dynamic' kayıtlarını hariç tutar
     """
-    _seed_if_empty()
+    _ensure_seed_places()
 
     conn = get_connection()
     cursor = conn.cursor()

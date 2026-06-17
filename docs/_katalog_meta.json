@@ -1,0 +1,3607 @@
+{
+  "app_py_funcs": [
+    {
+      "name": "_env_flag",
+      "start": 41,
+      "end": 46,
+      "doc": "ENV'den bool deÃşer okur.",
+      "routes": []
+    },
+    {
+      "name": "_env_float",
+      "start": 49,
+      "end": 57,
+      "doc": "ENV'den float deÃşer okur.",
+      "routes": []
+    },
+    {
+      "name": "_env_int",
+      "start": 60,
+      "end": 67,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_to_lat_lon_pair",
+      "start": 78,
+      "end": 91,
+      "doc": "[lat, lon] formatindaki veriyi guvenli float ciftine cevirir.",
+      "routes": []
+    },
+    {
+      "name": "_is_in_istanbul_bbox",
+      "start": 94,
+      "end": 98,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_outside_istanbul_response",
+      "start": 101,
+      "end": 111,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_first_outside_point",
+      "start": 114,
+      "end": 122,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_route_radius_multipliers",
+      "start": 125,
+      "end": 155,
+      "doc": "Noktalarin yayilimina gore denenmesi gereken graf yaricap carpani listesi.",
+      "routes": []
+    },
+    {
+      "name": "_get_graph_for_points_with_multiplier",
+      "start": 158,
+      "end": 163,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_collect_snap_metrics",
+      "start": 166,
+      "end": 182,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_route_index_from_type",
+      "start": 185,
+      "end": 186,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_round_point_pairs",
+      "start": 189,
+      "end": 196,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_route_response_cache_key",
+      "start": 199,
+      "end": 213,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_route_response_cache_get",
+      "start": 216,
+      "end": 220,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_route_response_cache_put",
+      "start": 223,
+      "end": 226,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_unreachable_waypoints_response",
+      "start": 229,
+      "end": 238,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_build_primary_route_with_retries",
+      "start": 241,
+      "end": 302,
+      "doc": "Giderek genisleyen graflarda rota dener.",
+      "routes": []
+    },
+    {
+      "name": "_build_alternative_batch_with_retries",
+      "start": 305,
+      "end": 365,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_is_place_text_in_istanbul",
+      "start": 368,
+      "end": 398,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_extract_nlp_places_for_scope_check",
+      "start": 401,
+      "end": 436,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_is_route_intent_query_text",
+      "start": 439,
+      "end": 452,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_has_poi_concept_cue",
+      "start": 455,
+      "end": 463,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_has_single_location_style_cue",
+      "start": 466,
+      "end": 471,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_postprocess_nlp_result_for_poi",
+      "start": 474,
+      "end": 505,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_openrouter_system_prompt",
+      "start": 508,
+      "end": 524,
+      "doc": "OpenRouter uzerinden giden tum sohbetler icin global system prompt.",
+      "routes": []
+    },
+    {
+      "name": "_inject_system_message",
+      "start": 527,
+      "end": 536,
+      "doc": "Mesaj listesinde en basta system rolu yoksa global system prompt ekler.",
+      "routes": []
+    },
+    {
+      "name": "_local_llm_system_prompt",
+      "start": 539,
+      "end": 551,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_inject_local_system_message",
+      "start": 554,
+      "end": 563,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_as_bool",
+      "start": 566,
+      "end": 573,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_normalize_messages",
+      "start": 576,
+      "end": 588,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_extract_latest_user_text",
+      "start": 591,
+      "end": 600,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_classify_llm_error",
+      "start": 603,
+      "end": 613,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_local_llm_max_tokens",
+      "start": 616,
+      "end": 635,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_local_llm_float_param",
+      "start": 638,
+      "end": 645,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_local_llm_int_param",
+      "start": 648,
+      "end": 655,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_normalize_common_turkish_glitches",
+      "start": 661,
+      "end": 683,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_normalize_for_match",
+      "start": 686,
+      "end": 703,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_contains_route_relation",
+      "start": 706,
+      "end": 711,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_is_dynamic_route_request",
+      "start": 714,
+      "end": 722,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_is_poi_request",
+      "start": 725,
+      "end": 731,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_should_use_rag_for_query_with_reason",
+      "start": 734,
+      "end": 773,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_should_use_rag_for_query",
+      "start": 776,
+      "end": 777,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_resolve_rag_min_similarity",
+      "start": 780,
+      "end": 790,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_should_fallback_from_rag",
+      "start": 793,
+      "end": 803,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_extract_stop_names_from_text",
+      "start": 806,
+      "end": 839,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_extract_query_line_code",
+      "start": 842,
+      "end": 845,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_extract_station_candidate_for_line_query",
+      "start": 848,
+      "end": 860,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_try_direct_rag_structured_answer",
+      "start": 863,
+      "end": 946,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_split_text_sentences",
+      "start": 957,
+      "end": 969,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_query_tokens_for_extractive",
+      "start": 972,
+      "end": 984,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_build_extractive_rag_answer",
+      "start": 987,
+      "end": 1046,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_is_rag_context_relevant",
+      "start": 1049,
+      "end": 1067,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_local_llm_generation_options",
+      "start": 1070,
+      "end": 1083,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_is_repetition_loop",
+      "start": 1086,
+      "end": 1109,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_unique_models",
+      "start": 1112,
+      "end": 1121,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_llm_candidate_models",
+      "start": 1124,
+      "end": 1135,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_chat_context_from_session",
+      "start": 1138,
+      "end": 1149,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_configure_live_console_output",
+      "start": 1152,
+      "end": 1168,
+      "doc": "Console stream buffering'i azaltÃır ve print'i anlÃık flush edecek Ã…şekilde ayarlar.",
+      "routes": []
+    },
+    {
+      "name": "_preload_bert_async",
+      "start": 1358,
+      "end": 1378,
+      "doc": "Arka planda BERT NLP engine'i yukler (lazy warm-up).",
+      "routes": []
+    },
+    {
+      "name": "_poi_version_token",
+      "start": 1444,
+      "end": 1445,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_increment_queue_timeout_counter",
+      "start": 1448,
+      "end": 1454,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_semaphore_snapshot",
+      "start": 1457,
+      "end": 1462,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_queue_stats_payload",
+      "start": 1465,
+      "end": 1481,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_should_log_bert_metrics",
+      "start": 1484,
+      "end": 1493,
+      "doc": "BERT metrik loglarÃınÃın hÃızÃınÃı sÃınÃırlar.",
+      "routes": []
+    },
+    {
+      "name": "_log_bert_runtime_metrics",
+      "start": 1496,
+      "end": 1516,
+      "doc": "BERT runtime donanÃım kullanÃımÃınÃı loglar.",
+      "routes": []
+    },
+    {
+      "name": "_log_bert_parse_trace",
+      "start": 1519,
+      "end": 1584,
+      "doc": "BERT parse trace bilgisini okunabilir satirlar halinde yazdirir.",
+      "routes": []
+    },
+    {
+      "name": "initialize_runtime",
+      "start": 1587,
+      "end": 1603,
+      "doc": "Calisma zamani temel baslangic gorevlerini bir kez calistirir.",
+      "routes": []
+    },
+    {
+      "name": "initialize_graph_preload",
+      "start": 1606,
+      "end": 1615,
+      "doc": "Populer bolgelerin grafilerini bir kez on yukler.",
+      "routes": []
+    },
+    {
+      "name": "_get_cached_graph",
+      "start": 1619,
+      "end": 1632,
+      "doc": "Graf objesini LRU cache'te alÃır (uygulama iÃƒçi).",
+      "routes": []
+    },
+    {
+      "name": "_redact_pii_text",
+      "start": 1635,
+      "end": 1641,
+      "doc": "Loglarda temel PII redaction uygular (telefon/e-posta/sayÃısal kimlik).",
+      "routes": []
+    },
+    {
+      "name": "_request_trace_prefix",
+      "start": 1644,
+      "end": 1647,
+      "doc": "",
+      "routes": []
+    },
+    {
+      "name": "_ensure_runtime_initialized",
+      "start": 1651,
+      "end": 1667,
+      "doc": "WSGI/moduler import senaryolarinda runtime gorevlerini lazy baslatir.",
+      "routes": []
+    },
+    {
+      "name": "_attach_trace_headers",
+      "start": 1671,
+      "end": 1693,
+      "doc": "Trace header'larini tum response'lara ekler.",
+      "routes": []
+    },
+    {
+      "name": "_disable_bert_runtime",
+      "start": 1696,
+      "end": 1701,
+      "doc": "Runtime'da BERT kullanÃılamaz hale geldiÃşinde fallback moduna geÃƒç.",
+      "routes": []
+    },
+    {
+      "name": "_build_regex_fallback_result",
+      "start": 1704,
+      "end": 1710,
+      "doc": "Regex parser sonucunu BERT endpoint sÃƒözleÃ…şmesine uyarlar.",
+      "routes": []
+    },
+    {
+      "name": "api_get_route",
+      "start": 1715,
+      "end": 1832,
+      "doc": "Koordinat listesi alÃır, optimize edilmiÃ…ş rota dÃƒöner.",
+      "routes": [
+        {
+          "route": "/api/get-route",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_get_route_steps",
+      "start": 1836,
+      "end": 2009,
+      "doc": "Verilen noktalar iÃƒçin adÃım adÃım yÃƒönlendirme (basitleÃ…ştirilmiÃ…ş).",
+      "routes": [
+        {
+          "route": "/api/get-route-steps",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_get_alternative_routes",
+      "start": 2014,
+      "end": 2165,
+      "doc": "AynÃı noktalar iÃƒçin 3 farklÃı alternatif rota dÃƒöner.",
+      "routes": [
+        {
+          "route": "/api/get-alternative-routes",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_search_pois",
+      "start": 2169,
+      "end": 2310,
+      "doc": "Belirtilen bÃƒölgede POI arar.",
+      "routes": [
+        {
+          "route": "/api/search-pois",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "health_check",
+      "start": 2314,
+      "end": 2316,
+      "doc": "Sunucu saÃşlÃık kontrolÃƒü.",
+      "routes": [
+        {
+          "route": "/api/health",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_cache_stats",
+      "start": 2320,
+      "end": 2334,
+      "doc": "Graph/POI ve multimodal compare cache istatistiklerini dondurur.",
+      "routes": [
+        {
+          "route": "/api/cache/stats",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_geocode_suggest",
+      "start": 2338,
+      "end": 2351,
+      "doc": "Yazarken Ãƒöneri iÃƒçin: KÃısmi yer ismi -> coklu sonuc doner (autocomplete).",
+      "routes": [
+        {
+          "route": "/api/geocode/suggest",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_geocode_forward_get",
+      "start": 2355,
+      "end": 2367,
+      "doc": "Compatibility GET endpoint for forward geocoding (query param: address)",
+      "routes": [
+        {
+          "route": "/api/geocode/forward",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_geocode_reverse_get",
+      "start": 2371,
+      "end": 2381,
+      "doc": "Compatibility GET endpoint for reverse geocoding (query params: lat, lon)",
+      "routes": [
+        {
+          "route": "/api/geocode/reverse",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_geocode",
+      "start": 2385,
+      "end": 2424,
+      "doc": "Yer ismini koordinata Ãƒçevirir.",
+      "routes": [
+        {
+          "route": "/api/geocode",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_reverse_geocode",
+      "start": 2428,
+      "end": 2463,
+      "doc": "KoordinatÃı yer ismine Ãƒçevirir.",
+      "routes": [
+        {
+          "route": "/api/reverse-geocode",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_geocode_batch",
+      "start": 2467,
+      "end": 2504,
+      "doc": "Toplu geocoding iÃ…şlemi.",
+      "routes": [
+        {
+          "route": "/api/geocode/batch",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "serve_frontend",
+      "start": 2508,
+      "end": 2515,
+      "doc": "Ana sayfa - Frontend'i sun.",
+      "routes": [
+        {
+          "route": "/",
+          "methods": null
+        }
+      ]
+    },
+    {
+      "name": "serve_static_files",
+      "start": 2519,
+      "end": 2539,
+      "doc": "Statik dosyalarÃı sun (CSS, JS, gÃƒörseller vb.).",
+      "routes": [
+        {
+          "route": "/<path:filepath>",
+          "methods": null
+        }
+      ]
+    },
+    {
+      "name": "api_save_route",
+      "start": 2547,
+      "end": 2602,
+      "doc": "RotayÃı kaydeder.",
+      "routes": [
+        {
+          "route": "/api/routes/save",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_get_routes",
+      "start": 2606,
+      "end": 2659,
+      "doc": "TÃƒüm kaydedilmiÃ…ş rotalarÃı getirir (Pagination destekli).",
+      "routes": [
+        {
+          "route": "/api/routes",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_get_route_by_id",
+      "start": 2663,
+      "end": 2682,
+      "doc": "Belirli bir rotayÃı getirir.",
+      "routes": [
+        {
+          "route": "/api/routes/<route_id>",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_update_route",
+      "start": 2686,
+      "end": 2722,
+      "doc": "RotayÃı gÃƒünceller.",
+      "routes": [
+        {
+          "route": "/api/routes/<route_id>",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_delete_route",
+      "start": 2726,
+      "end": 2749,
+      "doc": "RotayÃı siler.",
+      "routes": [
+        {
+          "route": "/api/routes/<route_id>",
+          "methods": [
+            "DELETE"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_toggle_favorite",
+      "start": 2753,
+      "end": 2778,
+      "doc": "RotayÃı favorilere ekler/ÃƒçÃıkarÃır.",
+      "routes": [
+        {
+          "route": "/api/routes/<route_id>/favorite",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_search_routes",
+      "start": 2782,
+      "end": 2810,
+      "doc": "Rota arama.",
+      "routes": [
+        {
+          "route": "/api/routes/search",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_route_statistics",
+      "start": 2814,
+      "end": 2833,
+      "doc": "Rota istatistikleri.",
+      "routes": [
+        {
+          "route": "/api/routes/statistics",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_create_timeline",
+      "start": 2841,
+      "end": 2905,
+      "doc": "Rota iÃƒçin zaman Ãƒçizelgesi oluÃ…şturur.",
+      "routes": [
+        {
+          "route": "/api/timeline/create",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_check_conflicts",
+      "start": 2909,
+      "end": 2952,
+      "doc": "Zaman Ãƒçizelgesinde ÃƒçakÃıÃ…şmalarÃı kontrol eder.",
+      "routes": [
+        {
+          "route": "/api/timeline/check-conflicts",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_optimize_timeline",
+      "start": 2956,
+      "end": 2994,
+      "doc": "Zaman Ãƒçizelgesini optimize eder ve Ãƒöneriler sunar.",
+      "routes": [
+        {
+          "route": "/api/timeline/optimize",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_get_locations",
+      "start": 3002,
+      "end": 3034,
+      "doc": "KaydedilmiÃ…ş tÃƒüm lokasyonlarÃı getirir.",
+      "routes": [
+        {
+          "route": "/api/locations",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_save_location",
+      "start": 3038,
+      "end": 3067,
+      "doc": "Yeni bir lokasyon kaydeder.",
+      "routes": [
+        {
+          "route": "/api/locations",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_delete_location",
+      "start": 3071,
+      "end": 3086,
+      "doc": "Lokasyonu siler.",
+      "routes": [
+        {
+          "route": "/api/locations/<location_id>",
+          "methods": [
+            "DELETE"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_update_location",
+      "start": 3090,
+      "end": 3111,
+      "doc": "Lokasyonu gÃƒünceller.",
+      "routes": [
+        {
+          "route": "/api/locations/<location_id>",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_toggle_location_favorite",
+      "start": 3115,
+      "end": 3132,
+      "doc": "Lokasyonun favori durumunu deÃşiÃ…ştirir.",
+      "routes": [
+        {
+          "route": "/api/locations/<location_id>/favorite",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_nlp_parse",
+      "start": 3140,
+      "end": 3305,
+      "doc": "DoÃşal dil sorgusunu analiz eder ve yapÃılandÃırÃılmÃıÃ…ş veri dÃƒöner.",
+      "routes": [
+        {
+          "route": "/api/nlp/parse",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_nlp_status",
+      "start": 3309,
+      "end": 3356,
+      "doc": "NLP engine durumunu kontrol eder.",
+      "routes": [
+        {
+          "route": "/api/nlp/status",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_nlp_audit_recent",
+      "start": 3360,
+      "end": 3371,
+      "doc": "Son NLP parse audit kayitlarini dondurur.",
+      "routes": [
+        {
+          "route": "/api/nlp/audit/recent",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_nlp_similarity",
+      "start": 3375,
+      "end": 3437,
+      "doc": "Ãİki metin arasÃındaki semantic similarity'yi hesaplar.",
+      "routes": [
+        {
+          "route": "/api/nlp/similarity",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_nlp_best_match",
+      "start": 3441,
+      "end": 3514,
+      "doc": "Sorguya en yakÃın adayÃı bulur (typo tolerant).",
+      "routes": [
+        {
+          "route": "/api/nlp/best-match",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_get_weather",
+      "start": 3522,
+      "end": 3574,
+      "doc": "Belirli bir konum iÃƒçin gÃƒüncel hava durumunu getirir.",
+      "routes": [
+        {
+          "route": "/api/weather",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_get_weather_forecast",
+      "start": 3578,
+      "end": 3631,
+      "doc": "Belirli bir konum iÃƒçin saatlik hava tahmini getirir.",
+      "routes": [
+        {
+          "route": "/api/weather/forecast",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_check_route_weather",
+      "start": 3635,
+      "end": 3694,
+      "doc": "Rota boyunca hava durumunu kontrol eder.",
+      "routes": [
+        {
+          "route": "/api/weather/check-route",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_weather_status",
+      "start": 3698,
+      "end": 3725,
+      "doc": "Hava durumu servisi durumunu dondurÃƒür.",
+      "routes": [
+        {
+          "route": "/api/weather/status",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_weather_health",
+      "start": 3729,
+      "end": 3743,
+      "doc": "Hava durumu servisi saglik kontrolÃƒü.",
+      "routes": [
+        {
+          "route": "/api/weather/health",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_weather_clear_cache",
+      "start": 3747,
+      "end": 3765,
+      "doc": "Hava durumu cache'ini temizler.",
+      "routes": [
+        {
+          "route": "/api/weather/clear-cache",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_llm_chat_sessions",
+      "start": 3769,
+      "end": 3784,
+      "doc": "Sohbet oturumlarini listeler.",
+      "routes": [
+        {
+          "route": "/api/llm/chat/sessions",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_create_llm_chat_session",
+      "start": 3788,
+      "end": 3797,
+      "doc": "Yeni sohbet oturumu olusturur.",
+      "routes": [
+        {
+          "route": "/api/llm/chat/sessions",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_llm_chat_session_messages",
+      "start": 3801,
+      "end": 3821,
+      "doc": "Verilen oturumun mesajlarini getirir.",
+      "routes": [
+        {
+          "route": "/api/llm/chat/sessions/<session_id>/messages",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_archive_llm_chat_session",
+      "start": 3825,
+      "end": 3832,
+      "doc": "Oturumu arsivler (silmez).",
+      "routes": [
+        {
+          "route": "/api/llm/chat/sessions/<session_id>/archive",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_llm_model_health",
+      "start": 3836,
+      "end": 3847,
+      "doc": "",
+      "routes": [
+        {
+          "route": "/api/llm/model-health",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_openrouter_status",
+      "start": 3851,
+      "end": 3874,
+      "doc": "OpenRouter entegrasyon durumunu dondurur.",
+      "routes": [
+        {
+          "route": "/api/llm/openrouter/status",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_openrouter_chat",
+      "start": 3878,
+      "end": 3947,
+      "doc": "OpenRouter uzerinden chat completion cagrisi yapar.",
+      "routes": [
+        {
+          "route": "/api/llm/openrouter/chat",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_openrouter_chat_stream",
+      "start": 3951,
+      "end": 4168,
+      "doc": "OpenRouter chat cagrisini canli akis (stream) olarak dondurur.",
+      "routes": [
+        {
+          "route": "/api/llm/openrouter/chat/stream",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_openrouter_models",
+      "start": 4172,
+      "end": 4185,
+      "doc": "OpenRouter'dan text modelleri listeler (image/video agirlikli modeller filtrelenir).",
+      "routes": [
+        {
+          "route": "/api/llm/openrouter/models",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_gemini_status",
+      "start": 4189,
+      "end": 4210,
+      "doc": "Google Gemini entegrasyon durumunu dondurur.",
+      "routes": [
+        {
+          "route": "/api/llm/gemini/status",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_gemini_chat",
+      "start": 4214,
+      "end": 4275,
+      "doc": "Gemini uzerinden uretim (tek seferde tam yanit).",
+      "routes": [
+        {
+          "route": "/api/llm/gemini/chat",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_gemini_chat_stream",
+      "start": 4279,
+      "end": 4490,
+      "doc": "Gemini canli akis (NDJSON), OpenRouter stream ile ayni satir formati.",
+      "routes": [
+        {
+          "route": "/api/llm/gemini/chat/stream",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_gemini_models",
+      "start": 4494,
+      "end": 4510,
+      "doc": "ENV'deki varsayilan + fallback Gemini model id'lerini listeler.",
+      "routes": [
+        {
+          "route": "/api/llm/gemini/models",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_local_llm_status",
+      "start": 4514,
+      "end": 4535,
+      "doc": "Local OpenAI-compatible LLM entegrasyon durumunu dondurur.",
+      "routes": [
+        {
+          "route": "/api/llm/local/status",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_local_llm_models",
+      "start": 4539,
+      "end": 4548,
+      "doc": "",
+      "routes": [
+        {
+          "route": "/api/llm/local/models",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_rag_status",
+      "start": 4552,
+      "end": 4574,
+      "doc": "",
+      "routes": [
+        {
+          "route": "/api/llm/rag/status",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_local_llm_chat_rag",
+      "start": 4578,
+      "end": 4848,
+      "doc": "",
+      "routes": [
+        {
+          "route": "/api/llm/local/chat/rag",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_local_llm_chat",
+      "start": 4852,
+      "end": 4931,
+      "doc": "",
+      "routes": [
+        {
+          "route": "/api/llm/local/chat",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_local_llm_chat_stream",
+      "start": 4935,
+      "end": 5152,
+      "doc": "",
+      "routes": [
+        {
+          "route": "/api/llm/local/chat/stream",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_transit_stops",
+      "start": 5175,
+      "end": 5206,
+      "doc": "Belirtilen koordinat etrafindaki toplu tasima duraklarini doner.",
+      "routes": [
+        {
+          "route": "/api/transit/stops",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_transit_search",
+      "start": 5210,
+      "end": 5238,
+      "doc": "Durak adi ile arama yapar.",
+      "routes": [
+        {
+          "route": "/api/transit/search",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_transit_route",
+      "start": 5242,
+      "end": 5267,
+      "doc": "Hat detay bilgisi doner.",
+      "routes": [
+        {
+          "route": "/api/transit/route",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_transit_stop_routes",
+      "start": 5271,
+      "end": 5297,
+      "doc": "Bir duraktan gecen hatlari doner.",
+      "routes": [
+        {
+          "route": "/api/transit/stop-routes",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_transit_stats",
+      "start": 5301,
+      "end": 5312,
+      "doc": "Transit veri istatistikleri.",
+      "routes": [
+        {
+          "route": "/api/transit/stats",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_transit_init",
+      "start": 5316,
+      "end": 5336,
+      "doc": "Transit verilerini baslatir/gunceller.",
+      "routes": [
+        {
+          "route": "/api/transit/init",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_multimodal_compare",
+      "start": 5362,
+      "end": 5478,
+      "doc": "Yuruyus ve toplu tasima seceneklerini karsilastirir.",
+      "routes": [
+        {
+          "route": "/api/multimodal/compare",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_nlp_warmup",
+      "start": 5514,
+      "end": 5528,
+      "doc": "Trigger BERT warmup in background. POST body or ?force=1 to force.",
+      "routes": [
+        {
+          "route": "/api/nlp/warmup",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_nlp_seed_places",
+      "start": 5532,
+      "end": 5576,
+      "doc": "Start place DB seeding and embedding computation.",
+      "routes": [
+        {
+          "route": "/api/nlp/seed-places",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "api_nlp_optimize_model",
+      "start": 5580,
+      "end": 5608,
+      "doc": "Trigger model optimization (ONNX export). Body: {\"mode\":\"onnx\" , \"background\": true}",
+      "routes": [
+        {
+          "route": "/api/nlp/optimize-model",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    }
+  ],
+  "bert_funcs": [
+    {
+      "name": "_osm_retry_request",
+      "start": 32,
+      "end": 57,
+      "doc": "OSM API istekleri için retry mekanizması."
+    },
+    {
+      "name": "get_all_locations",
+      "start": 83,
+      "end": 83,
+      "doc": ""
+    },
+    {
+      "name": "save_dynamic_place",
+      "start": 94,
+      "end": 94,
+      "doc": ""
+    },
+    {
+      "name": "get_dynamic_place_names",
+      "start": 95,
+      "end": 95,
+      "doc": ""
+    },
+    {
+      "name": "get_all_local_place_names",
+      "start": 96,
+      "end": 96,
+      "doc": ""
+    },
+    {
+      "name": "tr_lower",
+      "start": 142,
+      "end": 144,
+      "doc": ""
+    },
+    {
+      "name": "load_intent_template_bundle",
+      "start": 199,
+      "end": 234,
+      "doc": "Intent template bundle dosyasini yukler."
+    },
+    {
+      "name": "cosine_similarity",
+      "start": 246,
+      "end": 251,
+      "doc": "Iki embedding arasinda cosine similarity hesaplar."
+    },
+    {
+      "name": "should_force_unknown_with_hard_negative",
+      "start": 254,
+      "end": 267,
+      "doc": "Hard-negative benzerligi yuksekse ve intent marji darsa unknown'a zorlar."
+    },
+    {
+      "name": "apply_intent_conflict_matrix",
+      "start": 270,
+      "end": 322,
+      "doc": "Intent conflict matrix uygular."
+    },
+    {
+      "name": "_env_flag",
+      "start": 354,
+      "end": 359,
+      "doc": "ENV'den bool değer okur."
+    },
+    {
+      "name": "_env_float",
+      "start": 362,
+      "end": 370,
+      "doc": "ENV'den float değer okur."
+    },
+    {
+      "name": "_env_int",
+      "start": 373,
+      "end": 381,
+      "doc": "ENV'den int değer okur."
+    },
+    {
+      "name": "normalize_place_key",
+      "start": 396,
+      "end": 402,
+      "doc": "Yer adı karşılaştırmaları için normalize anahtar üretir."
+    },
+    {
+      "name": "is_likely_action_token",
+      "start": 405,
+      "end": 415,
+      "doc": "Kelimenin eylem/niyet belirten bir token olma olasılığını döner."
+    },
+    {
+      "name": "_singularize_tr_token",
+      "start": 418,
+      "end": 424,
+      "doc": "Basit çoğul eklerini budar (mekanlar -> mekan)."
+    },
+    {
+      "name": "_normalize_poi_mapping",
+      "start": 427,
+      "end": 435,
+      "doc": ""
+    },
+    {
+      "name": "is_poi_concept_term",
+      "start": 448,
+      "end": 462,
+      "doc": "Değerin POI tipi ifade edip etmediğini döner."
+    },
+    {
+      "name": "_collect_poi_tokens",
+      "start": 465,
+      "end": 515,
+      "doc": "POI konsepti için lokasyon dışı normalize token listesi çıkarır."
+    },
+    {
+      "name": "in_occupied_range",
+      "start": 481,
+      "end": 485,
+      "doc": ""
+    },
+    {
+      "name": "extract_poi_concept_with_meta",
+      "start": 518,
+      "end": 591,
+      "doc": "POI sorgusundan konsepti çözer ve kaynak/güven metadatası döner."
+    },
+    {
+      "name": "extract_poi_concept",
+      "start": 594,
+      "end": 596,
+      "doc": "Geri uyum için sadece konsept string döner."
+    },
+    {
+      "name": "_extract_explicit_multi_places",
+      "start": 599,
+      "end": 631,
+      "doc": "Virgül/ve ile verilen açık çoklu listeyi basitçe çıkarır."
+    },
+    {
+      "name": "_extract_plain_multi_places",
+      "start": 634,
+      "end": 654,
+      "doc": "Virgülsüz çoklu liste cümlelerinden aday yerleri çıkarır."
+    },
+    {
+      "name": "build_place_lookup_keys",
+      "start": 657,
+      "end": 682,
+      "doc": "Yer lookup için varyasyonlu anahtar listesi üretir."
+    },
+    {
+      "name": "normalize_query_text",
+      "start": 685,
+      "end": 687,
+      "doc": "Apostrof ve boşluk varyasyonlarını normalize eder."
+    },
+    {
+      "name": "normalize_token_with_role",
+      "start": 690,
+      "end": 738,
+      "doc": "Token'ı normalize eder ve varsa rol ipucu üretir."
+    },
+    {
+      "name": "extract_candidate_spans",
+      "start": 741,
+      "end": 810,
+      "doc": "Sorgudan Türkçe ekleri soyulmuş, metin pozisyonu korunmuş aday span'ler çıkarır."
+    },
+    {
+      "name": "add_span",
+      "start": 770,
+      "end": 782,
+      "doc": ""
+    },
+    {
+      "name": "__init__",
+      "start": 831,
+      "end": 876,
+      "doc": ""
+    },
+    {
+      "name": "_seed_dynamic_cache",
+      "start": 878,
+      "end": 887,
+      "doc": "Kalıcı OSM cache içindeki dinamik yer adlarını yükler."
+    },
+    {
+      "name": "_seed_user_locations",
+      "start": 889,
+      "end": 902,
+      "doc": "Kullanıcı lokasyonlarını ekler."
+    },
+    {
+      "name": "_seed_local_places",
+      "start": 904,
+      "end": 916,
+      "doc": "local_places tablosundaki kayıtları ekler."
+    },
+    {
+      "name": "_seed_turkish_places",
+      "start": 918,
+      "end": 929,
+      "doc": "Türkiye'nin tüm yer isimlerini yükler."
+    },
+    {
+      "name": "_seed_fallback_places",
+      "start": 931,
+      "end": 955,
+      "doc": "Yedek popüler yer isimleri."
+    },
+    {
+      "name": "add_place",
+      "start": 957,
+      "end": 1003,
+      "doc": "Yer ismini veritabanına ekle."
+    },
+    {
+      "name": "get_embedding_matrix",
+      "start": 1005,
+      "end": 1028,
+      "doc": "Tüm yer isimlerinin embedding matrisini döner."
+    },
+    {
+      "name": "resolve_lookup",
+      "start": 1030,
+      "end": 1038,
+      "doc": "Normalize lookup tabloları üzerinden canonical yer adını döner."
+    },
+    {
+      "name": "find_best_match",
+      "start": 1040,
+      "end": 1126,
+      "doc": "Sorguya en yakın yer ismini bulur."
+    },
+    {
+      "name": "score_embeddings",
+      "start": 1076,
+      "end": 1096,
+      "doc": ""
+    },
+    {
+      "name": "search_osm_api",
+      "start": 1128,
+      "end": 1176,
+      "doc": "OpenStreetMap API'den yer arama."
+    },
+    {
+      "name": "add_places_from_osm",
+      "start": 1178,
+      "end": 1188,
+      "doc": "OSM API'den yer çek ve veritabanına ekle."
+    },
+    {
+      "name": "cache_osm_results",
+      "start": 1190,
+      "end": 1297,
+      "doc": "OSM'den yer arar, sonuçları memory + local_places cache'e yazar."
+    },
+    {
+      "name": "_build_osm_prefetch_queries",
+      "start": 1299,
+      "end": 1312,
+      "doc": "Kullanıcı sorgusundan OSM için daha anlamlı aday arama parçaları üretir."
+    },
+    {
+      "name": "prefetch_osm_candidates",
+      "start": 1314,
+      "end": 1341,
+      "doc": "Tek parse akışında kontrollü sayıda OSM sorgusu yaparak aday havuzunu büyütür."
+    },
+    {
+      "name": "find_all_matches",
+      "start": 1343,
+      "end": 1377,
+      "doc": "Sorguya benzeyen tüm yer isimlerini bulur."
+    },
+    {
+      "name": "should_rescue_poi_intent",
+      "start": 1384,
+      "end": 1410,
+      "doc": "Lokasyon yakalansa bile kaybolan POI niyetini geri kazanmak icin son adim guard'i."
+    },
+    {
+      "name": "should_prefetch_osm_for_query",
+      "start": 1413,
+      "end": 1430,
+      "doc": "OSM prefetch'i sadece lokasyon/POI sinyali gucluyken ac."
+    },
+    {
+      "name": "__init__",
+      "start": 1444,
+      "end": 1498,
+      "doc": "BERT engine'i başlat."
+    },
+    {
+      "name": "_get_template_embeddings",
+      "start": 1500,
+      "end": 1519,
+      "doc": "Query template'lerinin embedding'lerini döner."
+    },
+    {
+      "name": "_get_hard_negative_embeddings",
+      "start": 1521,
+      "end": 1526,
+      "doc": "Hard negative template embedding'lerini lazy olarak döner."
+    },
+    {
+      "name": "classify_query_type_with_scores",
+      "start": 1528,
+      "end": 1586,
+      "doc": "Sorgunun tipini sınıflandırır."
+    },
+    {
+      "name": "classify_query_type",
+      "start": 1588,
+      "end": 1593,
+      "doc": "Sorgunun tipini sınıflandırır."
+    },
+    {
+      "name": "_is_location_like_match",
+      "start": 1595,
+      "end": 1642,
+      "doc": "False-positive azaltmak için aday span'in gerçekten lokasyon olup olmadığını kontrol eder."
+    },
+    {
+      "name": "extract_places",
+      "start": 1644,
+      "end": 1782,
+      "doc": "Sorgudan yer isimlerini çıkarır."
+    },
+    {
+      "name": "detect_route_direction",
+      "start": 1784,
+      "end": 1854,
+      "doc": "\"X'den Y'ye\" tarzı sorgularda yönü tespit eder."
+    },
+    {
+      "name": "select_best",
+      "start": 1803,
+      "end": 1813,
+      "doc": ""
+    },
+    {
+      "name": "_choose_best_poi_location",
+      "start": 1856,
+      "end": 1885,
+      "doc": "POI sorgularında en güvenilir lokasyon adayını seçer."
+    },
+    {
+      "name": "parse",
+      "start": 1887,
+      "end": 2267,
+      "doc": "Ana parse fonksiyonu."
+    },
+    {
+      "name": "get_bert_nlp_engine",
+      "start": 2277,
+      "end": 2288,
+      "doc": "Global BERT NLP engine singleton'ını döner."
+    },
+    {
+      "name": "test_bert_nlp",
+      "start": 2295,
+      "end": 2341,
+      "doc": "BERT NLP engine test."
+    }
+  ],
+  "multimodal_funcs": [
+    {
+      "name": "_resolve_cache_path",
+      "start": 98,
+      "end": 106,
+      "doc": ""
+    },
+    {
+      "name": "_current_telemetry",
+      "start": 147,
+      "end": 151,
+      "doc": ""
+    },
+    {
+      "name": "_telemetry_count",
+      "start": 154,
+      "end": 162,
+      "doc": ""
+    },
+    {
+      "name": "_telemetry_set_count",
+      "start": 165,
+      "end": 173,
+      "doc": ""
+    },
+    {
+      "name": "_telemetry_add_ms",
+      "start": 176,
+      "end": 185,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_cache_key_hash",
+      "start": 188,
+      "end": 190,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_shard_width",
+      "start": 193,
+      "end": 194,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_shard_db_path",
+      "start": 197,
+      "end": 199,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_db_paths",
+      "start": 202,
+      "end": 205,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_target_db_path",
+      "start": 208,
+      "end": 212,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_legacy_fallback_db_path",
+      "start": 215,
+      "end": 221,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_candidate_db_paths",
+      "start": 224,
+      "end": 230,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_connect",
+      "start": 233,
+      "end": 240,
+      "doc": ""
+    },
+    {
+      "name": "_ensure_osrm_sqlite_schema",
+      "start": 243,
+      "end": 264,
+      "doc": ""
+    },
+    {
+      "name": "_ensure_osrm_sqlite_cache",
+      "start": 267,
+      "end": 289,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_max_rows_per_db",
+      "start": 292,
+      "end": 298,
+      "doc": ""
+    },
+    {
+      "name": "_prune_osrm_sqlite_cache",
+      "start": 301,
+      "end": 321,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_cache_get",
+      "start": 324,
+      "end": 381,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_cache_put",
+      "start": 384,
+      "end": 424,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_sqlite_cache_size",
+      "start": 427,
+      "end": 445,
+      "doc": ""
+    },
+    {
+      "name": "_begin_osrm_inflight",
+      "start": 448,
+      "end": 460,
+      "doc": ""
+    },
+    {
+      "name": "_wait_osrm_inflight",
+      "start": 463,
+      "end": 479,
+      "doc": ""
+    },
+    {
+      "name": "_finish_osrm_inflight",
+      "start": 482,
+      "end": 494,
+      "doc": ""
+    },
+    {
+      "name": "_effective_walk_to_stop_limit_m",
+      "start": 497,
+      "end": 518,
+      "doc": "Ilk/son duraga yurume limitini mesafeye gore dinamiklestirir."
+    },
+    {
+      "name": "_cache_get",
+      "start": 521,
+      "end": 525,
+      "doc": ""
+    },
+    {
+      "name": "_cache_put",
+      "start": 528,
+      "end": 538,
+      "doc": ""
+    },
+    {
+      "name": "_ttl_cache_get",
+      "start": 541,
+      "end": 551,
+      "doc": ""
+    },
+    {
+      "name": "_ttl_cache_put",
+      "start": 554,
+      "end": 563,
+      "doc": ""
+    },
+    {
+      "name": "_compare_cache_get",
+      "start": 566,
+      "end": 575,
+      "doc": ""
+    },
+    {
+      "name": "_compare_cache_put",
+      "start": 578,
+      "end": 581,
+      "doc": ""
+    },
+    {
+      "name": "_lookup_cache_get",
+      "start": 584,
+      "end": 593,
+      "doc": ""
+    },
+    {
+      "name": "_lookup_cache_put",
+      "start": 596,
+      "end": 597,
+      "doc": ""
+    },
+    {
+      "name": "_segment_cache_get",
+      "start": 600,
+      "end": 611,
+      "doc": ""
+    },
+    {
+      "name": "_segment_cache_put",
+      "start": 614,
+      "end": 617,
+      "doc": ""
+    },
+    {
+      "name": "get_compare_cache_stats",
+      "start": 620,
+      "end": 631,
+      "doc": ""
+    },
+    {
+      "name": "get_transit_lookup_cache_stats",
+      "start": 634,
+      "end": 645,
+      "doc": ""
+    },
+    {
+      "name": "get_segment_cache_stats",
+      "start": 648,
+      "end": 659,
+      "doc": ""
+    },
+    {
+      "name": "get_osrm_cache_stats",
+      "start": 662,
+      "end": 714,
+      "doc": ""
+    },
+    {
+      "name": "_cached_get_stops_in_area",
+      "start": 717,
+      "end": 724,
+      "doc": ""
+    },
+    {
+      "name": "_cached_find_connecting_routes",
+      "start": 727,
+      "end": 734,
+      "doc": ""
+    },
+    {
+      "name": "_cached_get_route_info",
+      "start": 737,
+      "end": 745,
+      "doc": ""
+    },
+    {
+      "name": "_cached_get_metro_stations_in_area",
+      "start": 748,
+      "end": 755,
+      "doc": ""
+    },
+    {
+      "name": "_cached_get_metro_lines_for_station",
+      "start": 758,
+      "end": 765,
+      "doc": ""
+    },
+    {
+      "name": "_cached_get_metro_line_stations",
+      "start": 768,
+      "end": 775,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_route_coords",
+      "start": 782,
+      "end": 867,
+      "doc": ""
+    },
+    {
+      "name": "_get_bus_road_coords",
+      "start": 870,
+      "end": 937,
+      "doc": "Otobus duraklari arasindaki yol koordinatlarini OSRM ile hesaplar."
+    },
+    {
+      "name": "_sample_waypoints",
+      "start": 894,
+      "end": 906,
+      "doc": ""
+    },
+    {
+      "name": "_osrm_multi_waypoint",
+      "start": 940,
+      "end": 1015,
+      "doc": ""
+    },
+    {
+      "name": "_get_walk_road_coords",
+      "start": 1018,
+      "end": 1021,
+      "doc": "Yurume guzergahini OSRM foot routing ile hesaplar."
+    },
+    {
+      "name": "_walking_time_minutes",
+      "start": 1028,
+      "end": 1030,
+      "doc": "Yurume suresi (dakika)."
+    },
+    {
+      "name": "_bus_travel_time_minutes",
+      "start": 1033,
+      "end": 1037,
+      "doc": "Otobus seyahat suresi (dakika)."
+    },
+    {
+      "name": "_metro_travel_time_minutes",
+      "start": 1040,
+      "end": 1044,
+      "doc": "Metro/tram/funikuler ortalama sure (dakika)."
+    },
+    {
+      "name": "_ferry_travel_time_minutes",
+      "start": 1047,
+      "end": 1052,
+      "doc": "Vapur ortalama sure (dakika)."
+    },
+    {
+      "name": "_ferry_display_name",
+      "start": 1097,
+      "end": 1103,
+      "doc": ""
+    },
+    {
+      "name": "_resolve_ferry_terminal_key",
+      "start": 1106,
+      "end": 1108,
+      "doc": ""
+    },
+    {
+      "name": "_transfer_max_distance_for_name",
+      "start": 1137,
+      "end": 1142,
+      "doc": "Ayni adli istasyonlar arasinda transfer icin mesafe limiti."
+    },
+    {
+      "name": "_bosphorus_side",
+      "start": 1145,
+      "end": 1154,
+      "doc": "Bogaz icin kaba taraf tespiti:"
+    },
+    {
+      "name": "_is_forbidden_bosphorus_walk",
+      "start": 1157,
+      "end": 1180,
+      "doc": "Istanbul iki yaka arasi yuruyus (Bogaz gecisi) fiilen mumkun degil."
+    },
+    {
+      "name": "_is_likely_halic_straight_cross",
+      "start": 1183,
+      "end": 1198,
+      "doc": "Halic uzerinden duz-cizgi fallback gecisi (genelde OSRM fallback artefakti)."
+    },
+    {
+      "name": "_is_major_water_crossing_straight",
+      "start": 1201,
+      "end": 1213,
+      "doc": ""
+    },
+    {
+      "name": "_is_likely_halic_crossing",
+      "start": 1216,
+      "end": 1239,
+      "doc": "Halic etrafinda iki bank arasi gecis olasiligi."
+    },
+    {
+      "name": "_is_likely_alibey_crossing",
+      "start": 1242,
+      "end": 1289,
+      "doc": "Halic'in kuzey kolu (Alibeykoy deresi) uzerinde bank degisimi."
+    },
+    {
+      "name": "_alibey_side",
+      "start": 1262,
+      "end": 1267,
+      "doc": ""
+    },
+    {
+      "name": "_coords_pass_near_checkpoints",
+      "start": 1292,
+      "end": 1307,
+      "doc": ""
+    },
+    {
+      "name": "_is_allowed_water_crossing_walk",
+      "start": 1310,
+      "end": 1331,
+      "doc": "Su gecisi iceren yuruyuslerde deterministik kural."
+    },
+    {
+      "name": "_path_distance_m",
+      "start": 1334,
+      "end": 1344,
+      "doc": "Verilen [lat, lon] dizi boyunca toplam mesafe (metre)."
+    },
+    {
+      "name": "_max_jump_in_coords_m",
+      "start": 1347,
+      "end": 1359,
+      "doc": "Ardışık koordinatlar arasındaki maksimum sıçrama mesafesi (metre)."
+    },
+    {
+      "name": "_has_implausible_segment_jump",
+      "start": 1362,
+      "end": 1386,
+      "doc": "Transit segment geometrisinde bariz 'teleport' sıçramaları var mı?"
+    },
+    {
+      "name": "_sum_walk_distance_m",
+      "start": 1389,
+      "end": 1395,
+      "doc": ""
+    },
+    {
+      "name": "_sum_walk_duration_min",
+      "start": 1398,
+      "end": 1404,
+      "doc": ""
+    },
+    {
+      "name": "_looks_like_straight_fallback",
+      "start": 1407,
+      "end": 1420,
+      "doc": "OSRM hatali/fallback dondugunde genelde sadece [start, end] verir."
+    },
+    {
+      "name": "_direct_walk_metrics",
+      "start": 1423,
+      "end": 1459,
+      "doc": "Direkt yurume metrigini OSRM foot ile guvenilir hale getir."
+    },
+    {
+      "name": "_is_feasible_transfer_walk",
+      "start": 1462,
+      "end": 1500,
+      "doc": "Transfer edge'i icin iki istasyon arasi yurume baglantisini dogrula."
+    },
+    {
+      "name": "_build_walk_leg",
+      "start": 1503,
+      "end": 1598,
+      "doc": "Yaya segmentini OSRM foot ile dogrulayip dondurur."
+    },
+    {
+      "name": "_get_routes_at_stop",
+      "start": 1601,
+      "end": 1616,
+      "doc": "Bir duraktan gecen hatlari dondurur."
+    },
+    {
+      "name": "_normalize_transit_stop_name",
+      "start": 1619,
+      "end": 1633,
+      "doc": "Durak isimlerini kod/farkli karakter varyasyonlarina karsi normalize eder."
+    },
+    {
+      "name": "_expand_route_stop_code_aliases",
+      "start": 1636,
+      "end": 1696,
+      "doc": "Ayni fiziksel duragin hat-yon bazli farkli kodlarini toplar."
+    },
+    {
+      "name": "_get_route_stop_coords",
+      "start": 1699,
+      "end": 1801,
+      "doc": "Bir hat uzerindeki binis duragindan inis duragina kadar"
+    },
+    {
+      "name": "_get_nearby_routes",
+      "start": 1804,
+      "end": 1818,
+      "doc": "Belirli yaricaptaki duraklardan gecen hatlari toplar."
+    },
+    {
+      "name": "_normalize_station_name",
+      "start": 1821,
+      "end": 1835,
+      "doc": ""
+    },
+    {
+      "name": "_get_line_path_between_stations",
+      "start": 1838,
+      "end": 1871,
+      "doc": ""
+    },
+    {
+      "name": "_find_metro_transfer_pairs",
+      "start": 1874,
+      "end": 1925,
+      "doc": "Iki farkli metro hatti arasinda aktarma olabilecek istasyon ciftlerini bulur."
+    },
+    {
+      "name": "_build_metro_options",
+      "start": 1928,
+      "end": 2230,
+      "doc": "Metro API verisinden direkt ve tek aktarmali secenekler uretir."
+    },
+    {
+      "name": "_normalized_station_name",
+      "start": 2233,
+      "end": 2247,
+      "doc": ""
+    },
+    {
+      "name": "_normalized_station_name",
+      "start": 2250,
+      "end": 2280,
+      "doc": "Istasyon adlarini ortak anahtara indirger."
+    },
+    {
+      "name": "_build_metro_graph_data",
+      "start": 2283,
+      "end": 2503,
+      "doc": "Metro/tram/funikuler agini graf olarak hazirlar."
+    },
+    {
+      "name": "_is_valid_transfer_pair",
+      "start": 2350,
+      "end": 2373,
+      "doc": ""
+    },
+    {
+      "name": "_shortest_metro_path",
+      "start": 2506,
+      "end": 2687,
+      "doc": "Cok aktarmali metro aginda en iyi yolu bulur (Dijkstra)."
+    },
+    {
+      "name": "_build_graph_metro_option",
+      "start": 2690,
+      "end": 3042,
+      "doc": ""
+    },
+    {
+      "name": "_build_ferry_only_options",
+      "start": 3045,
+      "end": 3181,
+      "doc": "Dogrudan vapur terminal ciftlerinden secenek uretir."
+    },
+    {
+      "name": "_ferry_terminal_name",
+      "start": 3060,
+      "end": 3065,
+      "doc": ""
+    },
+    {
+      "name": "_near_ferry_terminals",
+      "start": 3067,
+      "end": 3078,
+      "doc": ""
+    },
+    {
+      "name": "_transit_signature",
+      "start": 3184,
+      "end": 3189,
+      "doc": ""
+    },
+    {
+      "name": "_diversify_transit_options",
+      "start": 3192,
+      "end": 3400,
+      "doc": "Farkli tercih tiplerine hitap eden toplu tasima secenekleri sec."
+    },
+    {
+      "name": "_option_walk_m",
+      "start": 3199,
+      "end": 3202,
+      "doc": ""
+    },
+    {
+      "name": "_option_walk_min",
+      "start": 3204,
+      "end": 3205,
+      "doc": ""
+    },
+    {
+      "name": "_effective_time",
+      "start": 3207,
+      "end": 3214,
+      "doc": ""
+    },
+    {
+      "name": "_count_mode",
+      "start": 3231,
+      "end": 3235,
+      "doc": ""
+    },
+    {
+      "name": "_option_bus_routes",
+      "start": 3237,
+      "end": 3255,
+      "doc": ""
+    },
+    {
+      "name": "_can_pick_under_route_cap",
+      "start": 3257,
+      "end": 3261,
+      "doc": ""
+    },
+    {
+      "name": "_route_usage_score",
+      "start": 3263,
+      "end": 3267,
+      "doc": ""
+    },
+    {
+      "name": "_register_route_usage",
+      "start": 3269,
+      "end": 3271,
+      "doc": ""
+    },
+    {
+      "name": "_metrobus_simplicity_score",
+      "start": 3273,
+      "end": 3279,
+      "doc": ""
+    },
+    {
+      "name": "_pick",
+      "start": 3281,
+      "end": 3306,
+      "doc": ""
+    },
+    {
+      "name": "_is_reasonable_transit_time",
+      "start": 3403,
+      "end": 3409,
+      "doc": "Transit suresini asiri kotu secenekleri elemek icin kontrol eder."
+    },
+    {
+      "name": "_is_reasonable_transit_distance",
+      "start": 3412,
+      "end": 3417,
+      "doc": "Transit toplam mesafesi, direkt mesafeye gore asiri sapmasin."
+    },
+    {
+      "name": "_normalize_allowed_modes",
+      "start": 3420,
+      "end": 3433,
+      "doc": "Kullanici tarafindan gelen mod listesini normalize eder."
+    },
+    {
+      "name": "_is_metrobus_code",
+      "start": 3436,
+      "end": 3438,
+      "doc": ""
+    },
+    {
+      "name": "_is_rail_route_code",
+      "start": 3441,
+      "end": 3452,
+      "doc": "Otobus olmayan rayli sistem kodlarini kabaca ayirt et."
+    },
+    {
+      "name": "_option_user_modes",
+      "start": 3455,
+      "end": 3486,
+      "doc": "Bir transit seceneginin gercekte hangi ulasim tiplerini kullandigini cikartir."
+    },
+    {
+      "name": "_is_absurd_transit_option",
+      "start": 3489,
+      "end": 3529,
+      "doc": "Bariz anlamsiz toplu tasima turlarini (uzun detour + zayif kazanc) eler."
+    },
+    {
+      "name": "_find_one_transfer_candidates",
+      "start": 3532,
+      "end": 3581,
+      "doc": "Tek aktarmali secenekler icin (hat A -> transfer duragi -> hat B) adaylarini bulur."
+    },
+    {
+      "name": "_get_route_stop_candidates_after",
+      "start": 3584,
+      "end": 3640,
+      "doc": "Verilen hatta, baslangic duragindan sonra gelebilecek aday duraklari dondurur."
+    },
+    {
+      "name": "_get_route_stop_candidates_before",
+      "start": 3643,
+      "end": 3698,
+      "doc": "Verilen hatta, hedef duraktan once gelebilecek aday duraklari dondurur."
+    },
+    {
+      "name": "_build_bus_metro_mixed_options",
+      "start": 3701,
+      "end": 3929,
+      "doc": "Karma secenekler: otobus + metro (tek/çok aktarmalı metro bacağı dahil)."
+    },
+    {
+      "name": "_build_metro_bus_mixed_options",
+      "start": 3932,
+      "end": 4267,
+      "doc": "Karma secenekler: metro/tram + bus/metrobus."
+    },
+    {
+      "name": "_dest_has_metrobus",
+      "start": 3965,
+      "end": 3970,
+      "doc": ""
+    },
+    {
+      "name": "find_transit_routes",
+      "start": 4274,
+      "end": 4832,
+      "doc": "Iki nokta arasi toplu tasima seceneklerini bulur."
+    },
+    {
+      "name": "compare_routes",
+      "start": 4835,
+      "end": 4944,
+      "doc": "Yuruyus ve toplu tasima seceneklerini karsilastirir."
+    }
+  ],
+  "route_funcs": [
+    {
+      "name": "_safe_print",
+      "start": 27,
+      "end": 32,
+      "doc": ""
+    },
+    {
+      "name": "_routing_weight_key",
+      "start": 38,
+      "end": 39,
+      "doc": ""
+    },
+    {
+      "name": "_route_speed_kmh",
+      "start": 42,
+      "end": 47,
+      "doc": ""
+    },
+    {
+      "name": "_route_debug_enabled",
+      "start": 50,
+      "end": 52,
+      "doc": ""
+    },
+    {
+      "name": "_route_debug_log",
+      "start": 55,
+      "end": 57,
+      "doc": ""
+    },
+    {
+      "name": "__init__",
+      "start": 63,
+      "end": 65,
+      "doc": ""
+    },
+    {
+      "name": "to_payload",
+      "start": 67,
+      "end": 73,
+      "doc": ""
+    },
+    {
+      "name": "shortest_path",
+      "start": 76,
+      "end": 95,
+      "doc": "İki düğüm arası en kısa yolu Dijkstra algoritması ile bulur."
+    },
+    {
+      "name": "_node_coord",
+      "start": 98,
+      "end": 101,
+      "doc": "Graf node'unu [lat, lon] formatinda dondurur."
+    },
+    {
+      "name": "_best_edge_data",
+      "start": 104,
+      "end": 114,
+      "doc": "Return the shortest parallel edge for a node pair."
+    },
+    {
+      "name": "_is_valid_path",
+      "start": 117,
+      "end": 121,
+      "doc": "Check that every consecutive node pair is connected in route direction."
+    },
+    {
+      "name": "_extract_edge_coords",
+      "start": 124,
+      "end": 159,
+      "doc": "Iki node arasindaki edge geometrisini [lat, lon] listesine cevirir."
+    },
+    {
+      "name": "sqdist",
+      "start": 151,
+      "end": 152,
+      "doc": ""
+    },
+    {
+      "name": "nodes_to_coords",
+      "start": 162,
+      "end": 185,
+      "doc": "Node listesi icin rota geometrisini [lat, lon] listesi olarak dondurur."
+    },
+    {
+      "name": "solve_tsp",
+      "start": 187,
+      "end": 296,
+      "doc": "Çoklu nokta için TSP (Gezgin Satıcı Problemi) optimizasyonu."
+    },
+    {
+      "name": "build_full_route",
+      "start": 299,
+      "end": 329,
+      "doc": "TSP sıralamasına göre tüm noktalar arasındaki rotaları birleştirir."
+    },
+    {
+      "name": "calculate_route_stats",
+      "start": 332,
+      "end": 366,
+      "doc": "Rota istatistiklerini hesaplar: toplam mesafe ve tahmini yürüme süresi."
+    },
+    {
+      "name": "generate_google_maps_link",
+      "start": 369,
+      "end": 384,
+      "doc": "Verilen koordinat listesi için Google Maps yol tarifi linki oluşturur."
+    },
+    {
+      "name": "path_to_edges",
+      "start": 387,
+      "end": 397,
+      "doc": "Node listesini edge listesine çevirir."
+    },
+    {
+      "name": "count_edge_overlap",
+      "start": 400,
+      "end": 434,
+      "doc": "İki rota arasındaki asimetrik EDGE overlap oranını hesaplar."
+    },
+    {
+      "name": "normalize_edge",
+      "start": 414,
+      "end": 418,
+      "doc": ""
+    },
+    {
+      "name": "dynamic_overlap_threshold",
+      "start": 437,
+      "end": 453,
+      "doc": "Rota uzunluğuna göre maksimum izin verilen overlap oranını belirler."
+    },
+    {
+      "name": "get_max_candidates",
+      "start": 456,
+      "end": 468,
+      "doc": "Rota uzunluğuna göre dinamik aday sayısı belirler."
+    },
+    {
+      "name": "__init__",
+      "start": 480,
+      "end": 488,
+      "doc": ""
+    },
+    {
+      "name": "finish",
+      "start": 490,
+      "end": 511,
+      "doc": "Telemetry verilerini tamamla ve logla"
+    },
+    {
+      "name": "check_alternative_potential",
+      "start": 514,
+      "end": 554,
+      "doc": "Topoloji ön-analizi: Origin ve destination arası kaç edge-disjoint yol var?"
+    },
+    {
+      "name": "find_disjoint_paths",
+      "start": 557,
+      "end": 610,
+      "doc": "Suurballe-style edge-disjoint paths bulur."
+    },
+    {
+      "name": "dynamic_overlap_threshold_connectivity",
+      "start": 613,
+      "end": 664,
+      "doc": "Hem mesafeye HEM connectivity'ye göre dinamik overlap eşiği."
+    },
+    {
+      "name": "apply_penalty_to_graph",
+      "start": 667,
+      "end": 712,
+      "doc": "Kullanilan kenarlara ceza uygulayarak grafigi kopyalar."
+    },
+    {
+      "name": "find_routes_with_penalty",
+      "start": 715,
+      "end": 777,
+      "doc": "Penalty-based generation ile ekstra rotalar bulur."
+    },
+    {
+      "name": "get_fallback_routes",
+      "start": 780,
+      "end": 846,
+      "doc": "Multi-level fallback stratejisi."
+    },
+    {
+      "name": "get_body_edges",
+      "start": 853,
+      "end": 863,
+      "doc": "Rotanın baş ve son kısmını atlayıp sadece gövde kenarlarını döndürür."
+    },
+    {
+      "name": "calculate_via_route_sample_count",
+      "start": 866,
+      "end": 882,
+      "doc": "Via-node hesaplamasi icin rota sample sayisini dinamik belirler."
+    },
+    {
+      "name": "find_via_node_routes",
+      "start": 885,
+      "end": 1036,
+      "doc": "Via-Node (Ara Nokta) yaklaşımı ile alternatif rotalar bulur."
+    },
+    {
+      "name": "min_distance_to_route",
+      "start": 964,
+      "end": 974,
+      "doc": "Noktanın rotaya olan minimum yaklaşık mesafesi (metre)"
+    },
+    {
+      "name": "find_alternative_routes",
+      "start": 1039,
+      "end": 1270,
+      "doc": "İki nokta arası GERÇEK alternatif rotalar bulur (v3.0 - Via-Node)."
+    },
+    {
+      "name": "build_alternative_routes",
+      "start": 1273,
+      "end": 1319,
+      "doc": "Çoklu nokta için alternatif rota stratejisi ile tam rota oluşturur."
+    },
+    {
+      "name": "build_all_alternative_routes_batch",
+      "start": 1322,
+      "end": 1405,
+      "doc": "Tüm segment alternatiflerini TEK SEFERDE hesaplar, 3 tam rota döner."
+    }
+  ],
+  "app_js_sections": [
+    {
+      "line": 7,
+      "title": "========== CONFIG =========="
+    },
+    {
+      "line": 17,
+      "title": "========== STATE =========="
+    },
+    {
+      "line": 29,
+      "title": "========== MAP INIT =========="
+    },
+    {
+      "line": 72,
+      "title": "========== DOM ELEMENTS =========="
+    },
+    {
+      "line": 153,
+      "title": "========== CUSTOM MARKER ICON =========="
+    },
+    {
+      "line": 178,
+      "title": "========== MAP CLICK HANDLER =========="
+    },
+    {
+      "line": 278,
+      "title": "========== UI UPDATES =========="
+    },
+    {
+      "line": 279,
+      "title": "========== DRAG & DROP VARIABLES =========="
+    },
+    {
+      "line": 282,
+      "title": "========== DRAG & DROP HANDLERS =========="
+    },
+    {
+      "line": 394,
+      "title": "========== ROUTE CALCULATION =========="
+    },
+    {
+      "line": 505,
+      "title": "========== POI SEARCH =========="
+    },
+    {
+      "line": 742,
+      "title": "========== LOADING =========="
+    },
+    {
+      "line": 752,
+      "title": "========== TOAST NOTIFICATIONS =========="
+    },
+    {
+      "line": 768,
+      "title": "========== LAYOUT CONTROLS =========="
+    },
+    {
+      "line": 906,
+      "title": "========== EVENT LISTENERS =========="
+    },
+    {
+      "line": 991,
+      "title": "========== PLACE SEARCH (GEOCODING) =========="
+    },
+    {
+      "line": 1198,
+      "title": "========== AI ASSISTANT (NLP) =========="
+    },
+    {
+      "line": 1409,
+      "title": "========== MAIN LLM CHAT (OPENROUTER/GEMINI) =========="
+    },
+    {
+      "line": 2340,
+      "title": "========== ALTERNATIVE ROUTES =========="
+    },
+    {
+      "line": 2534,
+      "title": "========== SAVE ROUTE =========="
+    },
+    {
+      "line": 2797,
+      "title": "========== TIME PLANNING =========="
+    },
+    {
+      "line": 2964,
+      "title": "========== SAVED LOCATIONS (KAYITLI YERLER) =========="
+    },
+    {
+      "line": 3239,
+      "title": "========== EVENT DELEGATION - XSS Güvenlik Düzeltmeleri =========="
+    },
+    {
+      "line": 3331,
+      "title": "========== WEATHER WIDGET =========="
+    },
+    {
+      "line": 3370,
+      "title": "========== WEATHER BANNER =========="
+    },
+    {
+      "line": 3615,
+      "title": "========== WEATHER & TIMELINE SIMULATOR =========="
+    },
+    {
+      "line": 3807,
+      "title": "========== TÜRKğYE VERğSğ YÖNETğMğ =========="
+    },
+    {
+      "line": 3909,
+      "title": "========== TURN-BY-TURN & TTS =========="
+    },
+    {
+      "line": 3997,
+      "title": "========== UX ENHANCEMENTS (2026-03-18) =========="
+    }
+  ],
+  "app_js_funcs": [
+    {
+      "name": "isInIstanbulBounds",
+      "start": 46,
+      "end": 54
+    },
+    {
+      "name": "focusMapInIstanbul",
+      "start": 55,
+      "end": 153
+    },
+    {
+      "name": "createNumberedIcon",
+      "start": 154,
+      "end": 163
+    },
+    {
+      "name": "createPoiIcon",
+      "start": 164,
+      "end": 173
+    },
+    {
+      "name": "isValidField",
+      "start": 174,
+      "end": 183
+    },
+    {
+      "name": "addPoint",
+      "start": 184,
+      "end": 235
+    },
+    {
+      "name": "removePoint",
+      "start": 236,
+      "end": 263
+    },
+    {
+      "name": "clearAllPoints",
+      "start": 264,
+      "end": 282
+    },
+    {
+      "name": "handleDragStart",
+      "start": 283,
+      "end": 289
+    },
+    {
+      "name": "handleDragEnd",
+      "start": 290,
+      "end": 298
+    },
+    {
+      "name": "handleDragOver",
+      "start": 299,
+      "end": 307
+    },
+    {
+      "name": "handleDragLeave",
+      "start": 308,
+      "end": 314
+    },
+    {
+      "name": "handleDrop",
+      "start": 315,
+      "end": 343
+    },
+    {
+      "name": "updatePointsList",
+      "start": 344,
+      "end": 383
+    },
+    {
+      "name": "updateButtons",
+      "start": 384,
+      "end": 394
+    },
+    {
+      "name": "calculateRoute",
+      "start": 395,
+      "end": 445
+    },
+    {
+      "name": "drawRoute",
+      "start": 446,
+      "end": 472
+    },
+    {
+      "name": "clearRoute",
+      "start": 473,
+      "end": 492
+    },
+    {
+      "name": "showRouteInfo",
+      "start": 493,
+      "end": 509
+    },
+    {
+      "name": "parsePoiButtonLabel",
+      "start": 510,
+      "end": 520
+    },
+    {
+      "name": "getPoiVisualFromCategory",
+      "start": 521,
+      "end": 541
+    },
+    {
+      "name": "formatPoiAge",
+      "start": 542,
+      "end": 552
+    },
+    {
+      "name": "renderPoiMeta",
+      "start": 553,
+      "end": 582
+    },
+    {
+      "name": "searchPois",
+      "start": 583,
+      "end": 659
+    },
+    {
+      "name": "displayPois",
+      "start": 660,
+      "end": 683
+    },
+    {
+      "name": "buildPoiPopup",
+      "start": 684,
+      "end": 732
+    },
+    {
+      "name": "clearPois",
+      "start": 733,
+      "end": 742
+    },
+    {
+      "name": "showLoading",
+      "start": 743,
+      "end": 747
+    },
+    {
+      "name": "hideLoading",
+      "start": 748,
+      "end": 752
+    },
+    {
+      "name": "showToast",
+      "start": 753,
+      "end": 782
+    },
+    {
+      "name": "isMobileViewport",
+      "start": 783,
+      "end": 786
+    },
+    {
+      "name": "loadLayoutPrefs",
+      "start": 787,
+      "end": 805
+    },
+    {
+      "name": "saveLayoutPrefs",
+      "start": 806,
+      "end": 813
+    },
+    {
+      "name": "updateLayoutButtonLabels",
+      "start": 814,
+      "end": 819
+    },
+    {
+      "name": "applyLayoutPrefs",
+      "start": 820,
+      "end": 841
+    },
+    {
+      "name": "initLayoutResizers",
+      "start": 842,
+      "end": 842
+    },
+    {
+      "name": "bindHorizontalResizer",
+      "start": 843,
+      "end": 1055
+    },
+    {
+      "name": "fetchSuggestions",
+      "start": 1056,
+      "end": 1098
+    },
+    {
+      "name": "searchPlace",
+      "start": 1099,
+      "end": 1141
+    },
+    {
+      "name": "displaySearchResult",
+      "start": 1142,
+      "end": 1176
+    },
+    {
+      "name": "selectSearchResult",
+      "start": 1177,
+      "end": 1190
+    },
+    {
+      "name": "escapeHtml",
+      "start": 1191,
+      "end": 1199
+    },
+    {
+      "name": "geocodePlaceName",
+      "start": 1200,
+      "end": 1214
+    },
+    {
+      "name": "setNlpLoading",
+      "start": 1215,
+      "end": 1219
+    },
+    {
+      "name": "buildNlpSummary",
+      "start": 1220,
+      "end": 1237
+    },
+    {
+      "name": "renderNlpResults",
+      "start": 1238,
+      "end": 1285
+    },
+    {
+      "name": "analyzeNaturalLanguageQuery",
+      "start": 1286,
+      "end": 1321
+    },
+    {
+      "name": "applyNlpResult",
+      "start": 1322,
+      "end": 1358
+    },
+    {
+      "name": "focusNlpLocation",
+      "start": 1359,
+      "end": 1528
+    },
+    {
+      "name": "mainLlmRepairText",
+      "start": 1529,
+      "end": 1550
+    },
+    {
+      "name": "mainLlmRepairTokenText",
+      "start": 1551,
+      "end": 1573
+    },
+    {
+      "name": "mainLlmGetProvider",
+      "start": 1574,
+      "end": 1578
+    },
+    {
+      "name": "mainLlmGetMode",
+      "start": 1579,
+      "end": 1582
+    },
+    {
+      "name": "mainLlmLocalCacheKey",
+      "start": 1583,
+      "end": 1586
+    },
+    {
+      "name": "mainLlmSaveLocalCache",
+      "start": 1587,
+      "end": 1596
+    },
+    {
+      "name": "mainLlmLoadLocalCache",
+      "start": 1597,
+      "end": 1617
+    },
+    {
+      "name": "mainLlmSetStatus",
+      "start": 1618,
+      "end": 1625
+    },
+    {
+      "name": "mainLlmSetActiveModel",
+      "start": 1626,
+      "end": 1631
+    },
+    {
+      "name": "mainLlmClassifyModel",
+      "start": 1632,
+      "end": 1643
+    },
+    {
+      "name": "mainLlmSelectedManualModel",
+      "start": 1644,
+      "end": 1647
+    },
+    {
+      "name": "mainLlmLoadModelHealth",
+      "start": 1648,
+      "end": 1670
+    },
+    {
+      "name": "mainLlmFetchProviderModels",
+      "start": 1671,
+      "end": 1697
+    },
+    {
+      "name": "mainLlmClassifyError",
+      "start": 1698,
+      "end": 1706
+    },
+    {
+      "name": "mainLlmAppendMeta",
+      "start": 1707,
+      "end": 1714
+    },
+    {
+      "name": "mainLlmAddMessage",
+      "start": 1715,
+      "end": 1724
+    },
+    {
+      "name": "mainLlmRenderMessages",
+      "start": 1725,
+      "end": 1737
+    },
+    {
+      "name": "mainLlmUpdateModeUi",
+      "start": 1738,
+      "end": 1756
+    },
+    {
+      "name": "mainLlmRefreshModelOptions",
+      "start": 1757,
+      "end": 1816
+    },
+    {
+      "name": "mainLlmSortSessions",
+      "start": 1817,
+      "end": 1824
+    },
+    {
+      "name": "mainLlmPopulateSessionSelect",
+      "start": 1825,
+      "end": 1840
+    },
+    {
+      "name": "mainLlmLoadSessions",
+      "start": 1841,
+      "end": 1851
+    },
+    {
+      "name": "mainLlmCreateSession",
+      "start": 1852,
+      "end": 1865
+    },
+    {
+      "name": "mainLlmLoadSessionMessages",
+      "start": 1866,
+      "end": 1884
+    },
+    {
+      "name": "mainLlmSetActiveSession",
+      "start": 1885,
+      "end": 1901
+    },
+    {
+      "name": "mainLlmEnsureActiveSession",
+      "start": 1902,
+      "end": 1916
+    },
+    {
+      "name": "mainLlmCreateAndSwitchSession",
+      "start": 1917,
+      "end": 1922
+    },
+    {
+      "name": "mainLlmArchiveCurrentSession",
+      "start": 1923,
+      "end": 1942
+    },
+    {
+      "name": "mainLlmToggleBusy",
+      "start": 1943,
+      "end": 1950
+    },
+    {
+      "name": "mainLlmPanelSetOpen",
+      "start": 1951,
+      "end": 1963
+    },
+    {
+      "name": "mainLlmCheckStatus",
+      "start": 1964,
+      "end": 2016
+    },
+    {
+      "name": "mainLlmSendMessage",
+      "start": 2017,
+      "end": 2251
+    },
+    {
+      "name": "initMainLlmChat",
+      "start": 2252,
+      "end": 2344
+    },
+    {
+      "name": "showAlternativeRoutes",
+      "start": 2345,
+      "end": 2385
+    },
+    {
+      "name": "displayAlternativeRoutes",
+      "start": 2386,
+      "end": 2444
+    },
+    {
+      "name": "selectAlternativeRoute",
+      "start": 2445,
+      "end": 2538
+    },
+    {
+      "name": "openSaveRouteModal",
+      "start": 2539,
+      "end": 2551
+    },
+    {
+      "name": "closeSaveRouteModal",
+      "start": 2552,
+      "end": 2562
+    },
+    {
+      "name": "confirmSaveRoute",
+      "start": 2563,
+      "end": 2619
+    },
+    {
+      "name": "loadSavedRoutes",
+      "start": 2620,
+      "end": 2641
+    },
+    {
+      "name": "displaySavedRoutes",
+      "start": 2642,
+      "end": 2694
+    },
+    {
+      "name": "loadRoute",
+      "start": 2695,
+      "end": 2744
+    },
+    {
+      "name": "toggleRouteFavorite",
+      "start": 2745,
+      "end": 2770
+    },
+    {
+      "name": "deleteRoute",
+      "start": 2771,
+      "end": 2801
+    },
+    {
+      "name": "showTimelinePlanner",
+      "start": 2802,
+      "end": 2814
+    },
+    {
+      "name": "generateTimeline",
+      "start": 2815,
+      "end": 2874
+    },
+    {
+      "name": "calculateSegmentDistances",
+      "start": 2875,
+      "end": 2889
+    },
+    {
+      "name": "displayTimeline",
+      "start": 2890,
+      "end": 3008
+    },
+    {
+      "name": "closeSaveLocationModal",
+      "start": 3009,
+      "end": 3016
+    },
+    {
+      "name": "confirmSaveLocation",
+      "start": 3017,
+      "end": 3071
+    },
+    {
+      "name": "loadSavedLocations",
+      "start": 3072,
+      "end": 3093
+    },
+    {
+      "name": "displaySavedLocationsSidebar",
+      "start": 3094,
+      "end": 3140
+    },
+    {
+      "name": "toggleLocationFavorite",
+      "start": 3141,
+      "end": 3161
+    },
+    {
+      "name": "deleteSavedLocation",
+      "start": 3162,
+      "end": 3189
+    },
+    {
+      "name": "drawSavedLocationsOnMap",
+      "start": 3190,
+      "end": 3211
+    },
+    {
+      "name": "clearSavedLocationMarkers",
+      "start": 3212,
+      "end": 3216
+    },
+    {
+      "name": "toggleSavedLocationsVisibility",
+      "start": 3217,
+      "end": 3335
+    },
+    {
+      "name": "fetchWeatherWidget",
+      "start": 3336,
+      "end": 3362
+    },
+    {
+      "name": "initWeatherWidget",
+      "start": 3363,
+      "end": 3374
+    },
+    {
+      "name": "formatLocalDateISO",
+      "start": 3375,
+      "end": 3398
+    },
+    {
+      "name": "checkRouteWeatherAndShowBanner",
+      "start": 3399,
+      "end": 3449
+    },
+    {
+      "name": "showWeatherBanner",
+      "start": 3450,
+      "end": 3520
+    },
+    {
+      "name": "showWeatherWarningModal",
+      "start": 3521,
+      "end": 3609
+    },
+    {
+      "name": "hideWeatherBanner",
+      "start": 3610,
+      "end": 3622
+    },
+    {
+      "name": "initWeatherSimulator",
+      "start": 3623,
+      "end": 3695
+    },
+    {
+      "name": "loadForecastStrip",
+      "start": 3696,
+      "end": 3755
+    },
+    {
+      "name": "getWeatherEmoji",
+      "start": 3756,
+      "end": 3789
+    },
+    {
+      "name": "getWeatherDescTr",
+      "start": 3790,
+      "end": 3810
+    },
+    {
+      "name": "loadTurkiyeData",
+      "start": 3811,
+      "end": 3822
+    },
+    {
+      "name": "initializeRegionDropdown",
+      "start": 3823,
+      "end": 3918
+    },
+    {
+      "name": "clearRouteSteps",
+      "start": 3919,
+      "end": 3928
+    },
+    {
+      "name": "fetchRouteSteps",
+      "start": 3929,
+      "end": 3954
+    },
+    {
+      "name": "displayRouteSteps",
+      "start": 3955,
+      "end": 3960
+    },
+    {
+      "name": "startVoicePlayback",
+      "start": 3961,
+      "end": 3971
+    },
+    {
+      "name": "playNextTTS",
+      "start": 3972,
+      "end": 3981
+    },
+    {
+      "name": "stopVoicePlayback",
+      "start": 3982,
+      "end": 4004
+    },
+    {
+      "name": "normalizePoiConfidenceScore",
+      "start": 4005,
+      "end": 4013
+    },
+    {
+      "name": "ensureRouteDecisionPanel",
+      "start": 4014,
+      "end": 4030
+    },
+    {
+      "name": "renderRouteDecisionPanel",
+      "start": 4031,
+      "end": 4067
+    },
+    {
+      "name": "summarizeWeatherForDecision",
+      "start": 4068,
+      "end": 4105
+    },
+    {
+      "name": "buildShortDistanceOverlapWarning",
+      "start": 4106,
+      "end": 4150
+    },
+    {
+      "name": "ensurePoiFilterPanel",
+      "start": 4151,
+      "end": 4186
+    },
+    {
+      "name": "applyPoiFilters",
+      "start": 4187,
+      "end": 4265
+    }
+  ],
+  "line_counts": {
+    "app_py": 5608,
+    "app_js": 4265,
+    "bert": 2345,
+    "multimodal": 4969,
+    "route_engine": 1405
+  }
+}

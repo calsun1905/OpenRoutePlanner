@@ -327,6 +327,82 @@
         return [];
     }
 
+    function normalizePointPair(raw) {
+        if (!Array.isArray(raw) || raw.length < 2) return null;
+        const lat = Number(raw[0]);
+        const lon = Number(raw[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        return [lat, lon];
+    }
+
+    function getTransitRoutePoints(explicitPoints) {
+        if (Array.isArray(explicitPoints) && explicitPoints.length >= 2) {
+            return explicitPoints
+                .map((point) => normalizePointPair(point))
+                .filter((point) => Array.isArray(point));
+        }
+
+        const livePoints = getCurrentSelectedPoints()
+            .map((point) => normalizePointPair(point))
+            .filter((point) => Array.isArray(point));
+        if (livePoints.length < 2) {
+            return livePoints;
+        }
+        return [livePoints[0], livePoints[livePoints.length - 1]];
+    }
+
+    function collectOptionRouteCoords(option) {
+        const coords = [];
+        const pushCoord = (raw) => {
+            const pair = normalizePointPair(raw);
+            if (!pair) return;
+            const last = coords[coords.length - 1];
+            if (last && last[0] === pair[0] && last[1] === pair[1]) {
+                return;
+            }
+            coords.push(pair);
+        };
+
+        (option?.segments || []).forEach((seg) => {
+            const displayCoords = getSegmentCoordsForDrawing(seg, option?.type === "transit");
+            const chunks = splitSegmentCoords(displayCoords, seg?.mode);
+            chunks.forEach((chunk) => chunk.forEach((point) => pushCoord(point)));
+        });
+
+        return coords;
+    }
+
+    function buildTransitRoutePayload(option, meta = {}) {
+        return {
+            kind: "transit",
+            version: 1,
+            selected_option: option,
+            recommendation_reason: meta.recommendationReason || "",
+            applied_modes: Array.isArray(meta.appliedModes) ? meta.appliedModes : [],
+            nearby_routes: meta.nearbyRoutes || {},
+        };
+    }
+
+    function buildCurrentTransitRouteData(option, meta = {}) {
+        const routeCoords = collectOptionRouteCoords(option);
+        const routePoints = getTransitRoutePoints(meta.points);
+        const rawDistanceM = Number(option?.total_distance_m);
+        const totalDistanceM = Number.isFinite(rawDistanceM)
+            ? rawDistanceM
+            : Math.round(segmentLengthMeters(routeCoords));
+
+        return {
+            points: routePoints,
+            route_coords: routeCoords,
+            total_distance_km: Math.round((Math.max(totalDistanceM, 0) / 1000) * 100) / 100,
+            estimated_walk_minutes: Number(option?.total_time_min) || 0,
+            route_type: "transit",
+            transport_mode: "transit",
+            optimize: false,
+            route_payload: buildTransitRoutePayload(option, meta),
+        };
+    }
+
     function segmentLengthMeters(coords, mode = "") {
         const chunks = splitSegmentCoords(coords, mode);
         if (!chunks.length) return 0;
@@ -371,12 +447,19 @@
         } else {
             chunks.forEach((chunk) => {
                 const latlngs = chunk.map((c) => [c[0], c[1]]);
-                const line = L.polyline(latlngs, {
-                    color: "#16a34a",
-                    weight: 4,
-                    opacity: transitOnlyView ? 0.82 : 0.9,
-                    dashArray: transitOnlyView ? null : "2,8", // Transit gorunumunde daha net olsun
-                }).addTo(map);
+                const lineOptions = transitOnlyView
+                    ? {
+                        color: "#16a34a",
+                        weight: 4,
+                        opacity: 0.82,
+                    }
+                    : {
+                        color: "#16a34a",
+                        weight: 4,
+                        opacity: 0.9,
+                        dashArray: "2,8",
+                    };
+                const line = L.polyline(latlngs, lineOptions).addTo(map);
                 transitRouteLayers.push(line);
             });
         }
@@ -420,7 +503,28 @@
         if (!option || !Array.isArray(option.segments)) return;
         const transitOnlyView = option.type === "transit";
 
+        if (typeof routePolyline !== "undefined" && routePolyline) {
+            try {
+                map.removeLayer(routePolyline);
+            } catch (e) {
+                // ignore
+            }
+            routePolyline = null;
+        }
+        if (typeof routeGlowPolylines !== "undefined" && Array.isArray(routeGlowPolylines)) {
+            routeGlowPolylines.forEach((layer) => {
+                try {
+                    map.removeLayer(layer);
+                } catch (e) {
+                    // ignore
+                }
+            });
+            routeGlowPolylines = [];
+        }
         clearTransitRoute();
+        if (typeof clearRouteSteps === "function") {
+            clearRouteSteps();
+        }
         const allBounds = [];
         const shownRouteLabels = new Set();
         const drawableSegments = option.segments.map((seg, idx) => {
@@ -550,6 +654,19 @@
         document.querySelectorAll(".multimodal-option").forEach((el, i) => {
             el.classList.toggle("active-route", i === optionIndex);
         });
+
+        currentRouteData = buildCurrentTransitRouteData(option, {
+            recommendationReason: multimodalData?.recommendation_reason || option?.description || "",
+            appliedModes: multimodalData?.applied_modes || [],
+            nearbyRoutes: multimodalData?.nearby_routes || {},
+        });
+        currentRouteOptimize = false;
+        if (typeof showRouteInfo === "function") {
+            showRouteInfo(currentRouteData);
+        }
+        if (typeof updateButtons === "function") {
+            updateButtons();
+        }
     };
 
     function displayMultimodalResults(data) {
@@ -746,6 +863,33 @@
     if (elBtnCompareRoutes) {
         elBtnCompareRoutes.addEventListener("click", compareMultimodalRoutes);
     }
+
+    window.restoreSavedTransitRoute = function (savedRoute) {
+        const payload = savedRoute?.route_payload;
+        const option = payload?.selected_option || null;
+        if (!option || !Array.isArray(option.segments)) {
+            return null;
+        }
+
+        displayMultimodalResults({
+            options: [option],
+            recommended: "transit",
+            recommendation_reason: payload?.recommendation_reason || "Kaydedilen toplu ulasim rotasi",
+            applied_modes: Array.isArray(payload?.applied_modes) ? payload.applied_modes : [],
+            nearby_routes: payload?.nearby_routes || {},
+        });
+
+        if (currentRouteData) {
+            return currentRouteData;
+        }
+
+        return buildCurrentTransitRouteData(option, {
+            points: savedRoute?.points,
+            recommendationReason: payload?.recommendation_reason || "Kaydedilen toplu ulasim rotasi",
+            appliedModes: payload?.applied_modes || [],
+            nearbyRoutes: payload?.nearby_routes || {},
+        });
+    };
 
     window.clearTransitRoute = clearTransitRoute;
 })();

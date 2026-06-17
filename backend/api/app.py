@@ -2052,6 +2052,10 @@ def api_save_route():
 
         if not data:
             return jsonify({"error": "GeÃƒçersiz veya eksik JSON gÃƒövdesi."}), 400
+
+        route_payload = data.get("route_payload")
+        if route_payload is not None and not isinstance(route_payload, dict):
+            return jsonify({"error": "'route_payload' alanÃı obje formatÄ±nda olmalÄ±."}), 400
         
         # Zorunlu alanlar
         required_fields = ["name", "points", "route_coords", "distance_km", "duration_minutes"]
@@ -2068,7 +2072,8 @@ def api_save_route():
             duration_minutes=data["duration_minutes"],
             route_type=data.get("route_type", "route_1"),
             description=data.get("description", ""),
-            tags=data.get("tags", [])
+            tags=data.get("tags", []),
+            route_payload=route_payload,
         )
         
         return jsonify({

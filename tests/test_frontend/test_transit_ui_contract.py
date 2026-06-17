@@ -31,6 +31,7 @@ def test_transit_route_api_exports_exist() -> None:
     assert "function clearTransitRoute()" in js
     assert "window.clearTransitRoute = clearTransitRoute;" in js
     assert "window.showTransitRoute = function (optionIndex)" in js
+    assert "window.restoreSavedTransitRoute = function (savedRoute)" in js
 
 
 def test_transit_segment_rendering_rules_present() -> None:

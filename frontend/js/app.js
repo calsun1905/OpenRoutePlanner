@@ -69,6 +69,34 @@ function focusMapInIstanbul(lat, lon, zoom = 16) {
 window.isInIstanbulBounds = isInIstanbulBounds;
 window.focusMapInIstanbul = focusMapInIstanbul;
 
+function isTransitRouteData(routeData) {
+    if (!routeData) return false;
+    if (String(routeData.transport_mode || "").toLowerCase() === "transit") return true;
+    if (String(routeData.route_type || "").toLowerCase() === "transit") return true;
+    return String(routeData?.route_payload?.kind || "").toLowerCase() === "transit";
+}
+
+function getActiveRoutePoints() {
+    if (Array.isArray(currentRouteData?.points) && currentRouteData.points.length >= 2) {
+        return currentRouteData.points;
+    }
+    return selectedPoints;
+}
+
+function getSavedTransitModeLabel(route) {
+    const payload = route?.route_payload;
+    if (String(payload?.kind || "").toLowerCase() !== "transit") {
+        return "";
+    }
+    const option = payload?.selected_option || (Array.isArray(payload?.options) ? payload.options[0] : null);
+    const mode = String(option?.transit_mode || "").toLowerCase();
+    if (mode === "metro") return "Metro";
+    if (mode === "ferry") return "Vapur";
+    if (mode === "mixed") return "Karma";
+    if (mode === "bus") return "Otobus";
+    return "Toplu ulasim";
+}
+
 // ========== DOM ELEMENTS ==========
 const elPointCount = document.getElementById("pointCount");
 const elPointsList = document.getElementById("pointsList");
@@ -181,7 +209,8 @@ map.on("dblclick", function (e) {
     addPoint(lat, lng);
 });
 
-function addPoint(lat, lng) {
+function addPoint(lat, lng, options = {}) {
+    const silent = Boolean(options?.silent);
     const hadRoute = Boolean(currentRouteData);
     const latNum = Number(lat);
     const lonNum = Number(lng);
@@ -229,7 +258,9 @@ function addPoint(lat, lng) {
     updatePointsList();
     updateButtons();
 
-    showToast(hadRoute ? "Nokta eklendi. Rota icin tekrar hesaplayin." : `Nokta ${index + 1} eklendi`, "info");
+    if (!silent) {
+        showToast(hadRoute ? "Nokta eklendi. Rota icin tekrar hesaplayin." : `Nokta ${index + 1} eklendi`, "info");
+    }
     return true;
 }
 
@@ -261,14 +292,17 @@ function removePoint(index) {
     }
 }
 
-function clearAllPoints() {
+function clearAllPoints(options = {}) {
+    const silent = Boolean(options?.silent);
     markers.forEach((m) => map.removeLayer(m));
     markers = [];
     selectedPoints = [];
     updatePointsList();
     updateButtons();
     clearRoute();
-    showToast("Tüm noktalar silindi", "info");
+    if (!silent) {
+        showToast("Tüm noktalar silindi", "info");
+    }
 
     // Noktalar temizlenince harita merkezine geri dön
     const center = map.getCenter();
@@ -385,7 +419,7 @@ function updateButtons() {
     elBtnClearAll.disabled = selectedPoints.length === 0;
     elBtnCalculate.disabled = selectedPoints.length < 2;
     elBtnShowAlternatives.disabled = selectedPoints.length < 2;
-    elBtnShowTimeline.disabled = selectedPoints.length < 2 || !currentRouteData;
+    elBtnShowTimeline.disabled = selectedPoints.length < 2 || !currentRouteData || isTransitRouteData(currentRouteData);
     if (elBtnCompareRoutes) {
         elBtnCompareRoutes.disabled = selectedPoints.length < 2;
     }
@@ -398,6 +432,8 @@ async function calculateRoute() {
         return;
     }
 
+    // UI -> backend route akisi:
+    // secili noktalar /api/get-route'a gider, donen geometri haritada cizilir.
     showLoading("Rota hesaplanıyor...\nHarita verisi ilk kez indiriliyorsa biraz zaman alabilir.");
 
     const optimize = false; // TSP optimizasyonu devre dışı
@@ -418,7 +454,14 @@ async function calculateRoute() {
             throw new Error(data.error || "Bilinmeyen hata");
         }
 
-        const routeData = { ...data, optimize };
+        // Backend cevabini tek objede toplayip
+        // cizim + istatistik + adim adim yonlendirme panellerini besle.
+        const routeData = {
+            ...data,
+            optimize,
+            points: selectedPoints.map((point) => [Number(point[0]), Number(point[1])]),
+            transport_mode: "walking",
+        };
         drawRoute(routeData);
         currentRouteOptimize = optimize;
         currentRouteData = routeData;
@@ -490,11 +533,14 @@ function showRouteInfo(data) {
     elRouteInfo.style.display = "block";
     elStatDistance.textContent = `${data.total_distance_km} km`;
     elStatDuration.textContent = `${data.estimated_walk_minutes} dk`;
-    elStatStops.textContent = selectedPoints.length;
+    const infoPoints = Array.isArray(data?.points) && data.points.length > 0 ? data.points : selectedPoints;
+    elStatStops.textContent = infoPoints.length;
 
     if (data.google_maps_link) {
         elBtnGoogleMaps.href = data.google_maps_link;
         elBtnGoogleMaps.style.display = "flex";
+    } else {
+        elBtnGoogleMaps.style.display = "none";
     }
 }
 
@@ -577,6 +623,8 @@ function renderPoiMeta(info) {
 }
 
 async function searchPois(category, markerEmoji, markerLabel, opts = {}) {
+    // POI arama akisi:
+    // il/ilce secimi -> place string olusturma -> backend boundary aramasi -> marker cizimi.
     const forceRefresh = Boolean(opts.forceRefresh);
 
     // Yeni dropdown'lardan veri al
@@ -597,6 +645,8 @@ async function searchPois(category, markerEmoji, markerLabel, opts = {}) {
         : (district ? `${district}, ${province}, Turkey` : `${province}, Turkey`);
 
     // POI'de il/ilce secimi daima idari sinir (place boundary) uzerinden taransin.
+    // Sunum notu:
+    // idari sinir tabanli arama, "yanlis ilceye kayma" riskini azaltir.
     const searchMode = "place_boundary_only";
 
     lastPoiSearch = {
@@ -1283,6 +1333,7 @@ async function analyzeNaturalLanguageQuery() {
         return;
     }
 
+    // NLP paneli yalnizca parse eder; rota/POI uygulama adimi buton aksiyonlarinda ayridir.
     setNlpLoading(true);
     elNlpResults.style.display = "none";
 
@@ -2032,8 +2083,13 @@ async function mainLlmSendMessage() {
     mainLlmSetStatus("Canli akis devam ediyor...");
     mainLlmCurrentAttemptModel = forcedModel || "";
 
+    // LLM paneli provider'a gore iki farkli akis kullanir:
+    // local: /api/llm/local/chat/rag (sync json)
+    // openrouter/gemini: stream endpoint (token bazli akis).
     const provider = mainLlmGetProvider();
     if (provider === "local") {
+        // Local modda backend RAG kararini kendisi verir;
+        // frontend sadece query + model tercihlerini gonderir.
         mainLlmSetStatus("Local model yanitliyor...");
         try {
             const response = await fetch("/api/llm/local/chat/rag", {
@@ -2484,7 +2540,9 @@ function selectAlternativeRoute(routeType, routeCoords) {
             route_type: routeType,
             google_maps_link: altData.google_maps_link,
             optimized_order: altData.optimized_order,
-            optimize: altData.optimize
+            optimize: altData.optimize,
+            points: selectedPoints.map((point) => [Number(point[0]), Number(point[1])]),
+            transport_mode: "walking",
         };
         currentRouteOptimize = Boolean(altData.optimize);
     } else {
@@ -2492,7 +2550,9 @@ function selectAlternativeRoute(routeType, routeCoords) {
         currentRouteData = {
             route_coords: routeCoords,
             route_type: routeType,
-            optimize: currentRouteOptimize
+            optimize: currentRouteOptimize,
+            points: selectedPoints.map((point) => [Number(point[0]), Number(point[1])]),
+            transport_mode: "walking",
         };
         console.warn("Alternatif rota cache kaydi bulunamadi:", routeType);
     }
@@ -2561,6 +2621,12 @@ async function confirmSaveRoute() {
         return;
     }
 
+    const routePoints = getActiveRoutePoints();
+    if (!Array.isArray(routePoints) || routePoints.length < 2) {
+        showToast("Kaydedilecek rota için en az 2 nokta gerekli!", "error");
+        return;
+    }
+
     // Etiketleri ayır
     const tags = tagsInput ? tagsInput.split(",").map(t => t.trim()).filter(t => t) : [];
 
@@ -2573,11 +2639,14 @@ async function confirmSaveRoute() {
             body: JSON.stringify({
                 name: name,
                 description: description,
-                points: selectedPoints,
-                route_coords: currentRouteData.route_coords,
+                points: routePoints,
+                route_coords: Array.isArray(currentRouteData.route_coords) && currentRouteData.route_coords.length > 0
+                    ? currentRouteData.route_coords
+                    : routePoints,
                 distance_km: currentRouteData.total_distance_km,
                 duration_minutes: currentRouteData.estimated_walk_minutes,
                 route_type: currentRouteData.route_type || "route_1",
+                route_payload: currentRouteData.route_payload || null,
                 tags: tags
             }),
         });
@@ -2605,6 +2674,8 @@ async function confirmSaveRoute() {
  */
 async function loadSavedRoutes() {
     try {
+        // Son kaydedilen rota kartlari sunucudan cekilir;
+        // detaylar route id ile ayrica istenir.
         const response = await fetch(`${API_BASE}/routes?sort_by=created_at&limit=10`);
         const data = await response.json();
 
@@ -2638,6 +2709,7 @@ function displaySavedRoutes(routes) {
         });
 
         const favoriteIcon = route.favorite ? "\u{2B50}" : "\u{2606}";
+        const transitModeLabel = getSavedTransitModeLabel(route);
 
         html += `
             <div class="saved-route-card">
@@ -2649,6 +2721,7 @@ function displaySavedRoutes(routes) {
                 </div>
                 ${route.description ? `<p class="saved-route-desc">${escapeHtml(route.description)}</p>` : ""}
                 <div class="saved-route-stats">
+                    ${transitModeLabel ? `<span>\u{1F68C} ${escapeHtml(transitModeLabel)}</span>` : ""}
                     <span>\u{1F4CF} ${route.distance_km} km</span>
                     <span>\u{23F1}\u{FE0F} ${route.duration_minutes} dk</span>
                     <span>\u{1F4C5} ${date}</span>
@@ -2690,19 +2763,51 @@ async function loadRoute(routeId) {
         const route = data.route;
 
         // Mevcut noktaları temizle
-        clearAllPoints();
+        clearAllPoints({ silent: true });
 
         // Rotanın noktalarını ekle
         route.points.forEach(([lat, lon]) => {
-            addPoint(lat, lon);
+            addPoint(lat, lon, { silent: true });
         });
+
+        if (isTransitRouteData(route)) {
+            let restoredRouteData = null;
+            if (typeof window.restoreSavedTransitRoute === "function") {
+                restoredRouteData = window.restoreSavedTransitRoute(route);
+            }
+
+            if (!restoredRouteData) {
+                restoredRouteData = {
+                    points: route.points,
+                    route_coords: route.route_coords,
+                    total_distance_km: route.distance_km,
+                    estimated_walk_minutes: route.duration_minutes,
+                    route_type: route.route_type || "transit",
+                    route_payload: route.route_payload || null,
+                    transport_mode: "transit",
+                    optimize: false,
+                };
+                drawRoute(restoredRouteData);
+            }
+
+            currentRouteData = restoredRouteData;
+            currentRouteOptimize = false;
+            showRouteInfo(currentRouteData);
+            clearRouteSteps();
+            updateButtons();
+            showToast(`"${route.name}" rotası yüklendi! \u{2705}`, "success");
+            return;
+        }
 
         // Rotayı çiz
         const routeData = {
+            points: route.points,
             route_coords: route.route_coords,
             total_distance_km: route.distance_km,
             estimated_walk_minutes: route.duration_minutes,
             route_type: route.route_type,
+            route_payload: route.route_payload || null,
+            transport_mode: "walking",
             optimize: false
         };
 
@@ -2788,6 +2893,10 @@ function showTimelinePlanner() {
         showToast("Önce bir rota hesaplayın!", "error");
         return;
     }
+    if (isTransitRouteData(currentRouteData)) {
+        showToast("Toplu ulasim rotalari icin timeline su an desteklenmiyor.", "info");
+        return;
+    }
 
     elTimelinePanel.style.display = "block";
     elTimelinePanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -2799,6 +2908,10 @@ function showTimelinePlanner() {
 async function generateTimeline() {
     if (!currentRouteData) {
         showToast("Önce bir rota hesaplayın!", "error");
+        return;
+    }
+    if (isTransitRouteData(currentRouteData)) {
+        showToast("Toplu ulasim rotalari icin timeline su an desteklenmiyor.", "info");
         return;
     }
 
@@ -3055,6 +3168,7 @@ async function confirmSaveLocation() {
  */
 async function loadSavedLocations() {
     try {
+        // Sidebar ve harita marker cizimi ayni API cevabindan beslenir.
         const response = await fetch(`${API_BASE}/locations?limit=20&sort_by=favorite`);
         const data = await response.json();
 
@@ -3698,20 +3812,23 @@ async function loadForecastStrip(lat, lon) {
             if (i >= times.length) break;
             const timeVal = times[i]; // E.g. "2026-03-10T09:00"
             const hourPart = timeVal.split("T")[1] || "00:00";
-            const tempVal = Math.round(temps[i]);
-            const codeVal = codes[i];
-            const prob = precipProbs[i] || 0;
+            const tempVal = Math.round(Number(temps[i]) || 0);
+            const codeVal = Number(codes[i]);
+            const prob = Math.max(0, Math.round(Number(precipProbs[i]) || 0));
 
             const emoji = getWeatherEmoji(codeVal);
+            const desc = getWeatherShortDesc(codeVal);
             const activeClass = i === 9 ? "active" : "";
+            const rainLabel = prob > 0 ? `Yağış %${prob}` : "Yağış %0";
 
             html += `
-                <div class="forecast-card ${activeClass}" data-hour="${i}" onclick="selectSimulatorHour(${i})">
+                <button type="button" class="forecast-card ${activeClass}" data-hour="${i}" onclick="selectSimulatorHour(${i})" aria-label="${hourPart} için ${desc}, ${tempVal} derece, yağış olasılığı yüzde ${prob}">
                     <span class="fc-time">${hourPart}</span>
                     <span class="fc-emoji">${emoji}</span>
                     <span class="fc-temp">${tempVal}°C</span>
-                    <span class="fc-rain">%${prob} â˜”</span>
-                </div>
+                    <span class="fc-desc">${escapeHtml(desc)}</span>
+                    <span class="fc-rain">${rainLabel}</span>
+                </button>
             `;
         }
 
@@ -3738,36 +3855,70 @@ window.selectSimulatorHour = function(hour) {
 
 function getWeatherEmoji(code) {
     const emojiMap = {
-        0: "â˜€ï¸",  // Clear sky
-        1: "ğŸŒ¤ï¸",  // Mainly clear
-        2: "â›…",  // Partly cloudy
-        3: "â˜ï¸",  // Overcast
-        45: "ğŸŒ«ï¸",  // Fog
-        48: "ğŸŒ«ï¸",  // Depositing rime fog
-        51: "ğŸŒ§ï¸",  // Light drizzle
-        53: "ğŸŒ§ï¸",  // Moderate drizzle
-        55: "ğŸŒ§ï¸",  // Dense drizzle
-        56: "ğŸŒ¨ï¸",  // Light freezing drizzle
-        57: "ğŸŒ¨ï¸",  // Dense freezing drizzle
-        61: "ğŸŒ§ï¸",  // Slight rain
-        63: "ğŸŒ§ï¸",  // Moderate rain
-        65: "ğŸŒ§ï¸",  // Heavy rain
-        66: "ğŸŒ¨ï¸",  // Light freezing rain
-        67: "ğŸŒ¨ï¸",  // Heavy freezing rain
-        71: "â„ï¸",  // Slight snow fall
-        73: "â„ï¸",  // Moderate snow fall
-        75: "â„ï¸",  // Heavy snow fall
-        77: "â„ï¸",  // Snow grains
-        80: "ğŸŒ¦ï¸",  // Slight rain showers
-        81: "ğŸŒ¦ï¸",  // Moderate rain showers
-        82: "ğŸŒ¦ï¸",  // Violent rain showers
-        85: "ğŸŒ¨ï¸",  // Slight snow showers
-        86: "ğŸŒ¨ï¸",  // Heavy snow showers
-        95: "â›ˆï¸",  // Thunderstorm
-        96: "â›ˆï¸",  // Thunderstorm with slight hail
-        99: "â›ˆï¸"   // Thunderstorm with heavy hail
+        0: "\u2600\uFE0F",
+        1: "\u{1F324}\uFE0F",
+        2: "\u26C5",
+        3: "\u2601\uFE0F",
+        45: "\u{1F32B}\uFE0F",
+        48: "\u{1F32B}\uFE0F",
+        51: "\u{1F327}\uFE0F",
+        53: "\u{1F327}\uFE0F",
+        55: "\u{1F327}\uFE0F",
+        56: "\u{1F328}\uFE0F",
+        57: "\u{1F328}\uFE0F",
+        61: "\u{1F327}\uFE0F",
+        63: "\u{1F327}\uFE0F",
+        65: "\u{1F327}\uFE0F",
+        66: "\u{1F328}\uFE0F",
+        67: "\u{1F328}\uFE0F",
+        71: "\u2744\uFE0F",
+        73: "\u2744\uFE0F",
+        75: "\u2744\uFE0F",
+        77: "\u2744\uFE0F",
+        80: "\u{1F326}\uFE0F",
+        81: "\u{1F326}\uFE0F",
+        82: "\u{1F326}\uFE0F",
+        85: "\u{1F328}\uFE0F",
+        86: "\u{1F328}\uFE0F",
+        95: "\u26C8\uFE0F",
+        96: "\u26C8\uFE0F",
+        99: "\u26C8\uFE0F"
     };
-    return emojiMap[code] || "â“";
+    return emojiMap[code] || "\u2754";
+}
+
+function getWeatherShortDesc(code) {
+    const shortMap = {
+        0: "Açık",
+        1: "Az bulut",
+        2: "Parçalı",
+        3: "Kapalı",
+        45: "Sis",
+        48: "Sis",
+        51: "Çiseleme",
+        53: "Çiseleme",
+        55: "Yoğun çiseleme",
+        56: "Donan yağış",
+        57: "Donan yağış",
+        61: "Yağmur",
+        63: "Yağmur",
+        65: "Şiddetli yağmur",
+        66: "Donan yağmur",
+        67: "Donan yağmur",
+        71: "Kar",
+        73: "Kar",
+        75: "Yoğun kar",
+        77: "Kar",
+        80: "Sağanak",
+        81: "Sağanak",
+        82: "Kuvvetli sağanak",
+        85: "Kar sağanağı",
+        86: "Kar sağanağı",
+        95: "Fırtına",
+        96: "Dolu riski",
+        99: "Dolu riski",
+    };
+    return shortMap[code] || "Bilinmiyor";
 }
 
 function getWeatherDescTr(code) {
@@ -3779,7 +3930,7 @@ function getWeatherDescTr(code) {
         61: "Hafif Yağmur", 63: "Orta Yağmur", 65: "Yoğun Yağmur",
         66: "Hafif Donan Yağmur", 67: "Yoğun Donan Yağmur",
         71: "Hafif Kar", 73: "Orta Kar", 75: "Yoğun Kar", 77: "Kar Taneleri",
-        80: "Hafif Sağanak Yağmur", 81: "Orta Sağanak Yağmur", 82: "Åiddetli Sağanak Yağmur",
+        80: "Hafif Sağanak Yağmur", 81: "Orta Sağanak Yağmur", 82: "Şiddetli Sağanak Yağmur",
         85: "Hafif Sağanak Kar", 86: "Yoğun Sağanak Kar",
         95: "Fırtına", 96: "Hafif Dolu Fırtınası", 99: "Yoğun Dolu Fırtınası"
     };
@@ -3912,6 +4063,7 @@ function clearRouteSteps() {
 async function fetchRouteSteps() {
     clearRouteSteps();
     if (!selectedPoints || selectedPoints.length < 2) return;
+    if (isTransitRouteData(currentRouteData)) return;
     const routeType = currentRouteData?.route_type || "route_1";
     const optimize = Boolean(currentRouteData?.optimize ?? currentRouteOptimize);
     try {

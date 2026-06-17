@@ -85,6 +85,8 @@ def shortest_path(G, origin_node: int, dest_node: int) -> list:
     Returns:
         list[int]: Düğüm ID listesi (rota)
     """
+    # Cekirdek rota primitive'i:
+    # ust seviyedeki tum rota kurucular en sonunda bu cagriya dayanir.
     try:
         path = nx.shortest_path(G, origin_node, dest_node, weight=_routing_weight_key())
         return path
@@ -202,11 +204,15 @@ def solve_tsp(G, points: list) -> list:
         return list(range(n))
     
     # Noktaları graf düğümlerine çevir
+    # Koordinatlari graph node'larina map etmeden
+    # network tabanli TSP hesabina gecemeyiz.
     nodes = [find_nearest_node(G, lat, lon) for lat, lon in points]
     
     # Düğümler arası mesafe matrisi oluştur
     # TSP için tam bir alt grafik (complete subgraph) gerekli
     # Her düğüm çifti arası en kısa yol uzunluğunu hesapla
+    # Yonlu ulasilabilirlik + mesafe matrisi:
+    # no-path ciftleri cezali agirlikla izlenir.
     dist_matrix = {}
     directed_reachable = {}
     no_path_count = 0
@@ -234,6 +240,8 @@ def solve_tsp(G, points: list) -> list:
         )
 
     # TSP optimizasyonu icin iki yonlu erisim gereklidir.
+    # Kritik kontrol:
+    # bir waypoint cifti hic ulasilamiyorsa sahte TSP sonucu yerine acik hata dondur.
     unreachable_pairs = []
     for i in range(n):
         for j in range(i + 1, n):
@@ -247,6 +255,7 @@ def solve_tsp(G, points: list) -> list:
         raise UnreachableWaypointsError(unreachable_pairs)
     
     # TSP alt grafını oluştur
+    # Complete alt-graf kurup TSP approx algoritmasina girdi sagla.
     tsp_graph = nx.Graph()
     for i in range(n):
         for j in range(i + 1, n):
@@ -298,6 +307,7 @@ def build_full_route(G, ordered_points: list) -> list:
     Returns:
         list[int]: Tüm ara düğümleri içeren birleşik rota
     """
+    # Segment bazli alternatifleri secip tek bir tam rota halinde zincirler.
     full_route_nodes = []
     
     for i in range(len(ordered_points) - 1):
@@ -1278,6 +1288,7 @@ def build_alternative_routes(G, ordered_points: list, route_index: int = 0) -> l
         origin = find_nearest_node(G, ordered_points[i][0], ordered_points[i][1])
         dest = find_nearest_node(G, ordered_points[i + 1][0], ordered_points[i + 1][1])
 
+        # Her segmentte en fazla 3 alternatif aday uretilir.
         alternatives = find_alternative_routes(G, origin, dest, num_routes=3)
 
         segment = None
@@ -1298,6 +1309,8 @@ def build_alternative_routes(G, ordered_points: list, route_index: int = 0) -> l
                 candidate_nodes.extend(segment)
             else:
                 candidate_nodes.extend(segment[1:])
+            # Segment birlestirme sonrasi edge butunlugu kontrolu:
+            # kopuk/ters bagli rota cizimlerini engeller.
             if not _is_valid_path(G, candidate_nodes):
                 print(f"[RouteEngine] Segment {i+1} gecersiz kenar iceriyor; tam rota iptal edildi")
                 return []
@@ -1319,6 +1332,8 @@ def build_all_alternative_routes_batch(G, ordered_points: list) -> list:
         list[dict]: [{"type": "route_1", "name": "Rota 1", "icon": "📍", "nodes": [...], ...}, ...]
     """
     # Her segment için alternatifleri BİR KEZ hesapla
+    # Performans stratejisi:
+    # once tum segment alternatiflerini bir kez topla, sonra 3 rotayi olustur.
     segment_alternatives = []
     for i in range(len(ordered_points) - 1):
         origin = find_nearest_node(G, ordered_points[i][0], ordered_points[i][1])
@@ -1332,6 +1347,7 @@ def build_all_alternative_routes_batch(G, ordered_points: list) -> list:
         segment_alternatives.append(alts)
 
     # 3 tam rota oluştur (her biri için aynı index'teki segmenti seç)
+    # route_1/2/3: segment listelerinde ayni index'i secerek birlestirilir.
     results = []
     num_routes = 3
 

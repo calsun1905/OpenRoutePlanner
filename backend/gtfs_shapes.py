@@ -40,13 +40,18 @@ GTFS_RESOURCES = {
     "shapes": "shapes.csv",
     "routes": "routes.csv",
     "stops": "stops.csv",
+    "trips": "trips.csv",
 }
 
 SHAPES_CACHE_FILE = os.path.join(CACHE_DIR, "shapes_cache.json")
 
 MAX_SHAPES_AGE_HOURS = 168  # 1 hafta
-MIN_GTFS_POINTS_FOR_DIRECT_USE = 8
-SPARSE_LINE_FALLBACK_KEYS = {"F1", "F2", "TF1", "TF2", "M2A"}
+
+
+def _cache_path(filename: str) -> str:
+    """Aktif cache dizini icinde dosya yolu dondurur."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    return os.path.join(CACHE_DIR, filename)
 
 
 # ============================================================================
@@ -305,45 +310,304 @@ def _normalize_for_matching(text: str) -> str:
     )
 
 
-def match_shapes_to_metro_lines(shapes: Dict[str, List[Tuple[float, float]]]) -> Dict[str, str]:
-    """Metro hattı isimlerini shape_id'lerle eşleştirir."""
+def _strip_leading_zeroes_from_line_code(text: str) -> str:
+    """M-M02 -> M2, F01 -> F1 benzeri normalize eder."""
+    compact = re.sub(r"[^A-Z0-9]+", "", str(text or "").upper())
+    if not compact:
+        return ""
+    match = re.fullmatch(r"([A-Z]+)0+([1-9][0-9A-Z]*)", compact)
+    if match:
+        return f"{match.group(1)}{match.group(2)}"
+    return compact
+
+
+def _build_line_aliases(line_name: str, functional_code: str = "") -> set[str]:
+    """DB hattini GTFS route_short_name ile eslestirmek icin alias kumesi uretir."""
+    aliases: set[str] = set()
+
+    def _add(value: str) -> None:
+        normalized = _normalize_for_matching(value)
+        if normalized:
+            aliases.add(normalized)
+
+    _add(line_name)
+    compact_line = _strip_leading_zeroes_from_line_code(line_name)
+    if compact_line:
+        _add(compact_line)
+
+    raw_code = str(functional_code or "").strip().upper()
+    if raw_code:
+        _add(raw_code)
+        if raw_code.startswith("GTFS-"):
+            _add(raw_code.split("-", 1)[1])
+
+        parts = [part for part in re.split(r"[^A-Z0-9]+", raw_code) if part]
+        if parts:
+            _add(parts[-1])
+            compact_code = _strip_leading_zeroes_from_line_code(parts[-1])
+            if compact_code:
+                _add(compact_code)
+
+    return aliases
+
+
+def _iter_gtfs_csv_rows(csv_name: str, force: bool = False) -> List[Dict[str, str]]:
+    """GTFS CSV icerigini DictReader ile parse edip satirlari dondurur."""
+    csv_content = download_gtfs_csv(csv_name, force=force)
+    if not csv_content:
+        return []
+    try:
+        reader = csv.DictReader(io.StringIO(csv_content))
+        return [dict(row) for row in reader]
+    except Exception as e:
+        print(f"[GTFS] {csv_name} parse hatasi: {e}")
+        return []
+
+
+def _get_active_metro_lines() -> List[sqlite3.Row]:
     conn = sqlite3.connect(TRANSIT_DB)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
     cursor.execute("SELECT id, name, functional_code FROM metro_lines WHERE is_active = 1")
     lines = cursor.fetchall()
     conn.close()
-    
-    matched = {}
-    
+    return lines
+
+
+def _get_station_shape_for_line(line_name: str) -> List[Tuple[float, float]]:
+    """Transit DB istasyon sirasindan hat geometrisi uretir."""
+    normalized_target = _normalize_for_matching(line_name)
+    if not normalized_target:
+        return []
+
+    lines = _get_active_metro_lines()
+    line_id: Optional[int] = None
+    resolved_name = ""
     for line in lines:
-        line_name = str(line['name'] or '').strip()
-        functional_code = str(line['functional_code'] or '').strip()
-        
-        candidates = []
-        
-        if functional_code:
-            for shape_id in shapes.keys():
-                norm_shape = _normalize_for_matching(shape_id)
-                norm_code = _normalize_for_matching(functional_code)
-                if norm_shape == norm_code or norm_shape.startswith(norm_code):
-                    candidates.append(shape_id)
-        
-        if not candidates and line_name:
-            for shape_id in shapes.keys():
-                norm_shape = _normalize_for_matching(shape_id)
-                match = re.search(r'[Mm](\d+)', line_name)
-                if match:
-                    alt_id = f"M{match.group(1)}"
-                    if _normalize_for_matching(alt_id) == norm_shape:
-                        candidates.append(shape_id)
-        
-        if candidates:
-            best_shape = max(candidates, key=lambda s: len(shapes.get(s, [])))
-            matched[line_name] = best_shape
-    
+        current_name = str(line["name"] or "").strip()
+        if _normalize_for_matching(current_name) == normalized_target:
+            line_id = int(line["id"])
+            resolved_name = current_name
+            break
+
+    if line_id is None:
+        return []
+
+    conn = sqlite3.connect(TRANSIT_DB)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT ms.lat, ms.lon
+        FROM metro_line_stations mls
+        JOIN metro_stations ms ON ms.id = mls.station_id
+        WHERE mls.line_id = ?
+        ORDER BY mls.station_order ASC
+        """,
+        (line_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    coords: List[Tuple[float, float]] = []
+    for row in rows:
+        try:
+            lat = float(row["lat"])
+            lon = float(row["lon"])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if lat == 0 or lon == 0:
+            continue
+        coords.append((lat, lon))
+
+    if len(coords) < 2:
+        return []
+
+    return coords
+
+
+def _find_route_candidates_for_line(
+    line_name: str,
+    functional_code: str,
+    route_rows: List[Dict[str, str]],
+) -> List[Tuple[int, Dict[str, str]]]:
+    """Bir transit DB hatti icin GTFS route adaylarini skorlayip siralar."""
+    aliases = _build_line_aliases(line_name, functional_code)
+    if not aliases:
+        return []
+
+    scored_candidates: List[Tuple[int, Dict[str, str]]] = []
+    for route in route_rows:
+        short_name = str(route.get("route_short_name") or "").strip()
+        long_name = str(route.get("route_long_name") or "").strip()
+        route_type = str(route.get("route_type") or "").strip()
+
+        if route_type not in {"0", "1", "6", "7"}:
+            continue
+
+        norm_short = _normalize_for_matching(short_name)
+        norm_compact_short = _normalize_for_matching(_strip_leading_zeroes_from_line_code(short_name))
+        norm_long = _normalize_for_matching(long_name)
+
+        score = 0
+        if norm_short and norm_short in aliases:
+            score = max(score, 4)
+        if norm_compact_short and norm_compact_short in aliases:
+            score = max(score, 4)
+        if norm_long and norm_long in aliases:
+            score = max(score, 2)
+
+        if score == 0 and len(norm_short) >= 3:
+            if any(norm_short.startswith(alias) for alias in aliases if len(alias) >= 3):
+                score = 1
+
+        if score > 0:
+            scored_candidates.append((score, route))
+
+    scored_candidates.sort(
+        key=lambda item: (
+            item[0],
+            len(str(item[1].get("route_short_name") or "")),
+            str(item[1].get("route_id") or ""),
+        ),
+        reverse=True,
+    )
+    return scored_candidates
+
+
+def _match_route_shapes_to_lines(
+    shapes: Dict[str, List[Tuple[float, float]]],
+) -> Dict[str, Dict[str, object]]:
+    """GTFS routes/trips verisini kullanarak aktif rayli hatlari shape'lerle eslestirir."""
+    lines = _get_active_metro_lines()
+    route_rows = _iter_gtfs_csv_rows("routes")
+    trip_rows = _iter_gtfs_csv_rows("trips")
+
+    if not lines or not route_rows or not trip_rows:
+        return {}
+
+    shape_usage_by_route: Dict[str, Dict[str, int]] = defaultdict(dict)
+    for row in trip_rows:
+        route_id = str(row.get("route_id") or "").strip()
+        shape_id = str(row.get("shape_id") or "").strip()
+        if not route_id or not shape_id:
+            continue
+        usage = shape_usage_by_route.setdefault(route_id, {})
+        usage[shape_id] = int(usage.get(shape_id, 0)) + 1
+
+    matched: Dict[str, Dict[str, object]] = {}
+    for line in lines:
+        line_name = str(line["name"] or "").strip()
+        functional_code = str(line["functional_code"] or "").strip()
+        best_rank: Optional[Tuple[int, int, int, str, str]] = None
+        best_route: Optional[Dict[str, str]] = None
+        best_shape_id = ""
+        best_trip_count = 0
+
+        for route_score, route in _find_route_candidates_for_line(line_name, functional_code, route_rows):
+            route_id = str(route.get("route_id") or "").strip()
+            if not route_id:
+                continue
+
+            shape_usage = shape_usage_by_route.get(route_id, {})
+            for shape_id, trip_count in shape_usage.items():
+                coords = shapes.get(shape_id) or []
+                if not coords:
+                    continue
+                candidate_rank = (
+                    route_score,
+                    len(coords),
+                    int(trip_count),
+                    route_id,
+                    shape_id,
+                )
+                if best_rank is None or candidate_rank > best_rank:
+                    best_rank = candidate_rank
+                    best_route = route
+                    best_shape_id = shape_id
+                    best_trip_count = int(trip_count)
+
+        if best_rank is None or best_route is None:
+            continue
+
+        matched[line_name] = {
+            "shape_id": best_shape_id,
+            "route_id": str(best_route.get("route_id") or "").strip(),
+            "route_short_name": str(best_route.get("route_short_name") or "").strip(),
+            "route_long_name": str(best_route.get("route_long_name") or "").strip(),
+            "trip_count": best_trip_count,
+            "coords": shapes.get(best_shape_id, []),
+        }
+
     return matched
+
+
+def _build_station_route_shapes() -> Dict[str, Dict[str, object]]:
+    """GTFS shape'i olmayan aktif hatlar icin istasyon geometrisi uretir."""
+    route_shapes: Dict[str, Dict[str, object]] = {}
+    for line in _get_active_metro_lines():
+        line_name = str(line["name"] or "").strip()
+        coords = _get_station_shape_for_line(line_name)
+        if not coords:
+            continue
+        route_shapes[line_name] = {
+            "shape_id": "",
+            "route_id": "",
+            "route_short_name": line_name,
+            "route_long_name": "",
+            "trip_count": 0,
+            "source": "stations",
+            "coords": [[float(lat), float(lon)] for lat, lon in coords],
+        }
+    return route_shapes
+
+
+def match_shapes_to_metro_lines(shapes: Dict[str, List[Tuple[float, float]]]) -> Dict[str, str]:
+    """Metro hattı isimlerini shape_id'lerle eşleştirir."""
+    return {
+        line_name: str(detail.get("shape_id") or "")
+        for line_name, detail in _match_route_shapes_to_lines(shapes).items()
+        if detail.get("shape_id")
+    }
+
+
+def build_gtfs_route_shapes_cache(
+    force: bool = False,
+    shapes: Optional[Dict[str, List[Tuple[float, float]]]] = None,
+) -> Dict[str, Dict[str, object]]:
+    """Hat bazli cizim cache'i uretir: once GTFS, eksiklerde istasyon geometrisi."""
+    import json
+
+    if shapes is None:
+        shapes = download_and_parse_shapes(force=force)
+
+    route_shapes: Dict[str, Dict[str, object]] = {}
+    if shapes:
+        matched = _match_route_shapes_to_lines(shapes)
+        for line_name, detail in matched.items():
+            coords = detail.get("coords") or []
+            if not coords:
+                continue
+            route_shapes[line_name] = {
+                "shape_id": str(detail.get("shape_id") or ""),
+                "route_id": str(detail.get("route_id") or ""),
+                "route_short_name": str(detail.get("route_short_name") or ""),
+                "route_long_name": str(detail.get("route_long_name") or ""),
+                "trip_count": int(detail.get("trip_count") or 0),
+                "source": "gtfs",
+                "coords": [[float(lat), float(lon)] for lat, lon in coords],
+            }
+
+    station_shapes = _build_station_route_shapes()
+    for line_name, detail in station_shapes.items():
+        route_shapes.setdefault(line_name, detail)
+
+    if route_shapes:
+        route_file = _cache_path("gtfs_route_shapes.json")
+        with open(route_file, "w", encoding="utf-8") as f:
+            json.dump(route_shapes, f)
+
+    return route_shapes
 
 
 def get_shape_for_line(line_name: str, shapes: Dict[str, List[Tuple[float, float]]]) -> List[Tuple[float, float]]:
@@ -596,52 +860,49 @@ METRO_LINE_SHAPES = {
 def get_metro_line_shape(line_name: str) -> List[Tuple[float, float]]:
     """
     Metro hattı için güzergah koordinatlarını döner.
-    GTFS route shapes öncelikli, yoksa manuel veri kullanılır.
+    GTFS route shapes öncelikli, eksik hatlarda istasyon geometrisi kullanılır.
     """
     import json
-    
-    def _manual_shape_for(name: str) -> List[Tuple[float, float]]:
-        for key, coords in METRO_LINE_SHAPES.items():
-            if _normalize_for_matching(key) == _normalize_for_matching(name):
-                return coords
+
+    def _read_gtfs_coords(route_shapes: Dict[str, Dict[str, object]], name: str) -> List[Tuple[float, float]]:
+        if name in route_shapes:
+            coords = route_shapes[name].get("coords") or []
+            return [(float(c[0]), float(c[1])) for c in coords]
+
+        norm_name = _normalize_for_matching(name)
+        for lname, data in route_shapes.items():
+            if _normalize_for_matching(lname) == norm_name:
+                coords = data.get("coords") or []
+                return [(float(c[0]), float(c[1])) for c in coords]
         return []
 
-    line_upper = str(line_name or "").strip().upper()
-
-    # Önce GTFS route shapes dosyasına bak (M1A, M2, Marmaray vs.)
-    gtfs_route_file = os.path.join(CACHE_DIR, "gtfs_route_shapes.json")
+    route_shapes: Dict[str, Dict[str, object]] = {}
+    gtfs_route_file = _cache_path("gtfs_route_shapes.json")
     if os.path.exists(gtfs_route_file):
         try:
-            with open(gtfs_route_file, 'r', encoding='utf-8') as f:
+            with open(gtfs_route_file, "r", encoding="utf-8") as f:
                 route_shapes = json.load(f)
-            
-            # Exact line name match
-            if line_name in route_shapes:
-                gtfs_coords = [(float(c[0]), float(c[1])) for c in route_shapes[line_name]['coords']]
-                if line_upper in SPARSE_LINE_FALLBACK_KEYS and len(gtfs_coords) < MIN_GTFS_POINTS_FOR_DIRECT_USE:
-                    manual_coords = _manual_shape_for(line_name)
-                    if manual_coords:
-                        return manual_coords
-                return gtfs_coords
-            
-            # Normalized match
-            norm_name = _normalize_for_matching(line_name)
-            for lname, data in route_shapes.items():
-                if _normalize_for_matching(lname) == norm_name:
-                    gtfs_coords = [(float(c[0]), float(c[1])) for c in data['coords']]
-                    if line_upper in SPARSE_LINE_FALLBACK_KEYS and len(gtfs_coords) < MIN_GTFS_POINTS_FOR_DIRECT_USE:
-                        manual_coords = _manual_shape_for(lname)
-                        if manual_coords:
-                            return manual_coords
-                    return gtfs_coords
         except Exception:
-            pass
-    
-    # Manuel veriye bak
-    manual = _manual_shape_for(line_name)
-    if manual:
-        return manual
-    
+            route_shapes = {}
+
+    gtfs_coords = _read_gtfs_coords(route_shapes, line_name)
+    if gtfs_coords:
+        return gtfs_coords
+
+    if not route_shapes or not gtfs_coords:
+        try:
+            route_shapes = build_gtfs_route_shapes_cache(force=False)
+        except Exception:
+            route_shapes = {}
+
+    gtfs_coords = _read_gtfs_coords(route_shapes, line_name)
+    if gtfs_coords:
+        return gtfs_coords
+
+    station_coords = _get_station_shape_for_line(line_name)
+    if station_coords:
+        return station_coords
+
     return []
 
 

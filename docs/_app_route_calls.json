@@ -1,0 +1,2524 @@
+[
+  {
+    "name": "_env_flag",
+    "start": 41,
+    "end": 46,
+    "doc": "ENV'den bool deÃşer okur.",
+    "routes": [],
+    "calls": [
+      "getenv",
+      "lower",
+      "strip"
+    ]
+  },
+  {
+    "name": "_env_float",
+    "start": 49,
+    "end": 57,
+    "doc": "ENV'den float deÃşer okur.",
+    "routes": [],
+    "calls": [
+      "getenv",
+      "strip"
+    ]
+  },
+  {
+    "name": "_env_int",
+    "start": 60,
+    "end": 67,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "getenv",
+      "strip"
+    ]
+  },
+  {
+    "name": "_to_lat_lon_pair",
+    "start": 78,
+    "end": 91,
+    "doc": "[lat, lon] formatindaki veriyi guvenli float ciftine cevirir.",
+    "routes": [],
+    "calls": []
+  },
+  {
+    "name": "_is_in_istanbul_bbox",
+    "start": 94,
+    "end": 98,
+    "doc": "",
+    "routes": [],
+    "calls": []
+  },
+  {
+    "name": "_outside_istanbul_response",
+    "start": 101,
+    "end": 111,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "jsonify"
+    ]
+  },
+  {
+    "name": "_first_outside_point",
+    "start": 114,
+    "end": 122,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_to_lat_lon_pair",
+      "_is_in_istanbul_bbox"
+    ]
+  },
+  {
+    "name": "_route_radius_multipliers",
+    "start": 125,
+    "end": 155,
+    "doc": "Noktalarin yayilimina gore denenmesi gereken graf yaricap carpani listesi.",
+    "routes": [],
+    "calls": [
+      "get",
+      "radians",
+      "sin",
+      "cos",
+      "atan2",
+      "sqrt",
+      "haversine_m",
+      "remove",
+      "insert"
+    ]
+  },
+  {
+    "name": "_get_graph_for_points_with_multiplier",
+    "start": 158,
+    "end": 163,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "get_graph_for_points"
+    ]
+  },
+  {
+    "name": "_collect_snap_metrics",
+    "start": 166,
+    "end": 182,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "find_nearest_node_with_distance",
+      "append"
+    ]
+  },
+  {
+    "name": "_route_index_from_type",
+    "start": 185,
+    "end": 186,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "get"
+    ]
+  },
+  {
+    "name": "_round_point_pairs",
+    "start": 189,
+    "end": 196,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_to_lat_lon_pair",
+      "append"
+    ]
+  },
+  {
+    "name": "_route_response_cache_key",
+    "start": 199,
+    "end": 213,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_round_point_pairs",
+      "dumps",
+      "hexdigest",
+      "sha1",
+      "encode"
+    ]
+  },
+  {
+    "name": "_route_response_cache_get",
+    "start": 216,
+    "end": 220,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "get"
+    ]
+  },
+  {
+    "name": "_route_response_cache_put",
+    "start": 223,
+    "end": 226,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "put"
+    ]
+  },
+  {
+    "name": "_unreachable_waypoints_response",
+    "start": 229,
+    "end": 238,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "get",
+      "join",
+      "jsonify"
+    ]
+  },
+  {
+    "name": "_build_primary_route_with_retries",
+    "start": 241,
+    "end": 302,
+    "doc": "Giderek genisleyen graflarda rota dener.",
+    "routes": [],
+    "calls": [
+      "_route_radius_multipliers",
+      "get",
+      "_route_index_from_type",
+      "_get_graph_for_points_with_multiplier",
+      "_collect_snap_metrics",
+      "solve_tsp",
+      "to_payload",
+      "build_alternative_routes"
+    ]
+  },
+  {
+    "name": "_build_alternative_batch_with_retries",
+    "start": 305,
+    "end": 365,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_route_radius_multipliers",
+      "get",
+      "_get_graph_for_points_with_multiplier",
+      "_collect_snap_metrics",
+      "solve_tsp",
+      "to_payload",
+      "build_all_alternative_routes_batch"
+    ]
+  },
+  {
+    "name": "_is_place_text_in_istanbul",
+    "start": 368,
+    "end": 398,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "strip",
+      "geocode",
+      "get",
+      "_is_in_istanbul_bbox"
+    ]
+  },
+  {
+    "name": "_extract_nlp_places_for_scope_check",
+    "start": 401,
+    "end": 436,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower",
+      "strip",
+      "get",
+      "append",
+      "casefold",
+      "add"
+    ]
+  },
+  {
+    "name": "_is_route_intent_query_text",
+    "start": 439,
+    "end": 452,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower",
+      "strip",
+      "search"
+    ]
+  },
+  {
+    "name": "_has_poi_concept_cue",
+    "start": 455,
+    "end": 463,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower",
+      "strip"
+    ]
+  },
+  {
+    "name": "_has_single_location_style_cue",
+    "start": 466,
+    "end": 471,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower",
+      "strip",
+      "search"
+    ]
+  },
+  {
+    "name": "_postprocess_nlp_result_for_poi",
+    "start": 474,
+    "end": 505,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower",
+      "strip",
+      "get",
+      "_is_route_intent_query_text",
+      "_has_poi_concept_cue",
+      "_has_single_location_style_cue"
+    ]
+  },
+  {
+    "name": "_openrouter_system_prompt",
+    "start": 508,
+    "end": 524,
+    "doc": "OpenRouter uzerinden giden tum sohbetler icin global system prompt.",
+    "routes": [],
+    "calls": [
+      "strip",
+      "getenv"
+    ]
+  },
+  {
+    "name": "_inject_system_message",
+    "start": 527,
+    "end": 536,
+    "doc": "Mesaj listesinde en basta system rolu yoksa global system prompt ekler.",
+    "routes": [],
+    "calls": [
+      "get",
+      "_openrouter_system_prompt"
+    ]
+  },
+  {
+    "name": "_local_llm_system_prompt",
+    "start": 539,
+    "end": 551,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "strip",
+      "getenv"
+    ]
+  },
+  {
+    "name": "_inject_local_system_message",
+    "start": 554,
+    "end": 563,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "get",
+      "_local_llm_system_prompt"
+    ]
+  },
+  {
+    "name": "_as_bool",
+    "start": 566,
+    "end": 573,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower",
+      "strip"
+    ]
+  },
+  {
+    "name": "_normalize_messages",
+    "start": 576,
+    "end": 588,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower",
+      "strip",
+      "get",
+      "repair_text",
+      "append"
+    ]
+  },
+  {
+    "name": "_extract_latest_user_text",
+    "start": 591,
+    "end": 600,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "reversed",
+      "lower",
+      "strip",
+      "get",
+      "repair_text"
+    ]
+  },
+  {
+    "name": "_classify_llm_error",
+    "start": 603,
+    "end": 613,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower"
+    ]
+  },
+  {
+    "name": "_local_llm_max_tokens",
+    "start": 616,
+    "end": 635,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_env_int"
+    ]
+  },
+  {
+    "name": "_local_llm_float_param",
+    "start": 638,
+    "end": 645,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "get",
+      "_env_float"
+    ]
+  },
+  {
+    "name": "_local_llm_int_param",
+    "start": 648,
+    "end": 655,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "get",
+      "_env_int"
+    ]
+  },
+  {
+    "name": "_normalize_common_turkish_glitches",
+    "start": 661,
+    "end": 683,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower",
+      "items",
+      "sub",
+      "escape"
+    ]
+  },
+  {
+    "name": "_normalize_for_match",
+    "start": 686,
+    "end": 703,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower",
+      "_normalize_common_turkish_glitches",
+      "repair_text",
+      "maketrans",
+      "translate",
+      "sub",
+      "strip"
+    ]
+  },
+  {
+    "name": "_contains_route_relation",
+    "start": 706,
+    "end": 711,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_normalize_for_match",
+      "search"
+    ]
+  },
+  {
+    "name": "_is_dynamic_route_request",
+    "start": 714,
+    "end": 722,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_normalize_for_match",
+      "_contains_route_relation"
+    ]
+  },
+  {
+    "name": "_is_poi_request",
+    "start": 725,
+    "end": 731,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_normalize_for_match"
+    ]
+  },
+  {
+    "name": "_should_use_rag_for_query_with_reason",
+    "start": 734,
+    "end": 773,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_normalize_for_match",
+      "search",
+      "_contains_route_relation"
+    ]
+  },
+  {
+    "name": "_should_use_rag_for_query",
+    "start": 776,
+    "end": 777,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_should_use_rag_for_query_with_reason"
+    ]
+  },
+  {
+    "name": "_resolve_rag_min_similarity",
+    "start": 780,
+    "end": 790,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "get",
+      "getenv"
+    ]
+  },
+  {
+    "name": "_should_fallback_from_rag",
+    "start": 793,
+    "end": 803,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "get"
+    ]
+  },
+  {
+    "name": "_extract_stop_names_from_text",
+    "start": 806,
+    "end": 839,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "strip",
+      "_normalize_common_turkish_glitches",
+      "repair_text",
+      "lower",
+      "find",
+      "rstrip",
+      "replace",
+      "sub",
+      "split",
+      "_normalize_for_match",
+      "add",
+      "append"
+    ]
+  },
+  {
+    "name": "_extract_query_line_code",
+    "start": 842,
+    "end": 845,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_normalize_for_match",
+      "search",
+      "strip",
+      "upper",
+      "group"
+    ]
+  },
+  {
+    "name": "_extract_station_candidate_for_line_query",
+    "start": 848,
+    "end": 860,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_normalize_common_turkish_glitches",
+      "repair_text",
+      "search",
+      "escape",
+      "strip",
+      "group",
+      "sub"
+    ]
+  },
+  {
+    "name": "_try_direct_rag_structured_answer",
+    "start": 863,
+    "end": 946,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_normalize_for_match",
+      "get",
+      "_extract_query_line_code",
+      "_normalize_common_turkish_glitches",
+      "repair_text",
+      "upper",
+      "strip",
+      "_extract_stop_names_from_text",
+      "split",
+      "join",
+      "search",
+      "_extract_station_candidate_for_line_query",
+      "replace",
+      "ratio",
+      "SequenceMatcher",
+      "append",
+      "findall"
+    ]
+  },
+  {
+    "name": "_split_text_sentences",
+    "start": 957,
+    "end": 969,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_normalize_common_turkish_glitches",
+      "repair_text",
+      "replace",
+      "split",
+      "strip",
+      "sub",
+      "append"
+    ]
+  },
+  {
+    "name": "_query_tokens_for_extractive",
+    "start": 972,
+    "end": 984,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_normalize_for_match",
+      "findall",
+      "add",
+      "append"
+    ]
+  },
+  {
+    "name": "_build_extractive_rag_answer",
+    "start": 987,
+    "end": 1046,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "get",
+      "_query_tokens_for_extractive",
+      "_extract_query_line_code",
+      "_normalize_for_match",
+      "append",
+      "_split_text_sentences",
+      "findall",
+      "lower",
+      "strip",
+      "sort",
+      "add",
+      "join"
+    ]
+  },
+  {
+    "name": "_is_rag_context_relevant",
+    "start": 1049,
+    "end": 1067,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_normalize_for_match",
+      "findall"
+    ]
+  },
+  {
+    "name": "_local_llm_generation_options",
+    "start": 1070,
+    "end": 1083,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_local_llm_float_param",
+      "_local_llm_max_tokens",
+      "get",
+      "_local_llm_int_param"
+    ]
+  },
+  {
+    "name": "_is_repetition_loop",
+    "start": 1086,
+    "end": 1109,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "strip",
+      "sub",
+      "lower",
+      "split"
+    ]
+  },
+  {
+    "name": "_unique_models",
+    "start": 1112,
+    "end": 1121,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "strip",
+      "add",
+      "append"
+    ]
+  },
+  {
+    "name": "_llm_candidate_models",
+    "start": 1124,
+    "end": 1135,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "lower",
+      "strip",
+      "gemini_status",
+      "local_llm_status",
+      "openrouter_status",
+      "get",
+      "_unique_models"
+    ]
+  },
+  {
+    "name": "_chat_context_from_session",
+    "start": 1138,
+    "end": 1149,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "list_chat_messages",
+      "lower",
+      "strip",
+      "get",
+      "repair_text",
+      "append"
+    ]
+  },
+  {
+    "name": "_configure_live_console_output",
+    "start": 1152,
+    "end": 1168,
+    "doc": "Console stream buffering'i azaltÃır ve print'i anlÃık flush edecek Ã…şekilde ayarlar.",
+    "routes": [],
+    "calls": [
+      "callable",
+      "reconfigure",
+      "_env_flag",
+      "partial",
+      "setattr"
+    ]
+  },
+  {
+    "name": "_preload_bert_async",
+    "start": 1358,
+    "end": 1378,
+    "doc": "Arka planda BERT NLP engine'i yukler (lazy warm-up).",
+    "routes": [],
+    "calls": [
+      "get_bert_nlp_engine",
+      "Thread",
+      "start"
+    ]
+  },
+  {
+    "name": "_poi_version_token",
+    "start": 1444,
+    "end": 1445,
+    "doc": "",
+    "routes": [],
+    "calls": []
+  },
+  {
+    "name": "_increment_queue_timeout_counter",
+    "start": 1448,
+    "end": 1454,
+    "doc": "",
+    "routes": [],
+    "calls": []
+  },
+  {
+    "name": "_semaphore_snapshot",
+    "start": 1457,
+    "end": 1462,
+    "doc": "",
+    "routes": [],
+    "calls": []
+  },
+  {
+    "name": "_queue_stats_payload",
+    "start": 1465,
+    "end": 1481,
+    "doc": "",
+    "routes": [],
+    "calls": [
+      "_semaphore_snapshot"
+    ]
+  },
+  {
+    "name": "_should_log_bert_metrics",
+    "start": 1484,
+    "end": 1493,
+    "doc": "BERT metrik loglarÃınÃın hÃızÃınÃı sÃınÃırlar.",
+    "routes": [],
+    "calls": [
+      "time"
+    ]
+  },
+  {
+    "name": "_log_bert_runtime_metrics",
+    "start": 1496,
+    "end": 1516,
+    "doc": "BERT runtime donanÃım kullanÃımÃınÃı loglar.",
+    "routes": [],
+    "calls": [
+      "_should_log_bert_metrics",
+      "get_bert_engine",
+      "get_runtime_metrics",
+      "dumps"
+    ]
+  },
+  {
+    "name": "_log_bert_parse_trace",
+    "start": 1519,
+    "end": 1584,
+    "doc": "BERT parse trace bilgisini okunabilir satirlar halinde yazdirir.",
+    "routes": [],
+    "calls": [
+      "get",
+      "items",
+      "join",
+      "dumps"
+    ]
+  },
+  {
+    "name": "initialize_runtime",
+    "start": 1587,
+    "end": 1603,
+    "doc": "Calisma zamani temel baslangic gorevlerini bir kez calistirir.",
+    "routes": [],
+    "calls": [
+      "ensure_db",
+      "ensure_chat_schema",
+      "ensure_llm_health_schema",
+      "ensure_nlp_audit_schema",
+      "rebuild_db_from_sync_json",
+      "run_sqlite_maintenance",
+      "purge_old_geocodes"
+    ]
+  },
+  {
+    "name": "initialize_graph_preload",
+    "start": 1606,
+    "end": 1615,
+    "doc": "Populer bolgelerin grafilerini bir kez on yukler.",
+    "routes": [],
+    "calls": [
+      "preload_popular_regions"
+    ]
+  },
+  {
+    "name": "_get_cached_graph",
+    "start": 1619,
+    "end": 1632,
+    "doc": "Graf objesini LRU cache'te alÃır (uygulama iÃƒçi).",
+    "routes": [],
+    "calls": [
+      "get",
+      "get_graph",
+      "put"
+    ]
+  },
+  {
+    "name": "_redact_pii_text",
+    "start": 1635,
+    "end": 1641,
+    "doc": "Loglarda temel PII redaction uygular (telefon/e-posta/sayÃısal kimlik).",
+    "routes": [],
+    "calls": [
+      "sub"
+    ]
+  },
+  {
+    "name": "_request_trace_prefix",
+    "start": 1644,
+    "end": 1647,
+    "doc": "",
+    "routes": [],
+    "calls": []
+  },
+  {
+    "name": "_ensure_runtime_initialized",
+    "start": 1651,
+    "end": 1667,
+    "doc": "WSGI/moduler import senaryolarinda runtime gorevlerini lazy baslatir.",
+    "routes": [],
+    "calls": [
+      "strip",
+      "get",
+      "uuid4",
+      "initialize_runtime"
+    ]
+  },
+  {
+    "name": "_attach_trace_headers",
+    "start": 1671,
+    "end": 1693,
+    "doc": "Trace header'larini tum response'lara ekler.",
+    "routes": [],
+    "calls": [
+      "get",
+      "lower",
+      "startswith"
+    ]
+  },
+  {
+    "name": "_disable_bert_runtime",
+    "start": 1696,
+    "end": 1701,
+    "doc": "Runtime'da BERT kullanÃılamaz hale geldiÃşinde fallback moduna geÃƒç.",
+    "routes": [],
+    "calls": []
+  },
+  {
+    "name": "_build_regex_fallback_result",
+    "start": 1704,
+    "end": 1710,
+    "doc": "Regex parser sonucunu BERT endpoint sÃƒözleÃ…şmesine uyarlar.",
+    "routes": [],
+    "calls": [
+      "regex_parse_query",
+      "get"
+    ]
+  },
+  {
+    "name": "api_get_route",
+    "start": 1715,
+    "end": 1832,
+    "doc": "Koordinat listesi alÃır, optimize edilmiÃ…ş rota dÃƒöner.",
+    "routes": [
+      {
+        "path": "/api/get-route",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "get",
+      "_first_outside_point",
+      "_outside_istanbul_response",
+      "_route_response_cache_key",
+      "_route_response_cache_get",
+      "_build_primary_route_with_retries",
+      "_unreachable_waypoints_response",
+      "nodes_to_coords",
+      "calculate_route_stats",
+      "generate_google_maps_link",
+      "_route_response_cache_put",
+      "route"
+    ]
+  },
+  {
+    "name": "api_get_route_steps",
+    "start": 1836,
+    "end": 2009,
+    "doc": "Verilen noktalar iÃƒçin adÃım adÃım yÃƒönlendirme (basitleÃ…ştirilmiÃ…ş).",
+    "routes": [
+      {
+        "path": "/api/get-route-steps",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "get",
+      "_to_lat_lon_pair",
+      "_first_outside_point",
+      "_outside_istanbul_response",
+      "_route_response_cache_key",
+      "_route_response_cache_get",
+      "_build_primary_route_with_retries",
+      "_unreachable_waypoints_response",
+      "append",
+      "get_node_coords",
+      "get_edge_data",
+      "values",
+      "build_turn_by_turn_steps",
+      "nodes_to_coords",
+      "_route_response_cache_put",
+      "route"
+    ]
+  },
+  {
+    "name": "api_get_alternative_routes",
+    "start": 2014,
+    "end": 2165,
+    "doc": "AynÃı noktalar iÃƒçin 3 farklÃı alternatif rota dÃƒöner.",
+    "routes": [
+      {
+        "path": "/api/get-alternative-routes",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "get",
+      "_to_lat_lon_pair",
+      "_first_outside_point",
+      "_outside_istanbul_response",
+      "_route_response_cache_key",
+      "_route_response_cache_get",
+      "_build_alternative_batch_with_retries",
+      "_unreachable_waypoints_response",
+      "nodes_to_coords",
+      "append",
+      "generate_google_maps_link",
+      "abs",
+      "_coords_equal",
+      "_route_response_cache_put",
+      "route"
+    ]
+  },
+  {
+    "name": "api_search_pois",
+    "start": 2169,
+    "end": 2310,
+    "doc": "Belirtilen bÃƒölgede POI arar.",
+    "routes": [
+      {
+        "path": "/api/search-pois",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "get",
+      "_is_place_text_in_istanbul",
+      "_outside_istanbul_response",
+      "lower",
+      "strip",
+      "split",
+      "_request_trace_prefix",
+      "resolve_poi_concept",
+      "_redact_pii_text",
+      "isascii",
+      "_poi_version_token",
+      "search_pois",
+      "route"
+    ]
+  },
+  {
+    "name": "health_check",
+    "start": 2314,
+    "end": 2316,
+    "doc": "Sunucu saÃşlÃık kontrolÃƒü.",
+    "routes": [
+      {
+        "path": "/api/health",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_cache_stats",
+    "start": 2320,
+    "end": 2334,
+    "doc": "Graph/POI ve multimodal compare cache istatistiklerini dondurur.",
+    "routes": [
+      {
+        "path": "/api/cache/stats",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get_all_cache_stats",
+      "multimodal_compare_cache_stats",
+      "multimodal_transit_lookup_cache_stats",
+      "multimodal_segment_cache_stats",
+      "multimodal_osrm_cache_stats",
+      "_queue_stats_payload",
+      "evaluate_cache_policy",
+      "isoformat",
+      "now",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_geocode_suggest",
+    "start": 2338,
+    "end": 2351,
+    "doc": "Yazarken Ãƒöneri iÃƒçin: KÃısmi yer ismi -> coklu sonuc doner (autocomplete).",
+    "routes": [
+      {
+        "path": "/api/geocode/suggest",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "strip",
+      "get",
+      "geocode_suggest",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_geocode_forward_get",
+    "start": 2355,
+    "end": 2367,
+    "doc": "Compatibility GET endpoint for forward geocoding (query param: address)",
+    "routes": [
+      {
+        "path": "/api/geocode/forward",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get",
+      "jsonify",
+      "geocode",
+      "route"
+    ]
+  },
+  {
+    "name": "api_geocode_reverse_get",
+    "start": 2371,
+    "end": 2381,
+    "doc": "Compatibility GET endpoint for reverse geocoding (query params: lat, lon)",
+    "routes": [
+      {
+        "path": "/api/geocode/reverse",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get",
+      "jsonify",
+      "reverse_geocode",
+      "route"
+    ]
+  },
+  {
+    "name": "api_geocode",
+    "start": 2385,
+    "end": 2424,
+    "doc": "Yer ismini koordinata Ãƒçevirir.",
+    "routes": [
+      {
+        "path": "/api/geocode",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "geocode",
+      "route"
+    ]
+  },
+  {
+    "name": "api_reverse_geocode",
+    "start": 2428,
+    "end": 2463,
+    "doc": "KoordinatÃı yer ismine Ãƒçevirir.",
+    "routes": [
+      {
+        "path": "/api/reverse-geocode",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "reverse_geocode",
+      "route"
+    ]
+  },
+  {
+    "name": "api_geocode_batch",
+    "start": 2467,
+    "end": 2504,
+    "doc": "Toplu geocoding iÃ…şlemi.",
+    "routes": [
+      {
+        "path": "/api/geocode/batch",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "geocode_batch",
+      "route"
+    ]
+  },
+  {
+    "name": "serve_frontend",
+    "start": 2508,
+    "end": 2515,
+    "doc": "Ana sayfa - Frontend'i sun.",
+    "routes": [
+      {
+        "path": "/",
+        "methods": []
+      }
+    ],
+    "calls": [
+      "send_from_directory",
+      "route"
+    ]
+  },
+  {
+    "name": "serve_static_files",
+    "start": 2519,
+    "end": 2539,
+    "doc": "Statik dosyalarÃı sun (CSS, JS, gÃƒörseller vb.).",
+    "routes": [
+      {
+        "path": "/<path:filepath>",
+        "methods": []
+      }
+    ],
+    "calls": [
+      "send_from_directory",
+      "endswith",
+      "route"
+    ]
+  },
+  {
+    "name": "api_save_route",
+    "start": 2547,
+    "end": 2602,
+    "doc": "RotayÃı kaydeder.",
+    "routes": [
+      {
+        "path": "/api/routes/save",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "save_route",
+      "get",
+      "route"
+    ]
+  },
+  {
+    "name": "api_get_routes",
+    "start": 2606,
+    "end": 2659,
+    "doc": "TÃƒüm kaydedilmiÃ…ş rotalarÃı getirir (Pagination destekli).",
+    "routes": [
+      {
+        "path": "/api/routes",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get",
+      "get_routes_count",
+      "get_all_routes",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_get_route_by_id",
+    "start": 2663,
+    "end": 2682,
+    "doc": "Belirli bir rotayÃı getirir.",
+    "routes": [
+      {
+        "path": "/api/routes/<route_id>",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get_route",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_update_route",
+    "start": 2686,
+    "end": 2722,
+    "doc": "RotayÃı gÃƒünceller.",
+    "routes": [
+      {
+        "path": "/api/routes/<route_id>",
+        "methods": [
+          "PUT"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "update_route",
+      "route"
+    ]
+  },
+  {
+    "name": "api_delete_route",
+    "start": 2726,
+    "end": 2749,
+    "doc": "RotayÃı siler.",
+    "routes": [
+      {
+        "path": "/api/routes/<route_id>",
+        "methods": [
+          "DELETE"
+        ]
+      }
+    ],
+    "calls": [
+      "delete_route",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_toggle_favorite",
+    "start": 2753,
+    "end": 2778,
+    "doc": "RotayÃı favorilere ekler/ÃƒçÃıkarÃır.",
+    "routes": [
+      {
+        "path": "/api/routes/<route_id>/favorite",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "toggle_favorite",
+      "jsonify",
+      "get",
+      "route"
+    ]
+  },
+  {
+    "name": "api_search_routes",
+    "start": 2782,
+    "end": 2810,
+    "doc": "Rota arama.",
+    "routes": [
+      {
+        "path": "/api/routes/search",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get",
+      "jsonify",
+      "search_routes",
+      "route"
+    ]
+  },
+  {
+    "name": "api_route_statistics",
+    "start": 2814,
+    "end": 2833,
+    "doc": "Rota istatistikleri.",
+    "routes": [
+      {
+        "path": "/api/routes/statistics",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get_statistics",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_create_timeline",
+    "start": 2841,
+    "end": 2905,
+    "doc": "Rota iÃƒçin zaman Ãƒçizelgesi oluÃ…şturur.",
+    "routes": [
+      {
+        "path": "/api/timeline/create",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "get",
+      "items",
+      "create_timeline",
+      "route"
+    ]
+  },
+  {
+    "name": "api_check_conflicts",
+    "start": 2909,
+    "end": 2952,
+    "doc": "Zaman Ãƒçizelgesinde ÃƒçakÃıÃ…şmalarÃı kontrol eder.",
+    "routes": [
+      {
+        "path": "/api/timeline/check-conflicts",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "get",
+      "items",
+      "check_time_conflicts",
+      "route"
+    ]
+  },
+  {
+    "name": "api_optimize_timeline",
+    "start": 2956,
+    "end": 2994,
+    "doc": "Zaman Ãƒçizelgesini optimize eder ve Ãƒöneriler sunar.",
+    "routes": [
+      {
+        "path": "/api/timeline/optimize",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "get",
+      "optimize_schedule",
+      "route"
+    ]
+  },
+  {
+    "name": "api_get_locations",
+    "start": 3002,
+    "end": 3034,
+    "doc": "KaydedilmiÃ…ş tÃƒüm lokasyonlarÃı getirir.",
+    "routes": [
+      {
+        "path": "/api/locations",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get",
+      "get_locations_count",
+      "get_all_locations",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_save_location",
+    "start": 3038,
+    "end": 3067,
+    "doc": "Yeni bir lokasyon kaydeder.",
+    "routes": [
+      {
+        "path": "/api/locations",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "save_location",
+      "get",
+      "route"
+    ]
+  },
+  {
+    "name": "api_delete_location",
+    "start": 3071,
+    "end": 3086,
+    "doc": "Lokasyonu siler.",
+    "routes": [
+      {
+        "path": "/api/locations/<location_id>",
+        "methods": [
+          "DELETE"
+        ]
+      }
+    ],
+    "calls": [
+      "delete_location",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_update_location",
+    "start": 3090,
+    "end": 3111,
+    "doc": "Lokasyonu gÃƒünceller.",
+    "routes": [
+      {
+        "path": "/api/locations/<location_id>",
+        "methods": [
+          "PUT"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "jsonify",
+      "update_location",
+      "route"
+    ]
+  },
+  {
+    "name": "api_toggle_location_favorite",
+    "start": 3115,
+    "end": 3132,
+    "doc": "Lokasyonun favori durumunu deÃşiÃ…ştirir.",
+    "routes": [
+      {
+        "path": "/api/locations/<location_id>/favorite",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "toggle_location_favorite",
+      "jsonify",
+      "get",
+      "route"
+    ]
+  },
+  {
+    "name": "api_nlp_parse",
+    "start": 3140,
+    "end": 3305,
+    "doc": "DoÃşal dil sorgusunu analiz eder ve yapÃılandÃırÃılmÃıÃ…ş veri dÃƒöner.",
+    "routes": [
+      {
+        "path": "/api/nlp/parse",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "_request_trace_prefix",
+      "get_json",
+      "jsonify",
+      "strip",
+      "get",
+      "_redact_pii_text",
+      "perf_counter",
+      "acquire",
+      "_increment_queue_timeout_counter",
+      "get_bert_nlp_engine",
+      "_log_bert_runtime_metrics",
+      "parse",
+      "_postprocess_nlp_result_for_poi",
+      "_extract_nlp_places_for_scope_check",
+      "_is_place_text_in_istanbul",
+      "append",
+      "_outside_istanbul_response",
+      "_log_bert_parse_trace",
+      "log_nlp_parse_audit",
+      "release"
+    ]
+  },
+  {
+    "name": "api_nlp_status",
+    "start": 3309,
+    "end": 3356,
+    "doc": "NLP engine durumunu kontrol eder.",
+    "routes": [
+      {
+        "path": "/api/nlp/status",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get_runtime_metrics",
+      "_queue_stats_payload",
+      "jsonify",
+      "get",
+      "route"
+    ]
+  },
+  {
+    "name": "api_nlp_audit_recent",
+    "start": 3360,
+    "end": 3371,
+    "doc": "Son NLP parse audit kayitlarini dondurur.",
+    "routes": [
+      {
+        "path": "/api/nlp/audit/recent",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get",
+      "jsonify",
+      "list_recent_nlp_parse_audits",
+      "route"
+    ]
+  },
+  {
+    "name": "api_nlp_similarity",
+    "start": 3375,
+    "end": 3437,
+    "doc": "Ãİki metin arasÃındaki semantic similarity'yi hesaplar.",
+    "routes": [
+      {
+        "path": "/api/nlp/similarity",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get_json",
+      "strip",
+      "get_bert_engine",
+      "_log_bert_runtime_metrics",
+      "similarity",
+      "route"
+    ]
+  },
+  {
+    "name": "api_nlp_best_match",
+    "start": 3441,
+    "end": 3514,
+    "doc": "Sorguya en yakÃın adayÃı bulur (typo tolerant).",
+    "routes": [
+      {
+        "path": "/api/nlp/best-match",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get_json",
+      "get",
+      "strip",
+      "get_bert_engine",
+      "_log_bert_runtime_metrics",
+      "find_best_match",
+      "route"
+    ]
+  },
+  {
+    "name": "api_get_weather",
+    "start": 3522,
+    "end": 3574,
+    "doc": "Belirli bir konum iÃƒçin gÃƒüncel hava durumunu getirir.",
+    "routes": [
+      {
+        "path": "/api/weather",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get",
+      "get_current_weather",
+      "route"
+    ]
+  },
+  {
+    "name": "api_get_weather_forecast",
+    "start": 3578,
+    "end": 3631,
+    "doc": "Belirli bir konum iÃƒçin saatlik hava tahmini getirir.",
+    "routes": [
+      {
+        "path": "/api/weather/forecast",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get",
+      "get_hourly_forecast",
+      "route"
+    ]
+  },
+  {
+    "name": "api_check_route_weather",
+    "start": 3635,
+    "end": 3694,
+    "doc": "Rota boyunca hava durumunu kontrol eder.",
+    "routes": [
+      {
+        "path": "/api/weather/check-route",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get_json",
+      "get",
+      "check_route_weather",
+      "route"
+    ]
+  },
+  {
+    "name": "api_weather_status",
+    "start": 3698,
+    "end": 3725,
+    "doc": "Hava durumu servisi durumunu dondurÃƒür.",
+    "routes": [
+      {
+        "path": "/api/weather/status",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get_service_status",
+      "route"
+    ]
+  },
+  {
+    "name": "api_weather_health",
+    "start": 3729,
+    "end": 3743,
+    "doc": "Hava durumu servisi saglik kontrolÃƒü.",
+    "routes": [
+      {
+        "path": "/api/weather/health",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "weather_health_check",
+      "route"
+    ]
+  },
+  {
+    "name": "api_weather_clear_cache",
+    "start": 3747,
+    "end": 3765,
+    "doc": "Hava durumu cache'ini temizler.",
+    "routes": [
+      {
+        "path": "/api/weather/clear-cache",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "clear_weather_cache",
+      "route"
+    ]
+  },
+  {
+    "name": "api_llm_chat_sessions",
+    "start": 3769,
+    "end": 3784,
+    "doc": "Sohbet oturumlarini listeler.",
+    "routes": [
+      {
+        "path": "/api/llm/chat/sessions",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "_as_bool",
+      "get",
+      "list_chat_sessions",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_create_llm_chat_session",
+    "start": 3788,
+    "end": 3797,
+    "doc": "Yeni sohbet oturumu olusturur.",
+    "routes": [
+      {
+        "path": "/api/llm/chat/sessions",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "repair_text",
+      "get",
+      "create_chat_session",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_llm_chat_session_messages",
+    "start": 3801,
+    "end": 3821,
+    "doc": "Verilen oturumun mesajlarini getirir.",
+    "routes": [
+      {
+        "path": "/api/llm/chat/sessions/<session_id>/messages",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "get_chat_session",
+      "jsonify",
+      "get",
+      "strip",
+      "list_chat_messages",
+      "route"
+    ]
+  },
+  {
+    "name": "api_archive_llm_chat_session",
+    "start": 3825,
+    "end": 3832,
+    "doc": "Oturumu arsivler (silmez).",
+    "routes": [
+      {
+        "path": "/api/llm/chat/sessions/<session_id>/archive",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "archive_chat_session",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_llm_model_health",
+    "start": 3836,
+    "end": 3847,
+    "doc": "",
+    "routes": [
+      {
+        "path": "/api/llm/model-health",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "lower",
+      "strip",
+      "get",
+      "jsonify",
+      "list_provider_health",
+      "route"
+    ]
+  },
+  {
+    "name": "api_openrouter_status",
+    "start": 3851,
+    "end": 3874,
+    "doc": "OpenRouter entegrasyon durumunu dondurur.",
+    "routes": [
+      {
+        "path": "/api/llm/openrouter/status",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "openrouter_status",
+      "list_provider_health",
+      "get",
+      "route"
+    ]
+  },
+  {
+    "name": "api_openrouter_chat",
+    "start": 3878,
+    "end": 3947,
+    "doc": "OpenRouter uzerinden chat completion cagrisi yapar.",
+    "routes": [
+      {
+        "path": "/api/llm/openrouter/chat",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "is_openrouter_configured",
+      "get_json",
+      "get",
+      "repair_text",
+      "_normalize_messages",
+      "_inject_system_message",
+      "_as_bool",
+      "openrouter_chat_completion_with_fallback",
+      "openrouter_chat_completion",
+      "route"
+    ]
+  },
+  {
+    "name": "api_openrouter_chat_stream",
+    "start": 3951,
+    "end": 4168,
+    "doc": "OpenRouter chat cagrisini canli akis (stream) olarak dondurur.",
+    "routes": [
+      {
+        "path": "/api/llm/openrouter/chat/stream",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "is_openrouter_configured",
+      "get_json",
+      "strip",
+      "get",
+      "get_chat_session",
+      "repair_text",
+      "_normalize_messages",
+      "_extract_latest_user_text",
+      "_inject_system_message",
+      "_chat_context_from_session",
+      "_as_bool",
+      "openrouter_status",
+      "_llm_candidate_models",
+      "is_model_blocked",
+      "append",
+      "time",
+      "dumps",
+      "openrouter_chat_completion_stream",
+      "record_llm_attempt"
+    ]
+  },
+  {
+    "name": "api_openrouter_models",
+    "start": 4172,
+    "end": 4185,
+    "doc": "OpenRouter'dan text modelleri listeler (image/video agirlikli modeller filtrelenir).",
+    "routes": [
+      {
+        "path": "/api/llm/openrouter/models",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "openrouter_list_text_models",
+      "route"
+    ]
+  },
+  {
+    "name": "api_gemini_status",
+    "start": 4189,
+    "end": 4210,
+    "doc": "Google Gemini entegrasyon durumunu dondurur.",
+    "routes": [
+      {
+        "path": "/api/llm/gemini/status",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "gemini_status",
+      "list_provider_health",
+      "get",
+      "route"
+    ]
+  },
+  {
+    "name": "api_gemini_chat",
+    "start": 4214,
+    "end": 4275,
+    "doc": "Gemini uzerinden uretim (tek seferde tam yanit).",
+    "routes": [
+      {
+        "path": "/api/llm/gemini/chat",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "is_gemini_configured",
+      "get_json",
+      "get",
+      "repair_text",
+      "_normalize_messages",
+      "_inject_system_message",
+      "_as_bool",
+      "gemini_chat_completion_with_fallback",
+      "gemini_chat_completion",
+      "route"
+    ]
+  },
+  {
+    "name": "api_gemini_chat_stream",
+    "start": 4279,
+    "end": 4490,
+    "doc": "Gemini canli akis (NDJSON), OpenRouter stream ile ayni satir formati.",
+    "routes": [
+      {
+        "path": "/api/llm/gemini/chat/stream",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "is_gemini_configured",
+      "get_json",
+      "strip",
+      "get",
+      "get_chat_session",
+      "repair_text",
+      "_normalize_messages",
+      "_extract_latest_user_text",
+      "_inject_system_message",
+      "_chat_context_from_session",
+      "_as_bool",
+      "gemini_status",
+      "_llm_candidate_models",
+      "is_model_blocked",
+      "append",
+      "time",
+      "dumps",
+      "gemini_chat_completion_stream",
+      "record_llm_attempt"
+    ]
+  },
+  {
+    "name": "api_gemini_models",
+    "start": 4494,
+    "end": 4510,
+    "doc": "ENV'deki varsayilan + fallback Gemini model id'lerini listeler.",
+    "routes": [
+      {
+        "path": "/api/llm/gemini/models",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "gemini_status",
+      "get",
+      "strip",
+      "add",
+      "append",
+      "route"
+    ]
+  },
+  {
+    "name": "api_local_llm_status",
+    "start": 4514,
+    "end": 4535,
+    "doc": "Local OpenAI-compatible LLM entegrasyon durumunu dondurur.",
+    "routes": [
+      {
+        "path": "/api/llm/local/status",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "local_llm_status",
+      "list_provider_health",
+      "get",
+      "route"
+    ]
+  },
+  {
+    "name": "api_local_llm_models",
+    "start": 4539,
+    "end": 4548,
+    "doc": "",
+    "routes": [
+      {
+        "path": "/api/llm/local/models",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "local_llm_list_models",
+      "route"
+    ]
+  },
+  {
+    "name": "api_rag_status",
+    "start": 4552,
+    "end": 4574,
+    "doc": "",
+    "routes": [
+      {
+        "path": "/api/llm/rag/status",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "rag_status",
+      "get",
+      "rag_list_collections",
+      "route"
+    ]
+  },
+  {
+    "name": "api_local_llm_chat_rag",
+    "start": 4578,
+    "end": 4848,
+    "doc": "",
+    "routes": [
+      {
+        "path": "/api/llm/local/chat/rag",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "is_local_llm_configured",
+      "get_json",
+      "strip",
+      "get",
+      "get_chat_session",
+      "repair_text",
+      "_normalize_messages",
+      "_extract_latest_user_text",
+      "_resolve_rag_min_similarity",
+      "_as_bool",
+      "_should_use_rag_for_query_with_reason",
+      "is_rag_available",
+      "rag_query",
+      "_normalize_common_turkish_glitches",
+      "_should_fallback_from_rag",
+      "_chat_context_from_session",
+      "_inject_local_system_message",
+      "pop",
+      "_local_llm_generation_options"
+    ]
+  },
+  {
+    "name": "api_local_llm_chat",
+    "start": 4852,
+    "end": 4931,
+    "doc": "",
+    "routes": [
+      {
+        "path": "/api/llm/local/chat",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "is_local_llm_configured",
+      "get_json",
+      "strip",
+      "get",
+      "get_chat_session",
+      "repair_text",
+      "_normalize_messages",
+      "_extract_latest_user_text",
+      "_chat_context_from_session",
+      "_inject_local_system_message",
+      "_local_llm_generation_options",
+      "_as_bool",
+      "local_llm_chat_completion_with_fallback",
+      "local_llm_chat_completion",
+      "save_chat_turn",
+      "route"
+    ]
+  },
+  {
+    "name": "api_local_llm_chat_stream",
+    "start": 4935,
+    "end": 5152,
+    "doc": "",
+    "routes": [
+      {
+        "path": "/api/llm/local/chat/stream",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "is_local_llm_configured",
+      "get_json",
+      "strip",
+      "get",
+      "get_chat_session",
+      "repair_text",
+      "_normalize_messages",
+      "_extract_latest_user_text",
+      "_inject_local_system_message",
+      "_chat_context_from_session",
+      "_local_llm_generation_options",
+      "_as_bool",
+      "local_llm_status",
+      "_llm_candidate_models",
+      "is_model_blocked",
+      "append",
+      "time",
+      "dumps",
+      "local_llm_chat_completion_stream"
+    ]
+  },
+  {
+    "name": "api_transit_stops",
+    "start": 5175,
+    "end": 5206,
+    "doc": "Belirtilen koordinat etrafindaki toplu tasima duraklarini doner.",
+    "routes": [
+      {
+        "path": "/api/transit/stops",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get",
+      "get_stops_in_area",
+      "route"
+    ]
+  },
+  {
+    "name": "api_transit_search",
+    "start": 5210,
+    "end": 5238,
+    "doc": "Durak adi ile arama yapar.",
+    "routes": [
+      {
+        "path": "/api/transit/search",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get",
+      "search_transit_stops",
+      "route"
+    ]
+  },
+  {
+    "name": "api_transit_route",
+    "start": 5242,
+    "end": 5267,
+    "doc": "Hat detay bilgisi doner.",
+    "routes": [
+      {
+        "path": "/api/transit/route",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get",
+      "get_transit_route_info",
+      "route"
+    ]
+  },
+  {
+    "name": "api_transit_stop_routes",
+    "start": 5271,
+    "end": 5297,
+    "doc": "Bir duraktan gecen hatlari doner.",
+    "routes": [
+      {
+        "path": "/api/transit/stop-routes",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get",
+      "get_routes_for_stop",
+      "route"
+    ]
+  },
+  {
+    "name": "api_transit_stats",
+    "start": 5301,
+    "end": 5312,
+    "doc": "Transit veri istatistikleri.",
+    "routes": [
+      {
+        "path": "/api/transit/stats",
+        "methods": [
+          "GET"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "get_transit_statistics",
+      "route"
+    ]
+  },
+  {
+    "name": "api_transit_init",
+    "start": 5316,
+    "end": 5336,
+    "doc": "Transit verilerini baslatir/gunceller.",
+    "routes": [
+      {
+        "path": "/api/transit/init",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "lower",
+      "get",
+      "initialize_transit_data",
+      "route"
+    ]
+  },
+  {
+    "name": "api_multimodal_compare",
+    "start": 5362,
+    "end": 5478,
+    "doc": "Yuruyus ve toplu tasima seceneklerini karsilastirir.",
+    "routes": [
+      {
+        "path": "/api/multimodal/compare",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "jsonify",
+      "perf_counter",
+      "get_json",
+      "get",
+      "lower",
+      "strip",
+      "add",
+      "append",
+      "_to_lat_lon_pair",
+      "_is_in_istanbul_bbox",
+      "_outside_istanbul_response",
+      "acquire",
+      "_increment_queue_timeout_counter",
+      "multimodal_compare",
+      "release",
+      "route"
+    ]
+  },
+  {
+    "name": "api_nlp_warmup",
+    "start": 5514,
+    "end": 5528,
+    "doc": "Trigger BERT warmup in background. POST body or ?force=1 to force.",
+    "routes": [
+      {
+        "path": "/api/nlp/warmup",
+        "methods": [
+          "GET",
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "get",
+      "lower",
+      "_preload_bert_async",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_nlp_seed_places",
+    "start": 5532,
+    "end": 5576,
+    "doc": "Start place DB seeding and embedding computation.",
+    "routes": [
+      {
+        "path": "/api/nlp/seed-places",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "get",
+      "join",
+      "getcwd",
+      "append",
+      "run",
+      "Thread",
+      "start",
+      "jsonify",
+      "route"
+    ]
+  },
+  {
+    "name": "api_nlp_optimize_model",
+    "start": 5580,
+    "end": 5608,
+    "doc": "Trigger model optimization (ONNX export). Body: {\"mode\":\"onnx\" , \"background\": true}",
+    "routes": [
+      {
+        "path": "/api/nlp/optimize-model",
+        "methods": [
+          "POST"
+        ]
+      }
+    ],
+    "calls": [
+      "get_json",
+      "get",
+      "join",
+      "getcwd",
+      "run",
+      "Thread",
+      "start",
+      "jsonify",
+      "route"
+    ]
+  }
+]

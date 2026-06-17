@@ -8,10 +8,47 @@ import pytest
 import sys
 import os
 import importlib
+from copy import deepcopy
 
 # Backend modüllerini path'e ekle
 backend_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'backend')
 sys.path.insert(0, backend_dir)
+
+
+def _stub_nlp_engine(monkeypatch, result, *, audit_id="audit-test-1"):
+    app_module = importlib.import_module("app")
+    template = deepcopy(result)
+
+    class _StubNlpEngine:
+        def parse(self, query, include_trace=False):
+            payload = deepcopy(template)
+            payload.setdefault("detected_places", [])
+            if include_trace:
+                payload.setdefault("trace", {"query": query, "source": "stub"})
+            return payload
+
+    monkeypatch.setattr(app_module, "BERT_NLP_AVAILABLE", True, raising=False)
+    monkeypatch.setattr(app_module, "get_bert_nlp_engine", lambda: _StubNlpEngine(), raising=False)
+    monkeypatch.setattr(app_module, "log_nlp_parse_audit", lambda **_kwargs: audit_id, raising=False)
+    return app_module
+
+
+def _stub_geocode(monkeypatch, mapping=None):
+    app_module = importlib.import_module("app")
+    mapping = mapping or {}
+
+    def _fake_geocode(address):
+        if address in mapping:
+            return deepcopy(mapping[address])
+        return {
+            "status": "success",
+            "lat": 41.0284,
+            "lon": 29.0244,
+            "display_name": address,
+        }
+
+    monkeypatch.setattr(app_module, "geocode", _fake_geocode, raising=False)
+    return app_module
 
 
 @pytest.fixture
@@ -120,6 +157,173 @@ def test_nlp_parse_with_query(client):
     assert data['trace_policy'].get('retention_days')
 
 
+@pytest.mark.parametrize(
+    ("query", "nlp_result", "expected_fields", "expected_scope_places"),
+    [
+        (
+            "Kadikoy'den Besiktas'a rota ciz",
+            {
+                "type": "route",
+                "confidence": 0.93,
+                "origin": "Kadikoy",
+                "destination": "Besiktas",
+                "detected_places": [
+                    {"place": "Kadikoy", "similarity": 0.99},
+                    {"place": "Besiktas", "similarity": 0.98},
+                ],
+            },
+            {"type": "route", "origin": "Kadikoy", "destination": "Besiktas"},
+            ["Kadikoy", "Besiktas"],
+        ),
+        (
+            "Kadikoyde kafe",
+            {
+                "type": "poi",
+                "confidence": 0.88,
+                "location": "Kadikoy",
+                "locations": ["Izmir"],
+                "detected_places": [{"place": "Kadikoy", "similarity": 0.96}],
+            },
+            {"type": "poi", "location": "Kadikoy"},
+            ["Kadikoy"],
+        ),
+        (
+            "Maltepeye git",
+            {
+                "type": "single",
+                "confidence": 0.84,
+                "destination": "Maltepe",
+                "detected_places": [{"place": "Maltepe", "similarity": 0.94}],
+            },
+            {"type": "single", "destination": "Maltepe"},
+            ["Maltepe"],
+        ),
+        (
+            "Kadikoy Moda Bostanci gez",
+            {
+                "type": "multi",
+                "confidence": 0.82,
+                "locations": ["Kadikoy", "Moda", "Bostanci"],
+                "detected_places": [
+                    {"place": "Kadikoy", "similarity": 0.95},
+                    {"place": "Moda", "similarity": 0.93},
+                    {"place": "Bostanci", "similarity": 0.92},
+                ],
+            },
+            {"type": "multi", "locations": ["Kadikoy", "Moda", "Bostanci"]},
+            ["Kadikoy", "Moda", "Bostanci"],
+        ),
+        (
+            "Merhaba nasilsin",
+            {
+                "type": "unknown",
+                "confidence": 0.41,
+                "error": "Sorgu anlasilamadi",
+                "detected_places": [],
+            },
+            {"type": "unknown", "error": "Sorgu anlasilamadi"},
+            [],
+        ),
+    ],
+)
+def test_nlp_parse_preserves_intent_contracts(client, monkeypatch, query, nlp_result, expected_fields, expected_scope_places):
+    _stub_nlp_engine(monkeypatch, nlp_result, audit_id="audit-contract-1")
+    _stub_geocode(monkeypatch)
+
+    rv = client.post("/api/nlp/parse", json={"query": query}, content_type="application/json")
+
+    assert rv.status_code == 200
+    data = rv.get_json()
+    assert data["engine"] == "bert-nlp"
+    assert data["audit_id"] == "audit-contract-1"
+    assert "queue_wait_ms" in data
+    assert "queue_timeout_sec" in data
+    assert data["trace_policy"].get("request_id")
+    assert data["trace_policy"].get("correlation_id")
+    assert data["trace_policy"].get("pii_redaction") is True
+    assert data["istanbul_scope"]["enforced"] is True
+    assert [item["place"] for item in data["istanbul_scope"]["checks"]] == expected_scope_places
+
+    for key, value in expected_fields.items():
+        assert data[key] == value
+
+
+def test_nlp_parse_debug_returns_trace(client, monkeypatch):
+    _stub_nlp_engine(
+        monkeypatch,
+        {
+            "type": "route",
+            "confidence": 0.9,
+            "origin": "Kadikoy",
+            "destination": "Besiktas",
+            "detected_places": [
+                {"place": "Kadikoy", "similarity": 0.98},
+                {"place": "Besiktas", "similarity": 0.97},
+            ],
+            "trace": {"decision": "route-pattern", "candidate_dedup": True},
+        },
+        audit_id="audit-debug-1",
+    )
+    _stub_geocode(monkeypatch)
+
+    rv = client.post(
+        "/api/nlp/parse",
+        json={"query": "Kadikoy'den Besiktas'a rota ciz", "debug": True},
+        content_type="application/json",
+    )
+
+    assert rv.status_code == 200
+    data = rv.get_json()
+    assert data["audit_id"] == "audit-debug-1"
+    assert data["trace"] == {"decision": "route-pattern", "candidate_dedup": True}
+
+
+def test_nlp_parse_rejects_outside_istanbul_locations(client, monkeypatch):
+    _stub_nlp_engine(
+        monkeypatch,
+        {
+            "type": "route",
+            "confidence": 0.91,
+            "origin": "Kadikoy",
+            "destination": "Ankara",
+            "detected_places": [
+                {"place": "Kadikoy", "similarity": 0.98},
+                {"place": "Ankara", "similarity": 0.97},
+            ],
+        },
+        audit_id="audit-scope-1",
+    )
+    _stub_geocode(
+        monkeypatch,
+        {
+            "Kadikoy": {
+                "status": "success",
+                "lat": 41.0284,
+                "lon": 29.0244,
+                "display_name": "Kadikoy, Istanbul",
+            },
+            "Ankara": {
+                "status": "success",
+                "lat": 39.9208,
+                "lon": 32.8541,
+                "display_name": "Ankara, Turkey",
+            },
+        },
+    )
+
+    rv = client.post(
+        "/api/nlp/parse",
+        json={"query": "Kadikoy'den Ankara'ya rota ciz"},
+        content_type="application/json",
+    )
+
+    assert rv.status_code == 400
+    data = rv.get_json()
+    assert data["code"] == "outside_istanbul"
+    assert data["field"] == "query"
+    assert "Ankara" in data["detail"]
+
+
 def test_nlp_parse_empty_query(client):
     """NLP parse endpoint testi - boş sorgu"""
     rv = client.post('/api/nlp/parse',
@@ -183,6 +387,64 @@ def test_routes_list(client):
     assert rv.status_code == 200
     data = rv.get_json()
     assert 'routes' in data
+
+
+def test_routes_save_and_load_transit_payload(client):
+    """Toplu ulasim rotasi payload'i round-trip korunmali."""
+    payload = {
+        "name": "Metro ile deneme rota",
+        "description": "Kayitli transit rota",
+        "points": [[41.0284, 29.0244], [41.0422, 29.0083]],
+        "route_coords": [[41.0284, 29.0244], [41.0350, 29.0165], [41.0422, 29.0083]],
+        "distance_km": 3.8,
+        "duration_minutes": 19,
+        "route_type": "transit",
+        "tags": ["transit", "metro"],
+        "route_payload": {
+            "kind": "transit",
+            "version": 1,
+            "recommendation_reason": "Kayitli test payload",
+            "selected_option": {
+                "type": "transit",
+                "transit_mode": "metro",
+                "name": "M4 ile rota",
+                "total_time_min": 19,
+                "total_distance_m": 3800,
+                "segments": [
+                    {
+                        "mode": "walk",
+                        "description": "Istasyona yuru",
+                        "duration_min": 4,
+                        "coords": [[41.0284, 29.0244], [41.0300, 29.0210]],
+                    },
+                    {
+                        "mode": "rail",
+                        "route_code": "M4",
+                        "description": "Metroya bin",
+                        "duration_min": 15,
+                        "coords": [[41.0300, 29.0210], [41.0422, 29.0083]],
+                    },
+                ],
+            },
+            "applied_modes": ["metro"],
+        },
+    }
+
+    save_rv = client.post('/api/routes/save', json=payload, content_type='application/json')
+    assert save_rv.status_code == 200
+    save_data = save_rv.get_json()
+    route_id = save_data["route"]["id"]
+
+    try:
+        get_rv = client.get(f'/api/routes/{route_id}')
+        assert get_rv.status_code == 200
+        route = get_rv.get_json()["route"]
+        assert route["route_type"] == "transit"
+        assert route["route_payload"]["kind"] == "transit"
+        assert route["route_payload"]["selected_option"]["transit_mode"] == "metro"
+        assert route["points"] == payload["points"]
+    finally:
+        client.delete(f'/api/routes/{route_id}')
 
 
 def test_routes_statistics(client):

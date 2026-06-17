@@ -2514,6 +2514,8 @@ def _shortest_metro_path(
     """
     Cok aktarmali metro aginda en iyi yolu bulur (Dijkstra).
     """
+    # Bu katman "duraklar arasi ag" uzerinden Dijkstra kosar.
+    # Ama amac yalniz rayli sistem degil: transfer ve ferry edge'leri de ayni graf icinde.
     if not origin_candidates or not dest_candidates:
         return None
 
@@ -2530,6 +2532,7 @@ def _shortest_metro_path(
     best: Dict[Tuple[int, int, int, int], float] = {}
     parent: Dict[Tuple[int, int, int, int], Tuple[Tuple[int, int, int, int], Tuple[int, float, int, str]]] = {}
 
+    # Baslangic durumlari: kullanicinin yuruyerek ulasabildigi aday istasyonlar.
     for o in origin_candidates:
         sid = int(o["id"])
         walk_to = _walking_time_minutes(float(o.get("distance_m", 0)))
@@ -2547,6 +2550,8 @@ def _shortest_metro_path(
         if cost > best.get(state, float("inf")):
             continue
 
+        # Hedefe varis kosulu:
+        # require_ferry aciksa en az bir ferry edge'i kullanilmis olmali.
         if sid in dest_ids and (not require_ferry or used_ferry == 1):
             walk_seg = None
             if final_dest_lat is not None and final_dest_lon is not None:
@@ -2586,6 +2591,8 @@ def _shortest_metro_path(
             next_line = current_line
             next_used_ferry = used_ferry
 
+            # Transit edge (rail/ferry) ile fiziksel transfer walk edge'i
+            # farkli maliyet modeline sahiptir.
             if edge_kind in {"rail", "ferry"}:
                 if edge_kind == "ferry":
                     ride_min = _ferry_travel_time_minutes(dist_m / 1000.0)
@@ -2689,6 +2696,8 @@ def _build_graph_metro_option(
     direct_walk_m: float,
     force_ferry: bool = False,
 ) -> Optional[Dict]:
+    # Artan cap stratejisi:
+    # yakin durakla basla, bulunamazsa aday havuzunu kontrollu buyut.
     search_radii = [1200, 2200, 3500, 5200, 7000]
     best_path_info: Optional[Dict] = None
     best_origin_candidates: List[Dict] = []
@@ -2715,6 +2724,8 @@ def _build_graph_metro_option(
         if not origin_candidates or not dest_candidates:
             continue
 
+        # Ayni yakada ve kisa yolculukta ferry opsiyonunu otomatik galip yapmamak icin
+        # once non-ferry varyanti da deniyoruz.
         path_variants: List[Dict] = []
         if prefer_non_ferry:
             no_ferry_path = _shortest_metro_path(
@@ -3042,6 +3053,8 @@ def _build_ferry_only_options(
     """
     Dogrudan vapur terminal ciftlerinden secenek uretir.
     """
+    # Sadece vapur modu secildiginde calisan deterministic uretici.
+    # Uygun terminal ciftlerinden walk + ferry + walk bacaklari kurar.
     options: List[Dict] = []
 
     def _ferry_terminal_name(st: Dict) -> str:
@@ -3112,7 +3125,7 @@ def _build_ferry_only_options(
             ferry_time = _ferry_travel_time_minutes(ferry_dist_m / 1000.0)
             total_time = float(walk_to["duration_min"]) + 6.0 + ferry_time + float(walk_from["duration_min"])
 
-            # Yurumeye gore anlamsiz secenekleri ele.
+            # Direkt yuruyusten asiri kotu kalan secenekleri ele.
             if total_time > max(direct_walk_min * 2.4, 180):
                 continue
 
@@ -4277,6 +4290,7 @@ def find_transit_routes(
     5. En iyi secenekleri dondur
     """
 
+    # Bu fonksiyon toplu tasima adayi uretir; yaya fallback'i sadece referans/kiyas icindir.
     max_transit_options = max(1, int(ROUTE_CONFIG.get("MULTIMODAL_MAX_TRANSIT_OPTIONS", max_results)))
 
     # Direkt yurume mesafesi (OSRM foot bazli)
@@ -4303,7 +4317,7 @@ def find_transit_routes(
         }],
     }
 
-    # Transit cizimini/senaryosunu yalnizca vapur istendiginde bus/metro akisiyla karistirma.
+    # Yalnizca vapur secildiyse bus/metro tarama akisina hic girme.
     if allowed_user_modes == {"ferry"}:
         stage_start = _time.perf_counter()
         ferry_options = _build_ferry_only_options(
@@ -4320,7 +4334,7 @@ def find_transit_routes(
         _telemetry_set_count("final_transit_options", len(ferry_diverse))
         return ferry_diverse
 
-    # Artan yaricaplarla dene
+    # Genel tarama: artan yaricap + durak cifti + ortak hat / aktarma analizi.
     transit_options = []
     # En yakin 16 durak bazen dogru hatti kacirabiliyor (orta siradaki ama etkili bir durak gibi).
     # Kisa/orta mesafede aday havuzunu bir miktar genisletiyoruz.
@@ -4380,9 +4394,8 @@ def find_transit_routes(
                         o_stop["code"],
                         d_stop["code"],
                     )
-                    # Yon/sira dogrulanamayan direkt bacaklari ele:
-                    # fallback kus-ucusu hesapla devam etmek haritada yaniltici
-                    # A->B->A benzeri artefaktlar uretebiliyor.
+                    # Durak sirasi dogrulanamayan dogrudan bacaklar elenir.
+                    # Aksi halde haritada yaniltici "kus ucusu" artefaktlari olusur.
                     if len(direct_leg_stop_coords) < 2:
                         continue
                     bus_distance_m = _path_distance_m(direct_leg_stop_coords)
@@ -4830,6 +4843,8 @@ def compare_routes(
     Yuruyus ve toplu tasima seceneklerini karsilastirir.
     Direkt baglanti bulunamazsa yakin hatlari bilgi olarak dondurur.
     """
+    # compare_routes API katmanina donen nihai sozlesmeyi kurar:
+    # aday uretimi, siralama, onerilen sonuc ve telemetry bu seviyede birlesir.
     compare_start = _time.perf_counter()
     telemetry: Dict[str, object] = {"stage_ms": {}, "counters": {}}
     stage_ms = telemetry["stage_ms"]
@@ -4841,6 +4856,7 @@ def compare_routes(
         round(float(dest_lon), 6),
         tuple(allowed_modes_norm),
     )
+    # Ayni koordinat/mod kombinasyonunda tekrar hesaplama maliyetini dusur.
     cached = _compare_cache_get(cache_key)
     if cached is not None:
         cached_telemetry = cached.get("telemetry")
@@ -4863,6 +4879,8 @@ def compare_routes(
 
     t0 = _time.perf_counter()
     walking = next((o for o in options if o.get("type") == "walking"), None)
+    # Guvenlik fallback'i:
+    # nadir durumlarda walking adayi uretilmemisse burada yeniden olusturulur.
     if walking is None:
         direct_walk_m, direct_walk_min, walking_road_coords = _direct_walk_metrics(
             origin_lat, origin_lon, dest_lat, dest_lon

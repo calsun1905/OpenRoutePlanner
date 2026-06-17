@@ -327,15 +327,54 @@ TO_SUFFIXES_APOSTROPHE = ("ye", "ya", "e", "a", "na", "ne")
 TO_SUFFIXES_PLAIN = ("ye", "ya", "na", "ne")
 LOC_SUFFIXES = ("de", "da", "te", "ta")
 COMMON_ALIASES = {
+    "adalar": "adalar",
+    "arnavutkoy": "arnavutköy",
+    "atasehir": "ataşehir",
+    "avcilar": "avcılar",
+    "bagcilar": "bağcılar",
+    "bahcelievler": "bahçelievler",
+    "basaksehir": "başakşehir",
+    "bayrampasa": "bayrampaşa",
     "kadikoy": "kadıköy",
     "besiktas": "beşiktaş",
+    "beykoz": "beykoz",
+    "beylikduzu": "beylikdüzü",
+    "beyoglu": "beyoğlu",
+    "buyukcekmece": "büyükçekmece",
+    "catalca": "çatalca",
+    "cekmekoy": "çekmeköy",
+    "esenler": "esenler",
+    "esenyurt": "esenyurt",
+    "eyup": "eyüp",
+    "eyupsultan": "eyüpsultan",
+    "gaziosmanpasa": "gaziosmanpaşa",
+    "gungoren": "güngören",
+    "kagithane": "kağıthane",
     "uskudar": "üsküdar",
     "sisli": "şişli",
+    "kucukcekmece": "küçükçekmece",
     "cankaya": "çankaya",
     "kizilay": "kızılay",
     "goztepe": "göztepe",
     "ortakoy": "ortaköy",
     "bakirkoy": "bakırköy",
+    "bostanci": "bostancı",
+    "karakoy": "karaköy",
+    "eminonu": "eminönü",
+    "taksim": "taksim",
+    "moda": "moda",
+    "maltepe": "maltepe",
+    "kartal": "kartal",
+    "pendik": "pendik",
+    "sancaktepe": "sancaktepe",
+    "sariyer": "sarıyer",
+    "silivri": "silivri",
+    "sultanbeyli": "sultanbeyli",
+    "sultangazi": "sultangazi",
+    "sile": "şile",
+    "tuzla": "tuzla",
+    "umraniye": "ümraniye",
+    "zeytinburnu": "zeytinburnu",
 }
 
 ACTION_WORD_SUFFIXES = (
@@ -418,6 +457,8 @@ def is_likely_action_token(token: str) -> bool:
 def _singularize_tr_token(token: str) -> str:
     """Basit çoğul eklerini budar (mekanlar -> mekan)."""
     lowered = normalize_place_key(token)
+    if lowered in COMMON_ALIASES.values():
+        return lowered
     for suffix in ("lar", "ler"):
         if lowered.endswith(suffix) and len(lowered) > len(suffix) + 2:
             return lowered[:-len(suffix)]

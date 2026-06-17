@@ -277,6 +277,7 @@ def apply_intent_conflict_matrix(
     unique_place_count: int,
     low_margin: bool,
     route_intent_cue: bool = False,
+    strong_route_pair: bool = False,
 ) -> Tuple[str, float, Dict[str, Any]]:
     """
     Intent conflict matrix uygular.
@@ -289,10 +290,10 @@ def apply_intent_conflict_matrix(
     reason = "none"
 
     # 1) Direction varsa route baskın (özellikle >=2 lokasyon)
-    if direction_hints and unique_place_count >= 2 and route_intent_cue:
+    if direction_hints and unique_place_count >= 2 and strong_route_pair:
         final_type = "route"
         final_conf = max(final_conf, 0.80)
-        reason = "direction+multi-place=>route"
+        reason = "direction+confident-pair=>route"
     # 2) POI cue varsa ve yön sinyali yoksa POI baskın
     elif has_poi_cue and not direction_hints:
         if initial_type in {"poi", "unknown", "single"} or low_margin:
@@ -315,6 +316,7 @@ def apply_intent_conflict_matrix(
             "has_multi_cue": bool(has_multi_cue),
             "direction_hints": bool(direction_hints),
             "route_intent_cue": bool(route_intent_cue),
+            "strong_route_pair": bool(strong_route_pair),
             "unique_place_count": int(unique_place_count),
             "low_margin": bool(low_margin),
         },
@@ -326,16 +328,56 @@ FROM_SUFFIXES = ("den", "dan", "ten", "tan", "nden", "ndan")
 TO_SUFFIXES_APOSTROPHE = ("ye", "ya", "e", "a", "na", "ne")
 TO_SUFFIXES_PLAIN = ("ye", "ya", "na", "ne")
 LOC_SUFFIXES = ("de", "da", "te", "ta")
+OBJECT_SUFFIXES = ("i", "ı", "u", "ü")
 COMMON_ALIASES = {
+    "adalar": "adalar",
+    "arnavutkoy": "arnavutköy",
+    "atasehir": "ataşehir",
+    "avcilar": "avcılar",
+    "bagcilar": "bağcılar",
+    "bahcelievler": "bahçelievler",
+    "basaksehir": "başakşehir",
+    "bayrampasa": "bayrampaşa",
     "kadikoy": "kadıköy",
     "besiktas": "beşiktaş",
+    "beykoz": "beykoz",
+    "beylikduzu": "beylikdüzü",
+    "beyoglu": "beyoğlu",
+    "buyukcekmece": "büyükçekmece",
+    "catalca": "çatalca",
+    "cekmekoy": "çekmeköy",
+    "esenler": "esenler",
+    "esenyurt": "esenyurt",
+    "eyup": "eyüp",
+    "eyupsultan": "eyüpsultan",
+    "gaziosmanpasa": "gaziosmanpaşa",
+    "gungoren": "güngören",
+    "kagithane": "kağıthane",
     "uskudar": "üsküdar",
     "sisli": "şişli",
+    "kucukcekmece": "küçükçekmece",
     "cankaya": "çankaya",
     "kizilay": "kızılay",
     "goztepe": "göztepe",
     "ortakoy": "ortaköy",
     "bakirkoy": "bakırköy",
+    "bostanci": "bostancı",
+    "karakoy": "karaköy",
+    "eminonu": "eminönü",
+    "taksim": "taksim",
+    "moda": "moda",
+    "maltepe": "maltepe",
+    "kartal": "kartal",
+    "pendik": "pendik",
+    "sancaktepe": "sancaktepe",
+    "sariyer": "sarıyer",
+    "silivri": "silivri",
+    "sultanbeyli": "sultanbeyli",
+    "sultangazi": "sultangazi",
+    "sile": "şile",
+    "tuzla": "tuzla",
+    "umraniye": "ümraniye",
+    "zeytinburnu": "zeytinburnu",
 }
 
 ACTION_WORD_SUFFIXES = (
@@ -349,6 +391,24 @@ ACTION_ROOT_HINTS = {
     "git", "gez", "ara", "goster", "göster", "planla", "hesapla",
     "dolas", "dolaş", "ciz", "çiz",
 }
+MULTI_STOP_TOKENS = {
+    "gez", "gezi", "gezisi", "tur", "turu", "plan", "plani", "planı",
+    "dolas", "dolaş", "rota", "rotasi", "rotası",
+}
+NON_LOCATION_STOP_TOKENS = MULTI_STOP_TOKENS | {
+    "ve", "ile", "arasi", "arası", "guzergah", "güzergah", "yol", "tarifi",
+    "nasil", "nasıl", "giderim", "gitmek", "istiyorum", "bugun", "bugün",
+    "hava", "saat", "kac", "kaç", "metro", "marmaray", "otobus", "otobüs",
+    "otobusle", "otobüsle", "tramvay", "vapur", "toplu", "tasima", "taşıma",
+    "var", "mi", "mı", "yer", "yerler", "mekan", "mekanlar", "gezilecek", "goster", "göster",
+    "nerede", "yenir", "civar", "civarın", "civarinda", "civarında",
+    "cevresinde", "çevresinde", "yakinda", "yakında",
+}
+GENERIC_POI_BROWSE_TERMS = frozenset({"mekan", "mekanlar", "yer", "yerler"})
+ROUTE_INTENT_TERMS = (
+    "rota", "yol tarifi", "giderim", "gidelim", "git", "güzergah", "guzergah",
+    "ulasim", "ulaşım", "toplu taşıma", "toplu tasima",
+)
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -412,12 +472,16 @@ def is_likely_action_token(token: str) -> bool:
         return True
     if normalized in ACTION_ROOT_HINTS:
         return True
+    if normalized in NON_LOCATION_STOP_TOKENS:
+        return True
     return len(normalized) >= 4 and normalized.endswith(ACTION_WORD_SUFFIXES)
 
 
 def _singularize_tr_token(token: str) -> str:
     """Basit çoğul eklerini budar (mekanlar -> mekan)."""
     lowered = normalize_place_key(token)
+    if lowered in COMMON_ALIASES.values():
+        return lowered
     for suffix in ("lar", "ler"):
         if lowered.endswith(suffix) and len(lowered) > len(suffix) + 2:
             return lowered[:-len(suffix)]
@@ -443,6 +507,14 @@ POI_CONCEPT_TOKENS = frozenset(
     for token in term.split()
     if len(token) >= 3
 )
+POI_CONCEPT_FOLDED = {
+    term.translate(_TR_FOLD_TABLE): term
+    for term in POI_CONCEPT_TERMS
+}
+POI_CONCEPT_TOKEN_FOLDED = {
+    token.translate(_TR_FOLD_TABLE): token
+    for token in POI_CONCEPT_TOKENS
+}
 
 
 def is_poi_concept_term(value: str) -> bool:
@@ -459,7 +531,16 @@ def is_poi_concept_term(value: str) -> bool:
     singular = _singularize_tr_token(normalized)
     if singular in POI_CONCEPT_TERMS:
         return True
+    folded = singular.translate(_TR_FOLD_TABLE)
+    if folded in POI_CONCEPT_FOLDED or folded in POI_CONCEPT_TOKEN_FOLDED:
+        return True
     return any(_singularize_tr_token(token) in POI_CONCEPT_TOKENS for token in normalized.split())
+
+
+def canonicalize_poi_concept_token(value: str) -> str:
+    normalized = _singularize_tr_token(normalize_place_key(value))
+    folded = normalized.translate(_TR_FOLD_TABLE)
+    return POI_CONCEPT_FOLDED.get(folded) or POI_CONCEPT_TOKEN_FOLDED.get(folded) or normalized
 
 
 def _collect_poi_tokens(query: str, detected_places: Optional[List[Dict[str, Any]]] = None) -> List[str]:
@@ -501,10 +582,14 @@ def _collect_poi_tokens(query: str, detected_places: Optional[List[Dict[str, Any
             # "eczane" gibi kelimeler plain suffix kuraliyla yanlis role-hint alabilir.
             # Ham token POI terimiyse role-hint'i yok sayip konsepte geri al.
             if is_poi_concept_term(raw_token_normalized):
-                token_normalized = raw_token_normalized
+                token_normalized = canonicalize_poi_concept_token(raw_token_normalized)
             else:
                 continue
+        elif is_poi_concept_term(token_normalized):
+            token_normalized = canonicalize_poi_concept_token(token_normalized)
         if is_likely_action_token(token_normalized):
+            continue
+        if token_normalized in NON_LOCATION_STOP_TOKENS:
             continue
         if token_normalized in seen:
             continue
@@ -620,6 +705,8 @@ def _extract_explicit_multi_places(query: str) -> List[str]:
             stem = _singularize_tr_token(stem)
             if not stem or is_likely_action_token(stem):
                 continue
+            if stem in NON_LOCATION_STOP_TOKENS:
+                continue
             if role_hint in {"from", "to"}:
                 continue
             candidate = stem
@@ -637,6 +724,8 @@ def _extract_plain_multi_places(query: str, limit: int = 4) -> List[str]:
     if not text:
         return []
 
+    directional_suffix_tokens = set(FROM_SUFFIXES) | set(TO_SUFFIXES_APOSTROPHE) | set(TO_SUFFIXES_PLAIN) | set(LOC_SUFFIXES)
+
     items: List[str] = []
     for match in TOKEN_PATTERN.finditer(text):
         token = match.group(0)
@@ -645,6 +734,14 @@ def _extract_plain_multi_places(query: str, limit: int = 4) -> List[str]:
         if not stem or is_likely_action_token(stem):
             continue
         if role_hint in {"from", "to"}:
+            continue
+        if len(stem) < 4:
+            continue
+        if stem in MULTI_STOP_TOKENS:
+            continue
+        if stem in directional_suffix_tokens:
+            continue
+        if len(stem) <= 5 and stem[:1] in {"y", "n"} and stem[1:] in directional_suffix_tokens:
             continue
         if stem in items:
             continue
@@ -692,15 +789,24 @@ def normalize_token_with_role(token: str) -> Tuple[str, Optional[str]]:
     Token'ı normalize eder ve varsa rol ipucu üretir.
     Örnek: "Kadıköy'den" -> ("kadıköy", "from")
     """
+    # Turkce ek ayrisi:
+    # "besiktas'tan" -> (besiktas, from), "uskudar'a" -> (uskudar, to)
     cleaned = normalize_query_text(token).strip(".,;:!?()[]{}\"")
     lowered = tr_lower(cleaned)
 
     if not lowered:
         return "", None
 
+    raw_key = normalize_place_key(lowered)
+    if is_poi_concept_term(raw_key):
+        return raw_key, None
+
     role_hint = None
     stem = lowered
+    known_roots = set(COMMON_ALIASES.keys()) | set(COMMON_ALIASES.values())
 
+    # Apostrof bulunan token'larda ekler daha guvenli ayrilir.
+    # Apostrof yoksa plain suffix setiyle devam edilir.
     if "'" in lowered:
         base, suffix = lowered.rsplit("'", 1)
         if suffix in FROM_SUFFIXES:
@@ -709,6 +815,8 @@ def normalize_token_with_role(token: str) -> Tuple[str, Optional[str]]:
             stem, role_hint = base, "to"
         elif suffix in LOC_SUFFIXES:
             stem, role_hint = base, "loc"
+        elif suffix in OBJECT_SUFFIXES:
+            stem, role_hint = base, None
     else:
         for suffix in FROM_SUFFIXES:
             if lowered.endswith(suffix) and len(lowered) > len(suffix) + 2:
@@ -720,6 +828,12 @@ def normalize_token_with_role(token: str) -> Tuple[str, Optional[str]]:
                     stem, role_hint = lowered[:-len(suffix)], "to"
                     break
         if role_hint is None:
+            for suffix in ("e", "a"):
+                base = lowered[:-len(suffix)] if lowered.endswith(suffix) else ""
+                if base and (base in known_roots or COMMON_ALIASES.get(base) in known_roots):
+                    stem, role_hint = base, "to"
+                    break
+        if role_hint is None:
             for suffix in LOC_SUFFIXES:
                 # "-da/-de/-ta/-te" plain ek soyma kuralı çok agresif olursa
                 # "Galata" gibi gerçek yer adlarını yanlış kırpar.
@@ -727,10 +841,72 @@ def normalize_token_with_role(token: str) -> Tuple[str, Optional[str]]:
                 if lowered.endswith(suffix) and len(lowered) > len(suffix) + 4:
                     stem, role_hint = lowered[:-len(suffix)], "loc"
                     break
+        if role_hint is None:
+            for suffix in OBJECT_SUFFIXES:
+                base = lowered[:-len(suffix)] if lowered.endswith(suffix) else ""
+                if base and (base in known_roots or COMMON_ALIASES.get(base) in known_roots):
+                    stem = base
+                    break
 
+    # Son adimda yazim/alias normalize edilir.
     stem = stem.strip(".,;:!?()[]{}\"'")
     stem = COMMON_ALIASES.get(stem, stem)
     return stem, role_hint
+
+
+def has_explicit_route_pattern(query: str, detected_places: Optional[List[Dict[str, Any]]] = None) -> bool:
+    """
+    Dogal Turkce rota kaliplarini route niyeti olarak tanir.
+    """
+    normalized = normalize_query_text(query or "")
+    if not normalized:
+        return False
+
+    if re.search(r"\b\w+(?:'?(?:den|dan|ten|tan|nden|ndan))\b.*\b\w+(?:'?(?:ye|ya|e|a|na|ne))\b", tr_lower(normalized)):
+        return True
+
+    places = detected_places or []
+    role_hints = {item.get("role_hint") for item in places if item.get("role_hint")}
+    if {"from", "to"} <= role_hints:
+        return True
+
+    return False
+
+
+def is_route_candidate_confident(candidate: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(candidate, dict):
+        return False
+    similarity = float(candidate.get("similarity", 0.0) or 0.0)
+    source = str(candidate.get("match_source", "") or "")
+    token_count = int(candidate.get("token_count", 1) or 1)
+    if source == "lookup-exact":
+        return True
+    if token_count > 1:
+        return similarity >= 0.78
+    return similarity >= 0.82
+
+
+def has_confident_route_pair(detected_places: List[Dict[str, Any]]) -> bool:
+    """
+    Yalnizca iki ucu da guvenilir ise route rescue'e izin ver.
+    """
+    if len(detected_places or []) < 2:
+        return False
+
+    from_candidates = [item for item in detected_places if item.get("role_hint") == "from"]
+    to_candidates = [item for item in detected_places if item.get("role_hint") == "to"]
+    if not from_candidates or not to_candidates:
+        return False
+
+    for from_item in from_candidates:
+        if not is_route_candidate_confident(from_item):
+            continue
+        for to_item in to_candidates:
+            if from_item.get("place") == to_item.get("place"):
+                continue
+            if is_route_candidate_confident(to_item):
+                return True
+    return False
 
 
 def extract_candidate_spans(query: str, max_ngram: int = 3) -> List[Dict[str, Any]]:
@@ -745,6 +921,9 @@ def extract_candidate_spans(query: str, max_ngram: int = 3) -> List[Dict[str, An
         normalized, role_hint = normalize_token_with_role(surface)
 
         if len(normalized) < 2:
+            continue
+
+        if role_hint is None and (normalized in NON_LOCATION_STOP_TOKENS or is_poi_concept_term(normalized)):
             continue
 
         if role_hint is None and is_likely_action_token(normalized):
@@ -1452,6 +1631,8 @@ class BertNLPEngine:
         # ORP_BERT_PREFER_OSM_FIRST=1/0
         # ORP_BERT_SEED_STATIC=1/0
         # ORP_BERT_SEED_USER_LOCATIONS=1/0
+        # Konfigurasyon tamamen ENV tabanli:
+        # ayni kodla farkli ortamlarda farkli NLP davranisi acilip kapanabilir.
         use_osm = _env_flag("ORP_BERT_USE_OSM", True)
         prefer_osm_first = _env_flag("ORP_BERT_PREFER_OSM_FIRST", False)
         seed_dynamic_cache = _env_flag("ORP_BERT_SEED_DYNAMIC", use_osm)
@@ -1460,6 +1641,8 @@ class BertNLPEngine:
         seed_user_locations = _env_flag("ORP_BERT_SEED_USER_LOCATIONS", True)
 
         # Yer ismi veritabanı (OSM API desteği ile)
+        # PlaceDatabase hibrit kaynakla calisir:
+        # static + local cache + opsiyonel OSM prefetch.
         self.places = PlaceDatabase(
             use_osm=use_osm,
             prefer_osm_first=prefer_osm_first,
@@ -1526,6 +1709,7 @@ class BertNLPEngine:
         Returns:
             (query_type, confidence, score_map)
         """
+        # Intent siniflandirma template benzerligi uzerinden yapilir.
         query_embedding = self.bert.encode(query)
         template_embeddings = self._get_template_embeddings()
 
@@ -1554,6 +1738,7 @@ class BertNLPEngine:
                 best_type = query_type
 
         # Hard-negative kontrolü: selamlaşma/yardım vb. sorguları yanlış intent'e çekmeyi azalt.
+        # Hard-negative seti chitchat metinlerinin route/poi'ye kaymasini azaltir.
         hard_negative_embs = self._get_hard_negative_embeddings()
         hard_negative_score = 0.0
         for neg_emb in hard_negative_embs:
@@ -1599,6 +1784,8 @@ class BertNLPEngine:
 
         tokens = [t for t in normalized.split() if t]
         has_poi_concept = any(is_poi_concept_term(token) for token in tokens)
+        if any(token in NON_LOCATION_STOP_TOKENS for token in tokens):
+            return False, "contains-stop-token"
 
         # Yön ekleri olan span'leri daha toleranslı kabul et.
         if role_hint in {"from", "to"}:
@@ -1626,6 +1813,9 @@ class BertNLPEngine:
         # Multi-token role_hint yoksa POI konsept içeren span'leri dışarıda bırak.
         if has_poi_concept:
             return False, "multi-has-poi-concept"
+        lookup_token_count = sum(1 for token in tokens if self.places.resolve_lookup(token))
+        if lookup_token_count >= 2:
+            return False, "multi-location-span"
         if similarity < 0.84:
             return False, "multi-low-similarity"
         return True, "multi-accepted"
@@ -1733,6 +1923,8 @@ class BertNLPEngine:
                 "end": span["end"],
                 "role_hint": span["role_hint"],
                 "token_count": span["token_count"],
+                "match_source": match.get("source"),
+                "match_reason": reason,
             }
 
             existing = best_matches.get(candidate["place"])
@@ -1756,6 +1948,30 @@ class BertNLPEngine:
             item for item in best_matches.values()
             if item["similarity"] >= 0.72
         ]
+
+        # Ayni yerin daha genel/detayli varyantlari birlikte geldiyse
+        # daha guvenilir ve daha dogrudan span ile uyusan adayi tercih et.
+        collapsed_by_signature: Dict[Tuple[int, int, str], Dict[str, Any]] = {}
+        for item in found_places:
+            signature = (
+                int(item.get("start", 0)),
+                int(item.get("end", 0)),
+                normalize_place_key(item.get("normalized") or item.get("surface") or ""),
+            )
+            existing = collapsed_by_signature.get(signature)
+            if existing is None:
+                collapsed_by_signature[signature] = item
+                continue
+
+            item_exact = str(item.get("match_source", "")) == "lookup-exact"
+            existing_exact = str(existing.get("match_source", "")) == "lookup-exact"
+            if item_exact and not existing_exact:
+                collapsed_by_signature[signature] = item
+                continue
+            if item_exact == existing_exact and float(item.get("similarity", 0.0)) > float(existing.get("similarity", 0.0)):
+                collapsed_by_signature[signature] = item
+
+        found_places = list(collapsed_by_signature.values())
 
         if len(found_places) > 5:
             found_places.sort(key=lambda item: (-item["similarity"], item["start"]))
@@ -1788,6 +2004,17 @@ class BertNLPEngine:
             detected_places,
             key=lambda item: (item.get("start", 0), -item.get("token_count", 1), -item.get("similarity", 0.0))
         )
+        direct_single_places = [
+            item for item in ordered_places
+            if int(item.get("token_count", 1)) == 1 and is_route_candidate_confident(item)
+        ]
+
+        normalized_query = tr_lower(normalize_query_text(query or ""))
+        if re.search(r"\b(arası|arasi)\b", normalized_query) and len(direct_single_places) >= 2:
+            return {
+                "origin": direct_single_places[0]["place"],
+                "destination": direct_single_places[1]["place"],
+            }
 
         def select_best(items: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
             if not items:
@@ -1818,24 +2045,31 @@ class BertNLPEngine:
             destination = destination_item["place"]
 
         if origin_item and not destination:
-            for item in ordered_places:
+            for item in direct_single_places or ordered_places:
                 if item["start"] > origin_item["start"] and item["place"] != origin:
                     destination_item = item
                     destination = item["place"]
                     break
 
         if destination_item and not origin:
-            for item in ordered_places:
+            for item in direct_single_places or ordered_places:
                 if item["start"] < destination_item["start"] and item["place"] != destination:
                     origin_item = item
                     origin = item["place"]
                     break
 
+        if not origin and not destination and len(direct_single_places) >= 2:
+            return {
+                "origin": direct_single_places[0]["place"],
+                "destination": direct_single_places[1]["place"],
+            }
+
         if not origin:
-            origin = ordered_places[0]["place"]
+            origin = (direct_single_places or ordered_places)[0]["place"]
 
         if not destination:
-            for item in ordered_places[1:]:
+            pool = direct_single_places[1:] if direct_single_places else ordered_places[1:]
+            for item in pool:
                 if item["place"] != origin:
                     destination = item["place"]
                     break
@@ -1918,11 +2152,13 @@ class BertNLPEngine:
         trace_data: Optional[Dict[str, Any]] = {} if include_trace else None
 
         # 1. Sorgu tipini sınıflandır
+        # 1) Intent siniflandirma (route/poi/multi/single/unknown)
         query_type, type_confidence, type_scores = self.classify_query_type_with_scores(query)
         initial_query_type = query_type
         initial_type_confidence = float(type_confidence)
 
         # 2. Yer isimlerini çıkar
+        # 2) Span cikarma + semantic place eslestirme
         detected_places = self.extract_places(query, trace=trace_data)
         ordered_places = sorted(
             detected_places,
@@ -1933,13 +2169,15 @@ class BertNLPEngine:
         role_hints = {p.get("role_hint") for p in ordered_places if p.get("role_hint")}
         direction_hints = bool({"from", "to"} & role_hints)
         normalized_query = normalize_query_text(query)
+        normalized_query_lower = tr_lower(normalized_query)
         route_intent_cue = bool(
-            re.search(r"\b(rota|yol\s+tarifi|giderim|gidelim|git|arası|arasi|güzergah)\b", normalized_query)
+            re.search(r"\b(" + "|".join(re.escape(term) for term in ROUTE_INTENT_TERMS) + r"|arası|arasi)\b", normalized_query_lower)
         )
+        route_pattern_cue = has_explicit_route_pattern(query, ordered_places)
         multi_action_cue = bool(
-            re.search(r"\b(gezi|gez|turu|turu|planı|plani|dolaş|dolas)\b", normalized_query)
+            re.search(r"\b(gezi|gezisi|gez|turu|planı|plani|dolaş|dolas)\b", normalized_query_lower)
         )
-        explicit_multi_delimiter = bool(re.search(r",|\bve\b", normalized_query))
+        explicit_multi_delimiter = bool(re.search(r",|\bve\b", normalized_query_lower))
         explicit_multi_places = _extract_explicit_multi_places(query)
         plain_multi_places = _extract_plain_multi_places(query)
         strong_single_place_count = sum(
@@ -1955,10 +2193,26 @@ class BertNLPEngine:
             else float(score_ranking[0][1]) if score_ranking else 0.0
         )
         low_margin = score_margin < INTENT_MARGIN_MIN
+        strong_route_pair = has_confident_route_pair(ordered_places)
+        direct_place_candidates = [
+            p for p in ordered_places
+            if str(p.get("match_source", "")) == "lookup-exact"
+            or (
+                p.get("role_hint") in {"from", "to", "loc"}
+                and int(p.get("token_count", 1)) == 1
+                and float(p.get("similarity", 0.0)) >= 0.95
+            )
+        ]
+        direct_place_count = len({p.get("place") for p in direct_place_candidates if p.get("place")})
+        has_direct_place_signal = direct_place_count > 0
         poi_resolution = extract_poi_concept_with_meta(query, ordered_places)
         poi_concept = (poi_resolution.get("concept") or "").strip()
         poi_osm_queries = poi_resolution.get("osm_queries") or []
         has_poi_cue = bool(poi_concept)
+        generic_poi_browse_cue = any(
+            re.search(r"\b" + re.escape(term) + r"\b", normalized_query_lower)
+            for term in GENERIC_POI_BROWSE_TERMS
+        )
         has_multi_cue = (
             (explicit_multi_delimiter and len(unique_place_names) >= 2 and not direction_hints)
             or (
@@ -1972,6 +2226,7 @@ class BertNLPEngine:
             )
         )
 
+        # 3) Cakisma matrisi: intent sinyalleri celisirse son karari dengeler.
         query_type, type_confidence, intent_matrix_meta = apply_intent_conflict_matrix(
             query_type,
             float(type_confidence),
@@ -1980,16 +2235,45 @@ class BertNLPEngine:
             direction_hints=direction_hints,
             unique_place_count=len(unique_place_names),
             low_margin=low_margin,
-            route_intent_cue=route_intent_cue,
+            route_intent_cue=(route_intent_cue or route_pattern_cue),
+            strong_route_pair=strong_route_pair,
         )
 
         # Chitchat/non-location guard: zayıf lokasyon sinyallerinde POI'ye düşme.
         poi_question_cue = bool(
             re.search(
-                r"\b(neler|nereler|ne var|yakında|civarında|gezilecek|yemek|müze|kafe|restoran|cami|eczane)\b",
-                normalize_query_text(query),
+                r"\b(neler|nereler|ne var|yakında|civarında|civarinda|çevresinde|cevresinde|gezilecek|yemek|müze|muze|kafe|restoran|cami|eczane)\b",
+                normalized_query_lower,
             )
+        ) or generic_poi_browse_cue
+        mixed_poi_place_conflict = has_poi_cue and direct_place_count >= 2 and not has_multi_cue
+        ambiguous_loc_to_route = (
+            route_intent_cue
+            and "loc" in role_hints
+            and "to" in role_hints
+            and "from" not in role_hints
         )
+        force_unknown_intent = False
+
+        if not has_direct_place_signal and query_type in {"route", "poi", "single", "multi"}:
+            query_type = "unknown"
+            type_confidence = min(float(type_confidence), 0.45)
+            intent_matrix_meta["final_type"] = "unknown"
+            intent_matrix_meta["reason"] = "no-direct-place-signal=>unknown"
+
+        if mixed_poi_place_conflict or ambiguous_loc_to_route:
+            query_type = "unknown"
+            type_confidence = min(float(type_confidence), 0.45)
+            intent_matrix_meta["final_type"] = "unknown"
+            intent_matrix_meta["reason"] = "mixed-intent=>unknown"
+            force_unknown_intent = True
+
+        if query_type == "route" and has_multi_cue and not direction_hints and len(plain_multi_places) >= 3:
+            query_type = "multi"
+            type_confidence = min(max(float(type_confidence), 0.78), 0.90)
+            intent_matrix_meta["final_type"] = "multi"
+            intent_matrix_meta["reason"] = "route-plan-list=>multi"
+
         if query_type == "poi" and multi_action_cue and len(plain_multi_places) >= 3 and not direction_hints:
             query_type = "multi"
             type_confidence = min(max(float(type_confidence), 0.80), 0.92)
@@ -2007,6 +2291,23 @@ class BertNLPEngine:
             type_confidence = min(float(type_confidence), 0.45)
             intent_matrix_meta["final_type"] = "unknown"
             intent_matrix_meta["reason"] = "weak-poi-signal=>unknown"
+
+        if (
+            query_type == "multi"
+            and multi_action_cue
+            and not has_multi_cue
+            and not direction_hints
+            and not has_poi_cue
+            and not poi_question_cue
+            and len(unique_place_names) == 1
+            and len(plain_multi_places) == 1
+            and normalize_place_key(plain_multi_places[0]) == normalize_place_key(unique_place_names[0])
+            and direct_place_count == 1
+        ):
+            query_type = "single"
+            type_confidence = min(max(float(type_confidence), 0.72), 0.88)
+            intent_matrix_meta["final_type"] = "single"
+            intent_matrix_meta["reason"] = "single-action-rescue=>single"
 
         # Lokasyon yakalansa da POI niyeti kaybolduysa son adimda geri kazan.
         if should_rescue_poi_intent(
@@ -2035,11 +2336,15 @@ class BertNLPEngine:
                 "has_multi_cue": has_multi_cue,
                 "direction_hints": direction_hints,
                 "route_intent_cue": route_intent_cue,
+                "route_pattern_cue": route_pattern_cue,
+                "strong_route_pair": strong_route_pair,
                 "multi_action_cue": multi_action_cue,
+                "generic_poi_browse_cue": generic_poi_browse_cue,
                 "explicit_multi_delimiter": explicit_multi_delimiter,
                 "explicit_multi_places": explicit_multi_places,
                 "plain_multi_places": plain_multi_places,
                 "strong_single_place_count": strong_single_place_count,
+                "direct_place_count": direct_place_count,
                 "max_place_similarity": round(float(max_place_similarity), 4),
                 "score_margin": round(float(score_margin), 4),
                 "role_hints": sorted(role_hints),
@@ -2112,14 +2417,19 @@ class BertNLPEngine:
             has_loc_role = any(p.get("role_hint") == "loc" for p in ordered_places)
             generic_browse_query = bool(
                 re.search(
-                    r"\b(neler var|nereler var|ne yapabilirim|gezilecek)\b",
-                    normalize_query_text(query),
+                    r"\b(neler var|nereler var|ne var|ne yapabilirim|yakında|civarında|civarinda|çevresinde|cevresinde|gezilecek)\b",
+                    normalized_query_lower,
                 )
-            )
+            ) or poi_question_cue or generic_poi_browse_cue
 
             # "kadikoyde cami ariyorum" gibi sorgularda lokasyon+mekan birlikte zorunlu.
             # Sadece lokasyon varsa (ve generic browse da degilse) sonucu unknown'a indir.
-            has_structured_poi_target = bool(result.get("poi_concept")) or bool(result.get("poi_tags_hint"))
+            has_structured_poi_target = (
+                bool(result.get("poi_concept"))
+                or bool(result.get("poi_tags_hint"))
+                or poi_question_cue
+                or generic_poi_browse_cue
+            )
             if result.get("location") and (not has_structured_poi_target) and (not generic_browse_query):
                 result["type"] = "unknown"
                 result["error"] = "Mekan tipi anlasilamadi"
@@ -2152,7 +2462,15 @@ class BertNLPEngine:
                 or (multi_action_cue and len(plain_multi_places) >= 3)
             )
 
-            if allow_multi:
+            if direction_hints and strong_route_pair and not has_multi_cue:
+                result["type"] = "route"
+                direction = self.detect_route_direction(query, ordered_places)
+                result["origin"] = direction["origin"]
+                result["destination"] = direction["destination"]
+                if trace_data is not None:
+                    intent_matrix_meta["final_type"] = "route"
+                    intent_matrix_meta["reason"] = "multi-to-route-rescue"
+            elif allow_multi:
                 if len(explicit_multi_places) >= 2:
                     result["locations"] = explicit_multi_places
                 elif multi_action_cue and len(plain_multi_places) >= 3:
@@ -2203,7 +2521,17 @@ class BertNLPEngine:
 
         elif query_type == "unknown":
             # Bilinmeyen tip - yer isimlerine göre karar ver
-            if has_multi_cue and len(place_names) >= 2:
+            if force_unknown_intent:
+                result["error"] = "Sorgu anlaşılamadı"
+            elif direction_hints and strong_route_pair:
+                result["type"] = "route"
+                direction = self.detect_route_direction(query, ordered_places)
+                result["origin"] = direction["origin"]
+                result["destination"] = direction["destination"]
+                if trace_data is not None:
+                    intent_matrix_meta["final_type"] = "route"
+                    intent_matrix_meta["reason"] = "route-pattern"
+            elif has_multi_cue and len(place_names) >= 2:
                 result["type"] = "multi"
                 if len(explicit_multi_places) >= 2:
                     result["locations"] = explicit_multi_places
@@ -2212,20 +2540,41 @@ class BertNLPEngine:
                 else:
                     result["locations"] = place_names
             elif len(place_names) == 2:
-                strong_match = all(p.get("similarity", 0.0) >= 0.78 for p in ordered_places[:2])
+                strong_match = all(is_route_candidate_confident(p) for p in ordered_places[:2])
                 has_direction_hint = bool({"from", "to"} & role_hints)
-                if strong_match or has_direction_hint:
+                if strong_match and has_direction_hint:
                     result["type"] = "route"
                     direction = self.detect_route_direction(query, ordered_places)
                     result["origin"] = direction["origin"] or place_names[0]
                     result["destination"] = direction["destination"] or place_names[1]
+                    if trace_data is not None:
+                        intent_matrix_meta["final_type"] = "route"
+                        intent_matrix_meta["reason"] = "candidate-dedup"
                 else:
                     result["error"] = "Sorgu anlaşılamadı"
             elif len(place_names) == 1:
                 single_candidate = ordered_places[0]
-                if single_candidate.get("similarity", 0.0) >= 0.82 and single_candidate.get("role_hint") == "to":
+                single_action_cue = (
+                    multi_action_cue
+                    and len(plain_multi_places) == 1
+                    and normalize_place_key(plain_multi_places[0]) == normalize_place_key(place_names[0])
+                )
+                single_is_direct = (
+                    str(single_candidate.get("match_source", "")) == "lookup-exact"
+                    or single_candidate.get("role_hint") == "to"
+                )
+                if (
+                    single_candidate.get("similarity", 0.0) >= 0.82
+                    and (
+                        single_candidate.get("role_hint") == "to"
+                        or (single_is_direct and single_action_cue)
+                    )
+                ):
                     result["type"] = "single"
                     result["destination"] = place_names[0]
+                    if trace_data is not None:
+                        intent_matrix_meta["final_type"] = "single"
+                        intent_matrix_meta["reason"] = "single-action-rescue"
                 else:
                     result["error"] = "Sorgu anlaşılamadı"
             else:

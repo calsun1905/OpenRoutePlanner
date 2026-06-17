@@ -22,3 +22,98 @@
 {"id":"tr_multi_004","query":"Galata Karaköy Taksim dolaş","expected":{"type":"multi","locations":["galata","karaköy","taksim"]},"tags":["multi","plain_list"]}
 {"id":"tr_unknown_001","query":"Bugün hava nasıl","expected":{"type":"unknown"},"tags":["unknown","non_location"]}
 {"id":"tr_unknown_002","query":"Merhaba nasılsın","expected":{"type":"unknown"},"tags":["unknown","chitchat"]}
+{"id":"tr_route_007","query":"Kadikoyden Maltepeye","expected":{"type":"route","origin":"kadıköy","destination":"maltepe"},"tags":["route","route-natural","typo","suffix_plain"]}
+{"id":"tr_route_008","query":"Kadikoy'den Maltepe'ye","expected":{"type":"route","origin":"kadıköy","destination":"maltepe"},"tags":["route","route-natural","typo","apostrophe"]}
+{"id":"tr_route_009","query":"Kadikoyden Maltepeye git","expected":{"type":"route","origin":"kadıköy","destination":"maltepe"},"tags":["route","route-natural","typo"]}
+{"id":"tr_route_010","query":"Kadikoyden Maltepeye rota ciz","expected":{"type":"route","origin":"kadıköy","destination":"maltepe"},"tags":["route","route-natural","typo"]}
+{"id":"tr_route_011","query":"Kadikoyden Maltepeye nasil giderim","expected":{"type":"route","origin":"kadıköy","destination":"maltepe"},"tags":["route","route-natural","typo"]}
+{"id":"tr_route_012","query":"Besiktastan Kadikoye toplu tasima ile git","expected":{"type":"route","origin":"beşiktaş","destination":"kadıköy"},"tags":["route","route-transit","typo","plain_typing"]}
+{"id":"tr_route_013","query":"Uskudardan Modaya metro ile git","expected":{"type":"route","origin":"üsküdar","destination":"moda"},"tags":["route","route-transit","alias"]}
+{"id":"tr_route_014","query":"Bostancidan Maltepeye marmaray ile git","expected":{"type":"route","origin":"bostancı","destination":"maltepe"},"tags":["route","route-transit","typo"]}
+{"id":"tr_route_015","query":"Kadikoy Besiktas arasi rota","expected":{"type":"route","origin":"kadıköy","destination":"beşiktaş"},"tags":["route","route-natural","typo"]}
+{"id":"tr_route_016","query":"Bakirkoyden Taksime guzergah","expected":{"type":"route","origin":"bakırköy","destination":"taksim"},"tags":["route","route-natural","typo"]}
+{"id":"tr_route_017","query":"Maltepe'den Kartal'a otobusle nasil giderim","expected":{"type":"route","origin":"maltepe","destination":"kartal"},"tags":["route","route-transit","apostrophe"]}
+{"id":"tr_route_018","query":"Kadikoyden Maltepeye yol tarifi","expected":{"type":"route","origin":"kadıköy","destination":"maltepe"},"tags":["route","route-natural","typo"]}
+{"id":"tr_poi_007","query":"Kadikoyde kafe","expected":{"type":"poi","location":"kadıköy"},"tags":["poi","poi-loc","typo","loc_suffix"]}
+{"id":"tr_poi_008","query":"Moda cevresinde ne var","expected":{"type":"poi","location":"moda"},"tags":["poi","poi-contextual","typo"]}
+{"id":"tr_poi_009","query":"Besiktasta kahve icilecek yerler","expected":{"type":"poi","location":"beşiktaş"},"tags":["poi","poi-loc","typo","loc_suffix"]}
+{"id":"tr_poi_010","query":"Uskudarda gezilecek yerler goster","expected":{"type":"poi","location":"üsküdar"},"tags":["poi","poi-contextual","alias","plain_suffix"]}
+{"id":"tr_poi_011","query":"Maltepede restoran ara","expected":{"type":"poi","location":"maltepe"},"tags":["poi","poi-loc","plain_suffix"]}
+{"id":"tr_poi_012","query":"Taksimde muze var mi","expected":{"type":"poi","location":"taksim"},"tags":["poi","poi-contextual","typo"]}
+{"id":"tr_poi_013","query":"Kadikoyde eczane","expected":{"type":"poi","location":"kadıköy"},"tags":["poi","poi-loc","typo"]}
+{"id":"tr_poi_014","query":"Besiktasta cami","expected":{"type":"poi","location":"beşiktaş"},"tags":["poi","poi-loc","typo"]}
+{"id":"tr_poi_015","query":"Karakoyde yemek","expected":{"type":"poi","location":"karaköy"},"tags":["poi","poi-loc","typo"]}
+{"id":"tr_poi_016","query":"Moda civarinda park var mi","expected":{"type":"poi","location":"moda"},"tags":["poi","poi-contextual","typo"]}
+{"id":"tr_single_007","query":"Maltepeye git","expected":{"type":"single","destination":"maltepe"},"tags":["single","single-target","plain_suffix"]}
+{"id":"tr_single_008","query":"Uskudara git","expected":{"type":"single","destination":"üsküdar"},"tags":["single","single-target","alias"]}
+{"id":"tr_single_009","query":"Kizilaya git","expected":{"type":"single","destination":"kızılay"},"tags":["single","single-target","alias"]}
+{"id":"tr_single_010","query":"Besiktasa git","expected":{"type":"single","destination":"beşiktaş"},"tags":["single","single-target","typo"]}
+{"id":"tr_single_011","query":"Modaya gitmek istiyorum","expected":{"type":"single","destination":"moda"},"tags":["single","single-target"]}
+{"id":"tr_single_012","query":"Bostanciya gidelim","expected":{"type":"single","destination":"bostancı"},"tags":["single","single-target","typo"]}
+{"id":"tr_single_013","query":"Kadikoye git","expected":{"type":"single","destination":"kadıköy"},"tags":["single","single-target","typo"]}
+{"id":"tr_single_014","query":"Taksime git","expected":{"type":"single","destination":"taksim"},"tags":["single","single-target","plain_suffix"]}
+{"id":"tr_single_015","query":"Karakoye git","expected":{"type":"single","destination":"karaköy"},"tags":["single","single-target","typo"]}
+{"id":"tr_single_016","query":"Uskudara nasil giderim","expected":{"type":"single","destination":"üsküdar"},"tags":["single","single-target","alias"]}
+{"id":"tr_multi_005","query":"Kadikoy, Taksim ve Besiktas'i gez","expected":{"type":"multi","locations":["kadıköy","taksim","beşiktaş"]},"tags":["multi","multi-list","typo","list"]}
+{"id":"tr_multi_006","query":"Moda Bostanci Maltepe gezi plani","expected":{"type":"multi","locations":["moda","bostancı","maltepe"]},"tags":["multi","multi-list","typo","plain_list"]}
+{"id":"tr_multi_007","query":"Uskudar Kadikoy Taksim turu","expected":{"type":"multi","locations":["üsküdar","kadıköy","taksim"]},"tags":["multi","multi-list","alias","plain_list"]}
+{"id":"tr_multi_008","query":"Galata Karakoy Taksim dolas","expected":{"type":"multi","locations":["galata","karaköy","taksim"]},"tags":["multi","multi-list","typo","plain_list"]}
+{"id":"tr_multi_009","query":"Kadikoy Moda Bostanci gez","expected":{"type":"multi","locations":["kadıköy","moda","bostancı"]},"tags":["multi","multi-list","typo","plain_list"]}
+{"id":"tr_multi_010","query":"Besiktas Ortakoy Karakoy turu","expected":{"type":"multi","locations":["beşiktaş","ortaköy","karaköy"]},"tags":["multi","multi-list","typo","plain_list"]}
+{"id":"tr_multi_011","query":"Uskudar, Moda, Bostanci ve Maltepe gezisi","expected":{"type":"multi","locations":["üsküdar","moda","bostancı","maltepe"]},"tags":["multi","multi-list","alias","list"]}
+{"id":"tr_multi_012","query":"Kadikoy Taksim Besiktas rota plani","expected":{"type":"multi","locations":["kadıköy","taksim","beşiktaş"]},"tags":["multi","multi-list","typo","plain_list"]}
+{"id":"tr_multi_013","query":"Moda Maltepe Kartal gezisi","expected":{"type":"multi","locations":["moda","maltepe","kartal"]},"tags":["multi","multi-list","plain_list"]}
+{"id":"tr_multi_014","query":"Karakoy Galata Eminonu turu","expected":{"type":"multi","locations":["karaköy","galata","eminönü"]},"tags":["multi","multi-list","typo","plain_list"]}
+{"id":"tr_unknown_003","query":"Bugun hava nasil","expected":{"type":"unknown"},"tags":["unknown","unknown-chitchat","non_location","typo"]}
+{"id":"tr_unknown_004","query":"Merhaba nasilsin","expected":{"type":"unknown"},"tags":["unknown","unknown-chitchat","chitchat","typo"]}
+{"id":"tr_unknown_005","query":"Tesekkurler","expected":{"type":"unknown"},"tags":["unknown","unknown-chitchat","chitchat","typo"]}
+{"id":"tr_unknown_006","query":"Saat kac","expected":{"type":"unknown"},"tags":["unknown","unknown-chitchat","chitchat","typo"]}
+{"id":"tr_unknown_007","query":"Kadikoyden","expected":{"type":"unknown"},"tags":["unknown","false-positive","typo"]}
+{"id":"tr_unknown_008","query":"Maltepeye","expected":{"type":"unknown"},"tags":["unknown","false-positive","plain_suffix"]}
+{"id":"tr_unknown_009","query":"Kadikoy Ankara Besiktas","expected":{"type":"unknown"},"tags":["unknown","false-positive","mixed-intent","scope","typo"]}
+{"id":"tr_unknown_010","query":"Kadikoyden Besiktasa kafe","expected":{"type":"unknown"},"tags":["unknown","route-ambiguous","mixed-intent","false-positive","typo"]}
+{"id":"tr_unknown_011","query":"Kadikoyde Besiktasa rota","expected":{"type":"unknown"},"tags":["unknown","route-ambiguous","mixed-intent","false-positive","typo"]}
+{"id":"tr_unknown_012","query":"Ankaradan Kizilaya rota","expected":{"type":"route","origin":"ankara","destination":"kızılay"},"tags":["route","scope","route-natural","city_to_district","typo"]}
+{"id":"tr_unknown_013","query":"Kadikoyden Ankaraya rota ciz","expected":{"type":"route","origin":"kadıköy","destination":"ankara"},"tags":["route","scope","route-natural","typo"]}
+{"id":"tr_unknown_014","query":"Izmirden Kadikoye nasil giderim","expected":{"type":"route","origin":"izmir","destination":"kadıköy"},"tags":["route","scope","route-natural","typo"]}
+{"id":"tr_unknown_015","query":"Kadikoy Besiktas kafe","expected":{"type":"unknown"},"tags":["unknown","mixed-intent","false-positive","typo"]}
+{"id":"tr_unknown_016","query":"Uskudar Moda Besiktas kafe","expected":{"type":"unknown"},"tags":["unknown","mixed-intent","false-positive","alias"]}
+{"id":"tr_unknown_017","query":"Ankara Kadikoy Besiktas","expected":{"type":"unknown"},"tags":["unknown","scope","false-positive","mixed-intent","typo"]}
+{"id":"tr_unknown_018","query":"Kadikoyden     ","expected":{"type":"unknown"},"tags":["unknown","false-positive","typo","spacing"]}
+{"id":"tr_unknown_019","query":"Metro ile gitmek istiyorum","expected":{"type":"unknown"},"tags":["unknown","false-positive","route-ambiguous"]}
+{"id":"tr_unknown_020","query":"Otobusle nasil giderim","expected":{"type":"unknown"},"tags":["unknown","false-positive","route-ambiguous","typo"]}
+{"id":"tr_single_017","query":"Taksime git","expected":{"type":"single","destination":"taksim"},"tags":["single","single-target","plain_suffix"]}
+{"id":"tr_single_018","query":"Modaya git","expected":{"type":"single","destination":"moda"},"tags":["single","single-target","plain_suffix"]}
+{"id":"tr_single_019","query":"Kadıköye git","expected":{"type":"single","destination":"kadıköy"},"tags":["single","single-target","plain_suffix"]}
+{"id":"tr_single_020","query":"Maltepe'ye git","expected":{"type":"single","destination":"maltepe"},"tags":["single","single-target","apostrophe"]}
+{"id":"tr_single_021","query":"Taksim'e git","expected":{"type":"single","destination":"taksim"},"tags":["single","single-target","apostrophe"]}
+{"id":"tr_single_022","query":"Beşiktaş'ı gez","expected":{"type":"single","destination":"beşiktaş"},"tags":["single","single-target","object_suffix","apostrophe"]}
+{"id":"tr_single_023","query":"Kadıköyü gez","expected":{"type":"single","destination":"kadıköy"},"tags":["single","single-target","object_suffix"]}
+{"id":"tr_single_024","query":"Taksimi dolaş","expected":{"type":"single","destination":"taksim"},"tags":["single","single-target","object_suffix"]}
+{"id":"tr_route_019","query":"Beşiktaştan Kadıköye git","expected":{"type":"route","origin":"beşiktaş","destination":"kadıköy"},"tags":["route","route-natural","plain_suffix"]}
+{"id":"tr_route_020","query":"Üsküdardan Modaya rota","expected":{"type":"route","origin":"üsküdar","destination":"moda"},"tags":["route","route-natural","plain_suffix"]}
+{"id":"tr_poi_017","query":"Kadıköyde kafe","expected":{"type":"poi","location":"kadıköy"},"tags":["poi","poi-loc","loc_suffix"]}
+{"id":"tr_poi_018","query":"Üsküdarda gezilecek yerler","expected":{"type":"poi","location":"üsküdar"},"tags":["poi","poi-contextual","plain_suffix"]}
+{"id":"tr_poi_019","query":"Taksimde müze","expected":{"type":"poi","location":"taksim"},"tags":["poi","poi-loc","loc_suffix"]}
+{"id":"tr_poi_020","query":"Beşiktaş'ta kafe","expected":{"type":"poi","location":"beşiktaş"},"tags":["poi","poi-loc","apostrophe"]}
+{"id":"tr_poi_021","query":"Kadıköyde mekanlar","expected":{"type":"poi","location":"kadıköy"},"tags":["poi","poi-contextual","plural"]}
+{"id":"tr_poi_022","query":"Kadıköyde yerler","expected":{"type":"poi","location":"kadıköy"},"tags":["poi","poi-contextual","plural"]}
+{"id":"tr_poi_023","query":"Taksimde restoranlar","expected":{"type":"poi","location":"taksim"},"tags":["poi","poi-loc","plural"]}
+{"id":"tr_poi_024","query":"Üsküdarda eczaneler","expected":{"type":"poi","location":"üsküdar"},"tags":["poi","poi-loc","plural"]}
+{"id":"tr_poi_025","query":"Karaköyde müzeler","expected":{"type":"poi","location":"karaköy"},"tags":["poi","poi-loc","plural"]}
+{"id":"tr_poi_026","query":"Kadıköyde kahve","expected":{"type":"poi","location":"kadıköy"},"tags":["poi","poi-loc","concept-root"]}
+{"id":"tr_poi_027","query":"Kadıköyde yemek","expected":{"type":"poi","location":"kadıköy"},"tags":["poi","poi-loc","concept-root"]}
+{"id":"tr_poi_028","query":"Kadıköyde hastane","expected":{"type":"poi","location":"kadıköy"},"tags":["poi","poi-loc","concept-root"]}
+{"id":"tr_poi_029","query":"Taksimde otel","expected":{"type":"poi","location":"taksim"},"tags":["poi","poi-loc","concept-root"]}
+{"id":"tr_poi_030","query":"Üsküdarda avm","expected":{"type":"poi","location":"üsküdar"},"tags":["poi","poi-loc","concept-root"]}
+{"id":"tr_poi_031","query":"Bostancıda durak","expected":{"type":"poi","location":"bostancı"},"tags":["poi","poi-loc","concept-root"]}
+{"id":"tr_poi_032","query":"Kadıköy yakınında eczane","expected":{"type":"poi","location":"kadıköy"},"tags":["poi","poi-contextual","nearby"]}
+{"id":"tr_poi_033","query":"Taksim civarında müze","expected":{"type":"poi","location":"taksim"},"tags":["poi","poi-contextual","nearby"]}
+{"id":"tr_poi_034","query":"kadikoyde kafeler","expected":{"type":"poi","location":"kadıköy"},"tags":["poi","poi-loc","typo","plural"]}
+{"id":"tr_poi_035","query":"besiktasta restoranlar","expected":{"type":"poi","location":"beşiktaş"},"tags":["poi","poi-loc","typo","plural"]}
+{"id":"tr_poi_036","query":"uskudarda muzeler","expected":{"type":"poi","location":"üsküdar"},"tags":["poi","poi-loc","typo","plural"]}
+{"id":"tr_poi_037","query":"bostancida duraklar","expected":{"type":"poi","location":"bostancı"},"tags":["poi","poi-loc","typo","plural"]}
+{"id":"tr_poi_038","query":"karakoyde mekanlar","expected":{"type":"poi","location":"karaköy"},"tags":["poi","poi-contextual","typo","plural"]}
+{"id":"tr_poi_039","query":"eminonunde camiler","expected":{"type":"poi","location":"eminönü"},"tags":["poi","poi-loc","typo","plural"]}
+{"id":"tr_unknown_021","query":"Kadıköyden Beşiktaşa kafe","expected":{"type":"unknown"},"tags":["unknown","mixed-intent","false-positive","route-ambiguous"]}
+{"id":"tr_unknown_022","query":"Kadıköy Beşiktaş kafe","expected":{"type":"unknown"},"tags":["unknown","mixed-intent","false-positive"]}

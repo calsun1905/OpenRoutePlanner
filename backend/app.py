@@ -1733,6 +1733,9 @@ def api_get_route():
         }
     """
     try:
+        # Bu endpoint yaya rota omurgasini verir.
+        # Akis: request dogrulama -> Istanbul geofence -> cache kontrolu ->
+        # graph/rota hesaplama -> koordinat+istatistik cevap.
         data = request.get_json(silent=True)
 
         if not data or "points" not in data:
@@ -1762,7 +1765,7 @@ def api_get_route():
             except (ValueError, TypeError):
                 return jsonify({"error": f"Nokta {i} geÃƒçersiz koordinat."}), 400
 
-        # 1) SeÃƒçilen noktalarÃı kapsayan grafÃı al (otomatik bÃƒölge algÃılama)
+        # Geofence zorunlu: uygulama Istanbul disi rotalari bilincli olarak reddeder.
         outside_point = _first_outside_point(points)
         if outside_point is not None:
             idx, lat, lon = outside_point
@@ -1771,6 +1774,7 @@ def api_get_route():
                 field="points",
             )
 
+        # Tekrarlanan istekleri hizlandirmak icin response seviyesinde cache kullanilir.
         route_cache_key = _route_response_cache_key(
             endpoint="/api/get-route",
             points=points,
@@ -1782,6 +1786,8 @@ def api_get_route():
             cached_response["cache_hit"] = True
             return jsonify(cached_response)
 
+        # Asil rota uretimi burada: retry/fallback politikasi
+        # _build_primary_route_with_retries icerisinde yonetilir.
         point_tuples = [(float(p[0]), float(p[1])) for p in points]
         route_ctx = _build_primary_route_with_retries(point_tuples, bool(optimize), route_type)
         if isinstance(route_ctx, dict) and route_ctx.get("unreachable_error"):
@@ -1797,7 +1803,7 @@ def api_get_route():
         if not route_nodes:
             return jsonify({"error": "Rota hesaplanamadÃı. Noktalar harita alanÃı dÃıÃ…şÃında olabilir."}), 400
 
-        # 5) Koordinatlara Ãƒçevir
+        # Node ID listesini cizim icin [lat, lon] akisina cevir.
         route_coords = nodes_to_coords(G, route_nodes)
 
         # 6) Ãİstatistikler
@@ -2048,6 +2054,8 @@ def api_get_alternative_routes():
         }
     """
     try:
+        # Bu endpoint ayni giris noktasi icin birden fazla geometri
+        # alternatifi dondurur; amac UI'da rota karsilastirmasini acmak.
         data = request.get_json(silent=True)
 
         if not data or "points" not in data:
@@ -2075,6 +2083,7 @@ def api_get_alternative_routes():
                 field="points",
             )
 
+        # Alternatif rota da cache'lenir; ayni noktalarda tekrar hesaplama azaltilir.
         route_cache_key = _route_response_cache_key(
             endpoint="/api/get-alternative-routes",
             points=points,
@@ -2086,6 +2095,8 @@ def api_get_alternative_routes():
             cached_response["cache_hit"] = True
             return jsonify(cached_response)
 
+        # Batch alternatif hesaplama segment bazli calisir
+        # (her segmentte birden fazla rota adayi uretilir).
         point_tuples = [(float(p[0]), float(p[1])) for p in points]
         alt_ctx = _build_alternative_batch_with_retries(point_tuples, bool(optimize))
         if isinstance(alt_ctx, dict) and alt_ctx.get("unreachable_error"):
@@ -2115,7 +2126,8 @@ def api_get_alternative_routes():
         if not alternatives:
             return jsonify({"error": "HiÃƒçbir alternatif rota hesaplanamadÃı."}), 400
 
-        # Ayni rotalari filtrele: rota uzunluguna gore dinamik koordinat toleransi.
+        # UI'da kopya kartlari engellemek icin geometri bazli dedup uygulanir.
+        # Esik degeri rota uzunluguna gore dinamik tutulur.
         def _coords_equal(a, b, distance_km: float):
             if len(a) != len(b):
                 return False
@@ -2173,6 +2185,11 @@ def api_search_pois():
         }
     """
     try:
+        # POI akisi:
+        # 1) kategori ve bolge dogrulama
+        # 2) Istanbul geofence
+        # 3) search_mode'a gore boundary veya auto stratejisi
+        # 4) cache + canli sorgu
         data = request.get_json(silent=True)
 
         if not data or "category" not in data:
@@ -2197,8 +2214,8 @@ def api_search_pois():
         else:
             force_refresh = bool(force_refresh_raw)
 
-        # GÃƒüvenlik aÃşÃı: il/ilÃƒçe seviyesinde idari yer adlarÃında
-        # fallback yerine doÃşrudan place-boundary sorgusu zorunlu olsun.
+        # Il/ilce seviyesinde belirsiz "yakina gore" arama yerine
+        # idari sinir (place boundary) stratejisini zorlariz.
         if search_mode == "auto" and isinstance(place, str):
             place_parts = [p.strip() for p in place.split(",") if p.strip()]
             place_tail = place_parts[-1].lower() if place_parts else ""
@@ -2555,6 +2572,10 @@ def api_save_route():
 
         if not data:
             return jsonify({"error": "GeÃƒçersiz veya eksik JSON gÃƒövdesi."}), 400
+
+        route_payload = data.get("route_payload")
+        if route_payload is not None and not isinstance(route_payload, dict):
+            return jsonify({"error": "'route_payload' alanÃı obje formatÄ±nda olmalÄ±."}), 400
         
         # Zorunlu alanlar
         required_fields = ["name", "points", "route_coords", "distance_km", "duration_minutes"]
@@ -2571,7 +2592,8 @@ def api_save_route():
             duration_minutes=data["duration_minutes"],
             route_type=data.get("route_type", "route_1"),
             description=data.get("description", ""),
-            tags=data.get("tags", [])
+            tags=data.get("tags", []),
+            route_payload=route_payload,
         )
         
         return jsonify({
@@ -3149,6 +3171,8 @@ def api_nlp_parse():
     permit_acquired = False
     queue_wait_ms = 0.0
     try:
+        # BERT NLP endpoint'i regex fallback olmadan calisir.
+        # Akis: input dogrulama -> queue/concurrency -> parse -> scope kontrol -> audit log.
         trace_prefix = _request_trace_prefix()
         print(f"\n{'='*60}")
         print(f"{trace_prefix} [NLP API] Parse ÃƒçaÃşrÃısÃı alÃındÃı")
@@ -3178,6 +3202,8 @@ def api_nlp_parse():
             print(f"[NLP API] ? BERT motoru ZORUNLU! Regex fallback KALDIRILDI.")
             return jsonify({"error": "BERT motoru gereklidir. Transformers ve PyTorch kurun."}), 503
 
+        # NLP istekleri bounded semaphore ile korunur:
+        # model asiri yukte oldugunda tutarli 429 donmek icin.
         queue_wait_start = time.perf_counter()
         permit_acquired = _NLP_PARSE_SEMAPHORE.acquire(timeout=_NLP_QUEUE_TIMEOUT_SEC)
         queue_wait_ms = round((time.perf_counter() - queue_wait_start) * 1000, 2)
@@ -3216,6 +3242,8 @@ def api_nlp_parse():
             print(f"{trace_prefix} [NLP API] ? BERT hatasÃı: {bert_exc}")
             return jsonify({"error": f"BERT motoru hatasÃı: {str(bert_exc)}"}), 500
 
+        # NLP sonucu lokasyon iceriyorsa Istanbul kapsami burada zorlanir.
+        # Boylece parser dogru olsa bile out-of-scope hedefler engellenir.
         scope_checks = []
         for place in _extract_nlp_places_for_scope_check(result):
             in_istanbul, meta = _is_place_text_in_istanbul(place)
@@ -4558,6 +4586,9 @@ def api_local_llm_chat_rag():
     if not is_local_llm_configured():
         return jsonify({"error": "LOCAL_LLM_ENABLED/BASE_URL ayari eksik"}), 503
 
+    # Local chat endpoint'i iki modda calisir:
+    # 1) RAG uygun/guvenilir ise extractive veya structured cevap
+    # 2) RAG uygun degilse normal LLM chat (fallback modeli dahil)
     data = request.get_json(silent=True) or {}
 
     session_id = str(data.get("session_id", "") or "").strip()
@@ -4607,6 +4638,7 @@ def api_local_llm_chat_rag():
     rag_used = False
     rag_skip_reason = ""
 
+    # RAG "her soruda zorunlu" degildir; intent tabanli karar verilir.
     use_rag_for_query, rag_reason = _should_use_rag_for_query_with_reason(user_text)
     if use_rag_for_query:
         if not RAG_SERVICE_AVAILABLE or not is_rag_available():
@@ -4623,6 +4655,8 @@ def api_local_llm_chat_rag():
         rag_context = _normalize_common_turkish_glitches(repair_text(rag_result.get("context", "")))
         if not rag_context:
             rag_context = "[Baglam bulunamadi]"
+        # Similarity/kalite dusukse RAG baglami guvenilmez kabul edilir
+        # ve modelin genel cevap moduna gecilir.
         fallback_from_rag, fallback_reason = _should_fallback_from_rag(
             rag_result,
             rag_min_similarity,
@@ -4650,7 +4684,8 @@ def api_local_llm_chat_rag():
             "gerektiginde guncel kontrol notu ekle."
         )
 
-    # Context bleed'i engellemek icin bu endpoint'te varsayilan olarak sadece son soru kullanilir.
+    # Context bleed'i engellemek icin varsayilan tek mesaj politikasi:
+    # sadece son kullanici sorusu modele verilir.
     use_session_context = _as_bool(data.get("use_session_context", False), default=False)
     if use_session_context and session_id and not rag_used:
         messages = _chat_context_from_session(session_id, context_limit=6) + [{"role": "user", "content": user_prompt}]
@@ -4672,6 +4707,7 @@ def api_local_llm_chat_rag():
 
     try:
         if rag_used:
+            # RAG tarafinda once deterministic cevabi dene (hallucination riskini azaltir).
             direct_answer = _try_direct_rag_structured_answer(user_text, rag_result)
             if direct_answer:
                 assistant_text = _normalize_common_turkish_glitches(repair_text(direct_answer))
@@ -5352,6 +5388,9 @@ def api_multimodal_compare():
     permit_acquired = False
     queue_wait_ms = 0.0
     try:
+        # Multimodal endpoint:
+        # input + geofence + allowed_modes normalize -> queue ->
+        # compare engine -> telemetry ile response.
         request_start = time.perf_counter()
         stage_ms = {}
 
@@ -5401,6 +5440,7 @@ def api_multimodal_compare():
             return _outside_istanbul_response(detail="Origin veya destination Istanbul disinda.", field="origin,destination")
         stage_ms["normalize_geofence_ms"] = round((time.perf_counter() - stage_start) * 1000, 2)
 
+        # Transit hesaplari maliyetli oldugu icin semaphore ile sinirlanir.
         queue_wait_start = time.perf_counter()
         permit_acquired = _MULTIMODAL_COMPARE_SEMAPHORE.acquire(timeout=_MULTIMODAL_QUEUE_TIMEOUT_SEC)
         queue_wait_ms = round((time.perf_counter() - queue_wait_start) * 1000, 2)

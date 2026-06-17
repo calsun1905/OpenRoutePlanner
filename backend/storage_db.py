@@ -184,6 +184,26 @@ def close_all_connections() -> None:
     _thread_local = threading.local()
 
 
+def _get_table_columns(cursor: sqlite3.Cursor, table_name: str) -> set[str]:
+    """Tablodaki mevcut kolon adlarini doner."""
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    rows = cursor.fetchall()
+    columns = set()
+    for row in rows:
+        try:
+            columns.add(str(row["name"]))
+        except (TypeError, KeyError, IndexError):
+            columns.add(str(row[1]))
+    return columns
+
+
+def _ensure_column(cursor: sqlite3.Cursor, table_name: str, column_name: str, ddl: str) -> None:
+    """Kolon yoksa ekler."""
+    if column_name in _get_table_columns(cursor, table_name):
+        return
+    cursor.execute(ddl)
+
+
 def init_schema(conn: sqlite3.Connection, run_analyze: bool = False) -> None:
     """Tablolari olusturur (yoksa)."""
     cursor = conn.cursor()
@@ -199,6 +219,7 @@ def init_schema(conn: sqlite3.Connection, run_analyze: bool = False) -> None:
             distance_km REAL NOT NULL,
             duration_minutes INTEGER NOT NULL,
             route_type TEXT DEFAULT 'route_1',
+            route_payload TEXT DEFAULT NULL,
             tags TEXT DEFAULT '[]',
             favorite INTEGER DEFAULT 0,
             times_used INTEGER DEFAULT 0,
@@ -206,6 +227,13 @@ def init_schema(conn: sqlite3.Connection, run_analyze: bool = False) -> None:
             updated_at TEXT NOT NULL
         )
         """
+    )
+
+    _ensure_column(
+        cursor,
+        "routes",
+        "route_payload",
+        "ALTER TABLE routes ADD COLUMN route_payload TEXT DEFAULT NULL",
     )
 
     cursor.execute(
