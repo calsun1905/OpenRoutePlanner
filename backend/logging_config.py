@@ -16,18 +16,25 @@ KULLANIM:
 
 import logging
 import sys
-import io
 
 import os
+
+
+def _configure_console_utf8() -> None:
+    """Avoid replacing stdio wrappers on Windows; reconfigure them in place."""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or getattr(stream, "closed", False):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 # Force UTF-8 stdout/stderr on Windows to avoid CP1254 terminal and redirect encoding mojibakes
 # Skip inside pytest environments to prevent standard output stream capturing issues
 if sys.platform.startswith('win') and "pytest" not in sys.argv[0] and "PYTEST_CURRENT_TEST" not in os.environ:
-    try:
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-    except Exception:
-        pass
+    _configure_console_utf8()
 
 import json
 from datetime import datetime

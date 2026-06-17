@@ -6,16 +6,23 @@ Rota optimizasyonu ve POI arama endpoint'leri saÃşlar.
 """
 import os
 import sys
-import io
+
+
+def _configure_console_utf8() -> None:
+    """Avoid replacing stdio wrappers on Windows; reconfigure them in place."""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or getattr(stream, "closed", False):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 # Force UTF-8 stdout/stderr on Windows to avoid CP1254 terminal and redirect encoding mojibakes
 # Skip inside pytest environments to prevent standard output stream capturing issues
 if sys.platform.startswith('win') and "pytest" not in sys.argv[0] and "PYTEST_CURRENT_TEST" not in os.environ:
-    try:
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-    except Exception:
-        pass
+    _configure_console_utf8()
 
     # Auto-re-execute using virtual environment python if running globally on Windows
     import subprocess
@@ -31,8 +38,8 @@ import builtins
 import uuid
 import re
 import threading
+import traceback
 from datetime import datetime, timezone
-from functools import partial
 from typing import Any
 from route_config import ROUTE_CONFIG
 
@@ -658,16 +665,29 @@ def _configure_live_console_output() -> None:
             except TypeError:
                 reconfigure(line_buffering=True)
 
-    if _env_flag("ORP_LOG_FORCE_PRINT_FLUSH", True):
-        if not getattr(builtins.print, "__orp_forced_flush__", False):
-            forced_print = partial(builtins.print, flush=True)
-            setattr(forced_print, "__orp_forced_flush__", True)
-            builtins.print = forced_print
+    force_flush = _env_flag("ORP_LOG_FORCE_PRINT_FLUSH", True)
+    if getattr(builtins.print, "__orp_safe_print__", False):
+        return
+
+    original_print = builtins.print
+
+    def safe_print(*args, **kwargs):
+        if force_flush and "flush" not in kwargs:
+            kwargs["flush"] = True
+        try:
+            return original_print(*args, **kwargs)
+        except (OSError, ValueError):
+            return None
+
+    setattr(safe_print, "__orp_safe_print__", True)
+    setattr(safe_print, "__orp_forced_flush__", force_flush)
+    builtins.print = safe_print
 
 
 _configure_live_console_output()
 
 from flask import Flask, request, jsonify, send_from_directory, g, Response, stream_with_context
+from werkzeug.exceptions import HTTPException
 # Compatibility: allow test client to pass 'query' kw -> map to 'query_string'
 try:
     from flask.testing import EnvironBuilder as _EnvironBuilder
@@ -1188,6 +1208,24 @@ def _attach_trace_headers(response):
     except Exception:
         pass
     return response
+
+
+@app.errorhandler(Exception)
+def _handle_unexpected_api_error(exc):
+    """Return JSON for unexpected API failures and keep traceback in logs."""
+    if isinstance(exc, HTTPException):
+        return exc
+
+    try:
+        print("[API] Beklenmeyen hata yakalandi:")
+        traceback.print_exc()
+    except Exception:
+        pass
+
+    if request.path.startswith("/api/"):
+        return jsonify({"error": f"Sunucu hatasi: {exc}"}), 500
+
+    raise exc
 
 
 def _disable_bert_runtime(exc: Exception) -> None:
@@ -4821,6 +4859,22 @@ def api_multimodal_compare():
             _MULTIMODAL_COMPARE_SEMAPHORE.release()
 
 
+def _run_local_server(port: int) -> None:
+    """Use a Windows-friendly WSGI server for local development."""
+    if sys.platform.startswith("win"):
+        try:
+            from wsgiref.simple_server import make_server
+
+            print("[Server] Windows uyumluluk modu etkin: stdlib WSGI sunucusu kullaniliyor.")
+            with make_server("127.0.0.1", port, app) as server:
+                server.serve_forever()
+            return
+        except Exception as exc:
+            print(f"[Server] stdlib WSGI fallback basarisiz: {exc}. Flask dev server'a donuluyor.")
+
+    app.run(debug=False, port=port)
+
+
 if __name__ == "__main__":
     # Transit verilerini arka planda yukle
     if _transit_available:
@@ -4850,7 +4904,7 @@ if __name__ == "__main__":
     initialize_runtime()
     if _PRELOAD_POPULAR_REGIONS_ON_STARTUP:
         initialize_graph_preload()
-    app.run(debug=False, port=port)
+    _run_local_server(port)
 
 # Management endpoints for BERT: warmup and place seeding
 @app.route("/api/nlp/warmup", methods=["GET", "POST"]) 

@@ -6,11 +6,20 @@ Başlangıç saati, ziyaret süreleri ve varış/ayrılış zamanlarını hesapl
 """
 
 import sys
-import io
+ 
+ 
+def _configure_console_utf8() -> None:
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or getattr(stream, "closed", False):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 # UTF-8 encoding için stdout ayarla (Windows terminal desteği)
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    _configure_console_utf8()
 
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional

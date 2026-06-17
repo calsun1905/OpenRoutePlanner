@@ -5,7 +5,7 @@
  */
 
 // ========== CONFIG ==========
-const API_BASE = "/api";
+const API_BASE = resolveApiBase();
 const ISTANBUL_GEOFENCE_BBOX = {
     minLat: 40.78,
     maxLat: 41.40,
@@ -13,6 +13,74 @@ const ISTANBUL_GEOFENCE_BBOX = {
     maxLon: 29.70,
 };
 const ISTANBUL_CENTER = [40.9903, 29.0291];
+
+function resolveApiBase() {
+    const override = window.__ORP_API_BASE__;
+    if (typeof override === "string" && override.trim()) {
+        return override.trim().replace(/\/+$/, "");
+    }
+
+    const protocol = window.location.protocol || "http:";
+    const hostname = window.location.hostname || "127.0.0.1";
+    const port = window.location.port || "";
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+
+    if (protocol === "file:" || (isLocalHost && port && port !== "5000")) {
+        return `http://${hostname}:5000/api`;
+    }
+
+    return "/api";
+}
+
+function apiUrl(path) {
+    if (/^https?:\/\//i.test(path)) {
+        return path;
+    }
+
+    const normalized = path.startsWith("/api/") ? path.slice(4) : path;
+    const safePath = normalized.startsWith("/") ? normalized : `/${normalized}`;
+    return `${API_BASE}${safePath}`;
+}
+
+function getApiHtmlErrorMessage(rawText) {
+    const text = String(rawText || "").trim();
+    if (!text) {
+        return "";
+    }
+
+    if (/<!doctype html/i.test(text) || /<html[\s>]/i.test(text)) {
+        const wrongOriginHint = window.location.port && window.location.port !== "5000"
+            ? " Uygulamayi http://127.0.0.1:5000 uzerinden acmayi deneyin."
+            : "";
+        return `Sunucu JSON yerine HTML hata sayfasi dondu.${wrongOriginHint}`;
+    }
+
+    return text.slice(0, 240);
+}
+
+async function parseApiResponse(response) {
+    const rawText = await response.text();
+    let payload = null;
+
+    if (rawText) {
+        try {
+            payload = JSON.parse(rawText);
+        } catch (error) {
+            payload = null;
+        }
+    }
+
+    if (!response.ok) {
+        const message = payload?.error || payload?.message || getApiHtmlErrorMessage(rawText) || `HTTP ${response.status}`;
+        throw new Error(message);
+    }
+
+    if (payload === null) {
+        throw new Error("Sunucudan gecerli JSON yaniti alinamadi.");
+    }
+
+    return payload;
+}
 
 // ========== STATE ==========
 let selectedPoints = [];
@@ -439,7 +507,7 @@ async function calculateRoute() {
     const optimize = false; // TSP optimizasyonu devre dışı
 
     try {
-        const response = await fetch(`${API_BASE}/get-route`, {
+        const response = await fetch(apiUrl("/get-route"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -448,11 +516,7 @@ async function calculateRoute() {
             }),
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || "Bilinmeyen hata");
-        }
+        const data = await parseApiResponse(response);
 
         // Backend cevabini tek objede toplayip
         // cizim + istatistik + adim adim yonlendirme panellerini besle.
@@ -2395,7 +2459,7 @@ async function showAlternativeRoutes() {
     const optimize = false; // TSP optimizasyonu devre dışı
 
     try {
-        const response = await fetch(`${API_BASE}/get-alternative-routes`, {
+        const response = await fetch(apiUrl("/get-alternative-routes"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -2404,11 +2468,7 @@ async function showAlternativeRoutes() {
             }),
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || "Bilinmeyen hata");
-        }
+        const data = await parseApiResponse(response);
 
         currentRouteOptimize = optimize;
         displayAlternativeRoutes(data.alternatives, data.optimized_order || selectedPoints.map((_, index) => index), optimize);
@@ -4067,16 +4127,12 @@ async function fetchRouteSteps() {
     const routeType = currentRouteData?.route_type || "route_1";
     const optimize = Boolean(currentRouteData?.optimize ?? currentRouteOptimize);
     try {
-        const resp = await fetch(`${API_BASE}/get-route-steps`, {
+        const resp = await fetch(apiUrl("/get-route-steps"), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ points: selectedPoints, optimize, route_type: routeType })
         });
-        if (!resp.ok) {
-            console.warn('Rota adimlari alinamadi:', resp.status);
-            return;
-        }
-        const data = await resp.json();
+        const data = await parseApiResponse(resp);
         if (data && data.steps && data.steps.length > 0) {
             displayRouteSteps(data.steps);
         } else {
