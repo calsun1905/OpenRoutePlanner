@@ -1,8 +1,0 @@
-[
-  {
-    "id": "user_case_001",
-    "category": "user_real_case",
-    "points": [[41.0000, 29.0000], [41.0100, 29.0150]],
-    "avoid_bridge_preference": true
-  }
-]

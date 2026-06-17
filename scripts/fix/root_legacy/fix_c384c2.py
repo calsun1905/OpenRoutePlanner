@@ -1,0 +1,102 @@
+# -*- coding: utf-8 -*-
+"""Fix all C3 84 C2 XX patterns in app.js"""
+import re
+
+with open('frontend/js/app.js', 'rb') as f:
+    data = f.read()
+
+# Find all C3 84 C2 XX patterns (4 bytes total)
+# These are: C3 (UTF-8 start for C0-FF range), 84 (second byte), C2 (Latin-1 prefix), XX (Latin-1 char)
+# The Latin-1 byte that was corrupted is in the second position after C2
+
+FIXES = {
+    # Map C3 84 C2 XX to correct UTF-8
+    # XX is the Latin-1 character that was incorrectly interpreted
+    b'\xc3\x84\xc2\xa0': b'\xc3\xa0',  # à
+    b'\xc3\x84\xc2\xa1': b'\xc3\xa1',  # á
+    b'\xc3\x84\xc2\xa2': b'\xc3\xa2',  # â
+    b'\xc3\x84\xc2\xa3': b'\xc3\xa3',  # ã
+    b'\xc3\x84\xc2\xa4': b'\xc3\xa4',  # ä
+    b'\xc3\x84\xc2\xa5': b'\xc3\xa5',  # å
+    b'\xc3\x84\xc2\xa6': b'\xc3\xa6',  # æ
+    b'\xc3\x84\xc2\xa7': b'\xc3\xa7',  # ç
+    b'\xc3\x84\xc2\xa8': b'\xc3\xa8',  # è
+    b'\xc3\x84\xc2\xa9': b'\xc3\xa9',  # é
+    b'\xc3\x84\xc2\xaa': b'\xc3\xaa',  # ê
+    b'\xc3\x84\xc2\xab': b'\xc3\xab',  # ë
+    b'\xc3\x84\xc2\xac': b'\xc3\xac',  # ì
+    b'\xc3\x84\xc2\xad': b'\xc3\xad',  # í
+    b'\xc3\x84\xc2\xae': b'\xc3\xae',  # î
+    b'\xc3\x84\xc2\xaf': b'\xc3\xaf',  # ï
+    b'\xc3\x84\xc2\xb0': b'\xc3\xb0',  # ğ
+    b'\xc3\x84\xc2\xb1': b'\xc3\xb1',  # ı
+    b'\xc3\x84\xc2\xb2': b'\xc3\xb2',  # ò
+    b'\xc3\x84\xc2\xb3': b'\xc3\xb3',  # ó
+    b'\xc3\x84\xc2\xb4': b'\xc3\xb4',  # ô
+    b'\xc3\x84\xc2\xb5': b'\xc3\xb5',  # õ
+    b'\xc3\x84\xc2\xb6': b'\xc3\xb6',  # ö
+    b'\xc3\x84\xc2\xb7': b'\xc3\xb7',  # ÷
+    b'\xc3\x84\xc2\xb8': b'\xc3\xb8',  # ø
+    b'\xc3\x84\xc2\xb9': b'\xc3\xb9',  # ù
+    b'\xc3\x84\xc2\xba': b'\xc3\xba',  # ú
+    b'\xc3\x84\xc2\xbb': b'\xc3\xbb',  # û
+    b'\xc3\x84\xc2\xbc': b'\xc3\xbc',  # ü
+    b'\xc3\x84\xc2\xbd': b'\xc3\xbd',  # ý
+    b'\xc3\x84\xc2\xbe': b'\xc3\xbe',  # þ
+    b'\xc3\x84\xc2\xbf': b'\xc3\xbf',  # ÿ
+    b'\xc3\x84\xc2\x80': b'\xc3\x80',  # À
+    b'\xc3\x84\xc2\x81': b'\xc3\x81',  # Á
+    b'\xc3\x84\xc2\x82': b'\xc3\x82',  # 
+    b'\xc3\x84\xc2\x83': b'\xc3\x83',  # Ã
+    b'\xc3\x84\xc2\x84': b'\xc3\x84',  # Ä
+    b'\xc3\x84\xc2\x85': b'\xc3\x85',  # Å
+    b'\xc3\x84\xc2\x86': b'\xc3\x86',  # Æ
+    b'\xc3\x84\xc2\x87': b'\xc3\x87',  # Ç
+    b'\xc3\x84\xc2\x88': b'\xc3\x88',  # È
+    b'\xc3\x84\xc2\x89': b'\xc3\x89',  # É
+    b'\xc3\x84\xc2\x8a': b'\xc3\x8a',  # Ê
+    b'\xc3\x84\xc2\x8b': b'\xc3\x8b',  # Ë
+    b'\xc3\x84\xc2\x8c': b'\xc3\x8c',  # Ì
+    b'\xc3\x84\xc2\x8d': b'\xc3\x8d',  # Í
+    b'\xc3\x84\xc2\x8e': b'\xc3\x8e',  # Î
+    b'\xc3\x84\xc2\x8f': b'\xc3\x8f',  # Ï
+    b'\xc3\x84\xc2\x90': b'\xc3\x90',  # Ð
+    b'\xc3\x84\xc2\x91': b'\xc3\x91',  # Ñ
+    b'\xc3\x84\xc2\x92': b'\xc3\x92',  # Ò
+    b'\xc3\x84\xc2\x93': b'\xc3\x93',  # Ó
+    b'\xc3\x84\xc2\x94': b'\xc3\x94',  # Ô
+    b'\xc3\x84\xc2\x95': b'\xc3\x95',  # Õ
+    b'\xc3\x84\xc2\x96': b'\xc3\x96',  # Ö
+    b'\xc3\x84\xc2\x97': b'\xc3\x97',  # ×
+    b'\xc3\x84\xc2\x98': b'\xc3\x98',  # Ø
+    b'\xc3\x84\xc2\x99': b'\xc3\x99',  # Ù
+    b'\xc3\x84\xc2\x9a': b'\xc3\x9a',  # Ú
+    b'\xc3\x84\xc2\x9b': b'\xc3\x9b',  # Ü
+    b'\xc3\x84\xc2\x9c': b'\xc3\x9c',  # Ù
+    b'\xc3\x84\xc2\x9d': b'\xc3\x9d',  # Ý
+    b'\xc3\x84\xc2\x9e': b'\xc3\x9e',  # Þ
+    b'\xc3\x84\xc2\x9f': b'\xc4\x9f',  # ğ (Turkish g-breve)
+    b'\xc3\x84\xc2\xa0': b'\xc3\xa0',  # à
+}
+
+print('Looking for C3 84 C2 XX patterns...')
+import re
+pattern = re.compile(b'\xc3\x84\xc2[\x80-\xbf]')
+
+matches = list(pattern.finditer(data))
+print(f'Found {len(matches)} occurrences')
+
+total = 0
+for bad, good in FIXES.items():
+    if bad in data:
+        count = data.count(bad)
+        data = data.replace(bad, good)
+        total += count
+        print(f'Fixed {count}x: {bad.hex()}')
+
+if total > 0:
+    with open('frontend/js/app.js', 'wb') as f:
+        f.write(data)
+    print(f'\nTotal: {total} bytes fixed')
+else:
+    print('No patterns found')
